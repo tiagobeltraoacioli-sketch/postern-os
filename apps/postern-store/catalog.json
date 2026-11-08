@@ -1,0 +1,1170 @@
+{
+  "schema": "postern.catalog/v1",
+  "generated": "2026-07-13",
+  "publisher": "Postern Labs",
+  "honesty": "This index's LIST is now SIGNED: a detached raw Ed25519 signature over the EXACT served bytes of this file is published beside it as catalog.json.sig, and the Store verifies it in-page against the curator key pinned in index.html (CATALOG_PUBKEY_B64), rendering VERIFIED. That signature proves only that the LIST came from Postern's curator key; it does NOT, and cannot, attest any upstream app binary. Every HOSTED per-app artifact below is still UNBUILT: its checksum and signing.signature stay null with signing.state = \"unpublished\" until a real build runs — the pmOS apk mirrors need a Linux/pmbootstrap build host (see pmos-overlay/HONESTY.md), the attestable-nix entries need the Postern OS Nix closure. A proprietary app can only ever be linked or proxied — it is structurally impossible for hosted_by_us to be true when license.class is \"proprietary\". The 'attestable' badge is reserved for tier = attestable-nix (built from source inside the reproducible Postern OS Nix closure); a signed apk mirror is NOT attestable.",
+  "index_signature": {
+    "scheme": "ed25519-detached",
+    "key_id": "postern-catalog@posternlabs.com",
+    "pubkey_b64": "xhW1EymjaCs8nAwYbFglWeGrTs4gMo8uoc2oV7nnAes=",
+    "sig_file": "catalog.json.sig",
+    "signature": null,
+    "state": "signed",
+    "note": "A DETACHED raw Ed25519 signature (64 bytes) over the EXACT served bytes of this file, published beside it as catalog.json.sig. The Store verifies it in-page with SubtleCrypto against the curator public key pinned in index.html as CATALOG_PUBKEY_B64 (identical to pubkey_b64 here) and renders VERIFIED. 'signature' stays null in-band because the signature is detached — it cannot sign over bytes that contain itself. Proves the LIST came from Postern's curator key; it does not, and cannot, attest each upstream app's binary. The private half is never committed (see pmos-overlay/keys/postern-keygen.sh)."
+  },
+  "vocab": {
+    "source": {
+      "native-linux": "Upstream native Linux build (from source or upstream binary).",
+      "flatpak": "Flathub / flatpak remote — sandboxed desktop app.",
+      "fdroid": "F-Droid — reproducible, FOSS-only Android repo (F-Droid signs).",
+      "waydroid-android": "Android app run in Waydroid, or its upstream APK — user brings their own.",
+      "web": "Runs in the browser / self-hosted web app; nothing to install locally.",
+      "postern-apk": "Alpine/pmOS apk that WE build+sign and host in the Postern overlay repo."
+    },
+    "tier": {
+      "attestable-nix": "Built from source inside the reproducible Postern OS Nix closure. The ONLY tier that earns the 'attestable' badge.",
+      "pmos-overlay": "Signed apk we host in the pmOS overlay. Proves who published it, NOT what it was built from. Not reproducible, not attestable.",
+      "sloboda-compat": "Android app reached via F-Droid, Waydroid, or the upstream APK. Trust chains to F-Droid or the upstream signer, not to us.",
+      "browser": "Web/self-hosted app opened in a browser. We host no binary; you run it or your own server does."
+    },
+    "license_class": {
+      "permissive": "MIT / BSD / Apache-2.0 — redistribute and rebrand both allowed.",
+      "weak-copyleft": "MPL-2.0 / LGPL — file/library-level copyleft; redistribute freely, rebrand allowed if modified files stay open.",
+      "strong-copyleft": "GPL / AGPL — redistribute freely; a rebranded fork must ship its full source under the same license.",
+      "proprietary": "Closed source. We may never host or rebrand it — link or proxy to the vendor only."
+    },
+    "distribution_model": {
+      "attest": "Built from source in the Postern OS Nix image; verity-sealed. hosted_by_us=true.",
+      "mirror": "We host an unmodified copy of the upstream binary as a signed apk. hosted_by_us=true.",
+      "overlay-build": "We build from source via an APKBUILD and host the signed apk. hosted_by_us=true.",
+      "link": "We only point at the upstream source (Flathub / F-Droid / vendor). hosted_by_us=false.",
+      "proxy": "We host a manifest/wrapper that fetches the upstream binary at install time — never the binary itself. hosted_by_us=false."
+    },
+    "rebrand_vs_redistribute": "redistribute = may we host the upstream binary as-is? rebrand = may we fork the source and ship it under Postern branding? Trademark can forbid using the upstream NAME/logo even when the license permits redistribution (Firefox/Thunderbird/Signal are the classic cases): those we link rather than mirror. Proprietary forbids both."
+  },
+  "apps": [
+    {
+      "id": "postern-vault",
+      "name": "Postern Vault",
+      "publisher": "Postern Labs",
+      "glyph": "V",
+      "category": "security",
+      "platform": "both",
+      "source": "native-linux",
+      "tier": "attestable-nix",
+      "oneliner": "First-party secrets/password vault, sealed with one canonical AEAD (XChaCha20-Poly1305 + Argon2id), software keystore — unaudited.",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": false,
+        "note": "Our own code; permissive by repo rule (deny.toml forbids GPL/AGPL)."
+      },
+      "distribution": {
+        "model": "attest",
+        "hosted_by_us": true,
+        "upstream": "https://posternlabs.com/vault",
+        "artifact": "nix-store://postern-os/vault",
+        "checksum": null,
+        "signing": {
+          "scheme": "nix-store+verity",
+          "state": "unpublished"
+        },
+        "verify": "Reproducible Nix build; verity-sealed in the Postern OS image."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "Secrets, encrypted at rest, never leave the device.",
+        "leaves": "Nothing."
+      },
+      "security": [
+        "post-quantum",
+        "tee-sealed",
+        "attestable",
+        "on-device-only"
+      ],
+      "capabilities": [
+        "store passwords",
+        "manage secrets",
+        "encrypted notes (planned)"
+      ],
+      "tags": [
+        "passwords",
+        "secrets",
+        "vault",
+        "keepass alternative",
+        "bitwarden alternative"
+      ],
+      "limits": "Built & tested at the crate level; the end-user UI is the remaining app layer."
+    },
+    {
+      "id": "postern-courier",
+      "name": "Postern Courier",
+      "publisher": "Postern Labs",
+      "glyph": "C",
+      "category": "files",
+      "platform": "both",
+      "source": "native-linux",
+      "tier": "attestable-nix",
+      "oneliner": "First-party serverless file drop over an ephemeral Tor onion, payload sealed post-quantum.",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": false,
+        "note": "Our own permissive code."
+      },
+      "distribution": {
+        "model": "attest",
+        "hosted_by_us": true,
+        "upstream": "https://posternlabs.com/courier",
+        "artifact": "nix-store://postern-os/courier",
+        "checksum": null,
+        "signing": {
+          "scheme": "nix-store+verity",
+          "state": "unpublished"
+        },
+        "verify": "Reproducible Nix build; verity-sealed in the Postern OS image."
+      },
+      "privacy": {
+        "level": "e2e",
+        "stays": "File contents — hybrid ML-KEM-sealed end-to-end to the recipient's key.",
+        "leaves": "Only ciphertext transits the Tor circuit."
+      },
+      "security": [
+        "post-quantum",
+        "over-tor",
+        "attestable"
+      ],
+      "capabilities": [
+        "send files without a server",
+        "serverless p2p file drop",
+        "scrub metadata first"
+      ],
+      "tags": [
+        "file",
+        "send",
+        "onionshare alternative",
+        "journalist",
+        "source"
+      ],
+      "limits": "Sender must stay online for the live transfer; onion address crypto is classical."
+    },
+    {
+      "id": "postern-os-desktop",
+      "name": "Postern OS Desktop",
+      "publisher": "Postern Labs",
+      "glyph": "O",
+      "category": "system",
+      "platform": "desktop",
+      "source": "native-linux",
+      "tier": "attestable-nix",
+      "oneliner": "First-party privacy Linux declared in Nix: reproducible image, Tor by default, zero telemetry.",
+      "license": {
+        "spdx": "MIT",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": false,
+        "note": "Our own Nix profile."
+      },
+      "distribution": {
+        "model": "attest",
+        "hosted_by_us": true,
+        "upstream": "https://posternlabs.com/os",
+        "artifact": "nix-store://postern-os/image",
+        "checksum": null,
+        "signing": {
+          "scheme": "nix-store+verity",
+          "state": "unpublished"
+        },
+        "verify": "Reproducible NixOS image; the root of the attestable tier."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "The OS sends nothing home: telemetry stripped, deny-inbound firewall, Tor client on.",
+        "leaves": "Only traffic you generate."
+      },
+      "security": [
+        "attestable",
+        "over-tor",
+        "post-quantum"
+      ],
+      "capabilities": [
+        "daily-driver OS",
+        "full-disk encryption",
+        "reproducible image",
+        "hardened browser"
+      ],
+      "tags": [
+        "os",
+        "nixos",
+        "linux",
+        "distro",
+        "hardened"
+      ],
+      "limits": "A NixOS profile to iterate, not a frozen distro; the image is not built in this sandbox (labeled designed)."
+    },
+    {
+      "id": "keepassxc",
+      "name": "KeePassXC",
+      "publisher": "KeePassXC Team",
+      "glyph": "K",
+      "category": "security",
+      "platform": "both",
+      "source": "flatpak",
+      "tier": "attestable-nix",
+      "oneliner": "Offline password manager with a local KDBX database — no cloud, no account.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPL permits a fork; the KeePassXC name/logo are the project's — a fork must be renamed. We build it unmodified in the Nix image."
+      },
+      "distribution": {
+        "model": "attest",
+        "hosted_by_us": true,
+        "upstream": "https://keepassxc.org/",
+        "artifact": "nix-store://postern-os/keepassxc",
+        "checksum": null,
+        "signing": {
+          "scheme": "nix-store+verity",
+          "state": "unpublished"
+        },
+        "verify": "Built from source in the Postern OS Nix closure — the attestation is of OUR image build, not of upstream's own binaries."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "The KDBX vault stays on your device.",
+        "leaves": "Nothing unless you enable browser integration or sync the file yourself."
+      },
+      "security": [
+        "on-device-only",
+        "attestable"
+      ],
+      "capabilities": [
+        "password manager",
+        "TOTP codes",
+        "KDBX database",
+        "browser autofill"
+      ],
+      "tags": [
+        "passwords",
+        "kdbx",
+        "keepass",
+        "offline",
+        "vault"
+      ],
+      "limits": "The 'attestable' badge covers our reproducible Nix build only; on Flathub/native you trust that channel's signer instead."
+    },
+    {
+      "id": "syncthing",
+      "name": "Syncthing",
+      "publisher": "Syncthing Foundation",
+      "glyph": "S",
+      "category": "files",
+      "platform": "both",
+      "source": "native-linux",
+      "tier": "attestable-nix",
+      "oneliner": "Continuous file sync directly between your own devices — no server in the middle.",
+      "license": {
+        "spdx": "MPL-2.0",
+        "class": "weak-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "MPL is file-level copyleft; redistribute freely. 'Syncthing' is a registered mark — a fork must drop the name."
+      },
+      "distribution": {
+        "model": "attest",
+        "hosted_by_us": true,
+        "upstream": "https://syncthing.net/",
+        "artifact": "nix-store://postern-os/syncthing",
+        "checksum": null,
+        "signing": {
+          "scheme": "nix-store+verity",
+          "state": "unpublished"
+        },
+        "verify": "Built from source in the Postern OS Nix closure."
+      },
+      "privacy": {
+        "level": "e2e",
+        "stays": "Your files stay on the devices you own; transfers are TLS between them.",
+        "leaves": "Metadata to global discovery/relay servers unless you disable them and pin device addresses."
+      },
+      "security": [
+        "on-device-only",
+        "attestable"
+      ],
+      "capabilities": [
+        "sync folders between devices",
+        "no cloud storage",
+        "versioned backups"
+      ],
+      "tags": [
+        "sync",
+        "backup",
+        "p2p",
+        "dropbox alternative",
+        "files"
+      ],
+      "limits": "Default discovery/relay servers see connection metadata; both are self-hostable."
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "publisher": "The GIMP Team",
+      "glyph": "G",
+      "category": "media",
+      "platform": "desktop",
+      "source": "flatpak",
+      "tier": "attestable-nix",
+      "oneliner": "Full raster image editor — a fully offline Photoshop alternative.",
+      "license": {
+        "spdx": "GPL-3.0-or-later",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPLv3+; a fork must rename off the GIMP mark."
+      },
+      "distribution": {
+        "model": "attest",
+        "hosted_by_us": true,
+        "upstream": "https://www.gimp.org/",
+        "artifact": "nix-store://postern-os/gimp",
+        "checksum": null,
+        "signing": {
+          "scheme": "nix-store+verity",
+          "state": "unpublished"
+        },
+        "verify": "Built from source in the Postern OS Nix closure."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "Everything — image editing is entirely on-device.",
+        "leaves": "Nothing."
+      },
+      "security": [
+        "on-device-only",
+        "attestable"
+      ],
+      "capabilities": [
+        "edit photos",
+        "retouch images",
+        "paint and draw",
+        "batch process"
+      ],
+      "tags": [
+        "image",
+        "photo",
+        "editor",
+        "photoshop alternative",
+        "graphics"
+      ],
+      "limits": "Not a vector tool; heavy files want RAM. The attestation is of our Nix build only."
+    },
+    {
+      "id": "vlc",
+      "name": "VLC media player",
+      "publisher": "VideoLAN",
+      "glyph": "▶",
+      "category": "media",
+      "platform": "both",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "oneliner": "Plays essentially any media file or stream, fully offline.",
+      "license": {
+        "spdx": "GPL-2.0-or-later",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPLv2+; redistribute freely. 'VLC' and the cone logo are VideoLAN marks — a fork must rename."
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://www.videolan.org/vlc/",
+        "artifact": "https://apk.posternlabs.com/v26.06/<arch>/vlc-postern.apk",
+        "checksum": null,
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@posternlabs.com",
+          "state": "unpublished"
+        },
+        "verify": "We host a SIGNED apk (proves we published it) — NOT reproducible, NOT attestable. See pmos-overlay/HONESTY.md."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "Local playback stays on-device.",
+        "leaves": "Only network streams you deliberately open."
+      },
+      "security": [
+        "on-device-only"
+      ],
+      "capabilities": [
+        "play video and audio",
+        "play any format",
+        "open network streams"
+      ],
+      "tags": [
+        "video",
+        "audio",
+        "player",
+        "media",
+        "codec"
+      ],
+      "limits": "Signed, not attestable: the signature proves the publisher, not that the binary matches source."
+    },
+    {
+      "id": "libreoffice",
+      "name": "LibreOffice",
+      "publisher": "The Document Foundation",
+      "glyph": "L",
+      "category": "files",
+      "platform": "both",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "oneliner": "Complete offline office suite — documents, spreadsheets, presentations.",
+      "license": {
+        "spdx": "MPL-2.0",
+        "class": "weak-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "MPL-2.0; redistribute freely. 'LibreOffice' is a TDF mark — a fork must rename (as Collabora/OxOffice do)."
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://www.libreoffice.org/",
+        "artifact": "https://apk.posternlabs.com/v26.06/<arch>/libreoffice-postern.apk",
+        "checksum": null,
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@posternlabs.com",
+          "state": "unpublished"
+        },
+        "verify": "Signed apk in the Postern overlay — signed, not attestable."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "Your documents stay on the device.",
+        "leaves": "Nothing unless you enable an online feature. Run Postern Hygiene before sharing — office files carry author/GPS metadata."
+      },
+      "security": [
+        "on-device-only"
+      ],
+      "capabilities": [
+        "write documents",
+        "edit spreadsheets",
+        "make presentations",
+        "open .docx / .xlsx"
+      ],
+      "tags": [
+        "office",
+        "documents",
+        "word",
+        "excel",
+        "microsoft office alternative"
+      ],
+      "limits": "Signed, not attestable. Large suite — the pmOS build is heavy on mobile."
+    },
+    {
+      "id": "onionshare",
+      "name": "OnionShare",
+      "publisher": "Micah Lee / OnionShare",
+      "glyph": "◉",
+      "category": "files",
+      "platform": "desktop",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "oneliner": "Share files, host a site, or chat over your own temporary Tor onion service.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPLv3; a fork must rename off the OnionShare mark."
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://onionshare.org/",
+        "artifact": "https://apk.posternlabs.com/v26.06/<arch>/onionshare-postern.apk",
+        "checksum": null,
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@posternlabs.com",
+          "state": "unpublished"
+        },
+        "verify": "Signed apk in the overlay; upstream also publishes GPG-signed releases you can cross-check."
+      },
+      "privacy": {
+        "level": "e2e",
+        "stays": "Files and the service run on your own machine.",
+        "leaves": "Only over the Tor circuit to the recipient's onion address."
+      },
+      "security": [
+        "over-tor",
+        "on-device-only"
+      ],
+      "capabilities": [
+        "share files anonymously",
+        "host a temporary website",
+        "anonymous chat"
+      ],
+      "tags": [
+        "file",
+        "share",
+        "tor",
+        "anonymous",
+        "onion",
+        "journalist"
+      ],
+      "limits": "Sender stays online during the transfer; Tor endpoint timing analysis remains out of scope."
+    },
+    {
+      "id": "cryptomator",
+      "name": "Cryptomator",
+      "publisher": "Skymatic",
+      "glyph": "◧",
+      "category": "security",
+      "platform": "both",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "oneliner": "Client-side encryption for any cloud folder — the provider only ever sees ciphertext.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "Desktop app is GPLv3; a fork must rename. (The mobile apps carry their own terms upstream.)"
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://cryptomator.org/",
+        "artifact": "https://apk.posternlabs.com/v26.06/<arch>/cryptomator-postern.apk",
+        "checksum": null,
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@posternlabs.com",
+          "state": "unpublished"
+        },
+        "verify": "Signed apk in the overlay — signed, not attestable."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "Encryption keys and plaintext stay on the device.",
+        "leaves": "Only encrypted vault files, to whatever cloud folder you point it at."
+      },
+      "security": [
+        "on-device-only"
+      ],
+      "capabilities": [
+        "encrypt cloud files",
+        "transparent vault folder",
+        "protect Dropbox / Nextcloud data"
+      ],
+      "tags": [
+        "encryption",
+        "cloud",
+        "vault",
+        "dropbox",
+        "veracrypt alternative"
+      ],
+      "limits": "Protects file contents, not filenames-count/size metadata the cloud can still see."
+    },
+    {
+      "id": "mumble",
+      "name": "Mumble",
+      "publisher": "Mumble Project",
+      "glyph": "◌",
+      "category": "communication",
+      "platform": "both",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "oneliner": "Low-latency voice chat you can self-host — permissively licensed.",
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": false,
+        "note": "Permissive — redistribute and rebrand both allowed with attribution."
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://www.mumble.info/",
+        "artifact": "https://apk.posternlabs.com/v26.06/<arch>/mumble-postern.apk",
+        "checksum": null,
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@posternlabs.com",
+          "state": "unpublished"
+        },
+        "verify": "Signed apk in the overlay — signed, not attestable."
+      },
+      "privacy": {
+        "level": "metadata-exposed",
+        "stays": "Your identity/certificate is local.",
+        "leaves": "Voice + who-talks-to-whom to the server you connect to; run your own for control. Not end-to-end encrypted by default."
+      },
+      "security": [],
+      "capabilities": [
+        "group voice chat",
+        "self-hosted voice server",
+        "push to talk"
+      ],
+      "tags": [
+        "voice",
+        "chat",
+        "teamspeak alternative",
+        "discord alternative",
+        "gaming"
+      ],
+      "limits": "Transport is client↔server TLS, not end-to-end; the server operator can hear channels unless configured otherwise."
+    },
+    {
+      "id": "thunderbird",
+      "name": "Mozilla Thunderbird",
+      "publisher": "MZLA / Mozilla",
+      "glyph": "T",
+      "category": "communication",
+      "platform": "desktop",
+      "source": "flatpak",
+      "tier": "pmos-overlay",
+      "oneliner": "Full desktop email client with built-in OpenPGP encryption.",
+      "license": {
+        "spdx": "MPL-2.0",
+        "class": "weak-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": false,
+        "trademark": true,
+        "note": "MPL code is free, but the Thunderbird NAME + logo are Mozilla trademarks: we may NOT ship a 'Thunderbird'-branded build. So we LINK to Flathub, never mirror under the name. A rebranded fork must strip Mozilla branding."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://www.thunderbird.net/",
+        "artifact": "https://flathub.org/apps/org.mozilla.Thunderbird",
+        "checksum": null,
+        "signing": {
+          "scheme": "flathub",
+          "state": "upstream"
+        },
+        "verify": "Install from Flathub; Flathub and Mozilla sign their builds. We host nothing."
+      },
+      "privacy": {
+        "level": "e2e",
+        "stays": "OpenPGP private keys and local mail store stay on-device.",
+        "leaves": "Mail to/from your providers (SMTP/IMAP see everything unencrypted mail carries); PGP protects body, not headers/subject on older setups."
+      },
+      "security": [],
+      "capabilities": [
+        "read and send email",
+        "OpenPGP encryption",
+        "multiple accounts",
+        "calendar"
+      ],
+      "tags": [
+        "email",
+        "mail",
+        "pgp",
+        "outlook alternative",
+        "imap"
+      ],
+      "limits": "Trademark forces link-only: we can't distribute a build called Thunderbird. Email metadata is inherently exposed to providers."
+    },
+    {
+      "id": "newpipe",
+      "name": "NewPipe",
+      "publisher": "TeamNewPipe",
+      "glyph": "N",
+      "category": "media",
+      "platform": "mobile",
+      "source": "fdroid",
+      "tier": "sloboda-compat",
+      "oneliner": "Watch YouTube and other sites with no Google account, ads, or background tracking.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPLv3; a fork must rename off the NewPipe mark."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://newpipe.net/",
+        "artifact": "https://f-droid.org/packages/org.schabi.newpipe/",
+        "checksum": null,
+        "signing": {
+          "scheme": "fdroid",
+          "state": "upstream"
+        },
+        "verify": "Install from F-Droid, which builds from source and signs. We host nothing."
+      },
+      "privacy": {
+        "level": "metadata-exposed",
+        "stays": "No account, no watch history synced anywhere.",
+        "leaves": "Your requests still reach the origin site (e.g. YouTube), which sees your IP and what you fetch."
+      },
+      "security": [],
+      "capabilities": [
+        "watch YouTube without an account",
+        "background audio",
+        "download videos",
+        "no ads"
+      ],
+      "tags": [
+        "youtube",
+        "video",
+        "no account",
+        "no ads",
+        "streaming"
+      ],
+      "limits": "Depends on scraping origin sites; breaks when they change. The origin still sees your IP/requests."
+    },
+    {
+      "id": "aegis",
+      "name": "Aegis Authenticator",
+      "publisher": "Beem Development",
+      "glyph": "◆",
+      "category": "security",
+      "platform": "mobile",
+      "source": "fdroid",
+      "tier": "sloboda-compat",
+      "oneliner": "Offline TOTP/HOTP two-factor codes in an encrypted local vault.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPLv3; a fork must rename off the Aegis mark."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://getaegis.app/",
+        "artifact": "https://f-droid.org/packages/com.beemdevelopment.aegis/",
+        "checksum": null,
+        "signing": {
+          "scheme": "fdroid",
+          "state": "upstream"
+        },
+        "verify": "Install from F-Droid; it builds and signs from source. We host nothing."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "All 2FA secrets — encrypted at rest on the device.",
+        "leaves": "Nothing; codes are generated offline."
+      },
+      "security": [
+        "on-device-only"
+      ],
+      "capabilities": [
+        "two-factor codes",
+        "TOTP and HOTP",
+        "encrypted export",
+        "authy alternative"
+      ],
+      "tags": [
+        "2fa",
+        "totp",
+        "authenticator",
+        "authy alternative",
+        "offline"
+      ],
+      "limits": "Back up your encrypted export yourself — there is no cloud recovery by design."
+    },
+    {
+      "id": "briar",
+      "name": "Briar",
+      "publisher": "Briar Project",
+      "glyph": "B",
+      "category": "communication",
+      "platform": "mobile",
+      "source": "fdroid",
+      "tier": "sloboda-compat",
+      "oneliner": "Peer-to-peer messaging over Tor — or Wi-Fi/Bluetooth when the internet is down.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "GPLv3; a fork must rename off the Briar mark."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://briarproject.org/",
+        "artifact": "https://f-droid.org/packages/org.briarproject.briar.android/",
+        "checksum": null,
+        "signing": {
+          "scheme": "fdroid",
+          "state": "upstream"
+        },
+        "verify": "Install from F-Droid; upstream also publishes reproducible-build verification. We host nothing."
+      },
+      "privacy": {
+        "level": "e2e",
+        "stays": "Messages and contacts — stored encrypted on-device; no central server.",
+        "leaves": "Only end-to-end encrypted traffic over Tor (or local radio); no phone number or account."
+      },
+      "security": [
+        "over-tor",
+        "on-device-only"
+      ],
+      "capabilities": [
+        "encrypted messaging",
+        "works without internet",
+        "no phone number",
+        "forums and blogs"
+      ],
+      "tags": [
+        "messaging",
+        "tor",
+        "offline",
+        "signal alternative",
+        "activist"
+      ],
+      "limits": "Both parties must add each other; no async delivery if neither device is reachable."
+    },
+    {
+      "id": "organic-maps",
+      "name": "Organic Maps",
+      "publisher": "Organic Maps",
+      "glyph": "M",
+      "category": "assistants",
+      "platform": "mobile",
+      "source": "fdroid",
+      "tier": "sloboda-compat",
+      "oneliner": "Offline maps and turn-by-turn navigation from OpenStreetMap — no tracking.",
+      "license": {
+        "spdx": "Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "Apache-2.0 — permissive; the 'Organic Maps' name/logo are the project's, so a fork must rename."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://organicmaps.app/",
+        "artifact": "https://f-droid.org/packages/app.organicmaps/",
+        "checksum": null,
+        "signing": {
+          "scheme": "fdroid",
+          "state": "upstream"
+        },
+        "verify": "Install from F-Droid. We host nothing."
+      },
+      "privacy": {
+        "level": "local-only",
+        "stays": "Downloaded maps and your location stay on the device.",
+        "leaves": "Nothing during navigation; only the map downloads you request."
+      },
+      "security": [
+        "on-device-only"
+      ],
+      "capabilities": [
+        "offline maps",
+        "turn-by-turn navigation",
+        "hiking and cycling routes",
+        "no tracking"
+      ],
+      "tags": [
+        "maps",
+        "navigation",
+        "gps",
+        "offline",
+        "google maps alternative"
+      ],
+      "limits": "Map data quality is whatever OpenStreetMap has for the area; no live traffic."
+    },
+    {
+      "id": "signal-android",
+      "name": "Signal (Android)",
+      "publisher": "Signal Foundation",
+      "glyph": "◈",
+      "category": "communication",
+      "platform": "mobile",
+      "source": "waydroid-android",
+      "tier": "sloboda-compat",
+      "oneliner": "Modern end-to-end encrypted messenger and calls; the client is open source.",
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": false,
+        "trademark": true,
+        "note": "Client is GPLv3, but 'Signal' is a registered mark and the Foundation asks that their build not be redistributed under the Signal name — so we LINK to the upstream APK, we do not mirror or rebrand it."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://signal.org/android/apk/",
+        "artifact": "https://signal.org/android/apk/",
+        "checksum": null,
+        "signing": {
+          "scheme": "upstream-apk",
+          "state": "upstream"
+        },
+        "verify": "Install the official APK from signal.org (or Play). We host nothing and do not rebrand it."
+      },
+      "privacy": {
+        "level": "e2e",
+        "stays": "Message contents — end-to-end encrypted; keys only on your devices.",
+        "leaves": "Ciphertext plus minimal metadata to Signal's servers; registration needs a phone number."
+      },
+      "security": [],
+      "capabilities": [
+        "encrypted messaging",
+        "encrypted calls",
+        "disappearing messages"
+      ],
+      "tags": [
+        "messaging",
+        "encrypted",
+        "whatsapp alternative",
+        "calls",
+        "signal"
+      ],
+      "limits": "Requires a phone number; runs in Waydroid on a Linux phone, not natively. FOSS client, but we link rather than repackage."
+    },
+    {
+      "id": "jitsi-meet",
+      "name": "Jitsi Meet",
+      "publisher": "Jitsi / 8x8",
+      "glyph": "J",
+      "category": "communication",
+      "platform": "both",
+      "source": "web",
+      "tier": "browser",
+      "oneliner": "Self-hostable group video calls in the browser — no account, no install.",
+      "license": {
+        "spdx": "Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "Apache-2.0 — permissive; a self-hosted deployment must drop the Jitsi trademark if rebranded."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://jitsi.org/",
+        "artifact": "https://meet.jit.si/",
+        "checksum": null,
+        "signing": {
+          "scheme": "web",
+          "state": "upstream"
+        },
+        "verify": "Run your own server, or use meet.jit.si. We host no instance."
+      },
+      "privacy": {
+        "level": "metadata-exposed",
+        "stays": "Nothing local to install.",
+        "leaves": "Audio/video to whichever server hosts the room; the server sees participants. E2EE is optional and browser-dependent. Self-host for control."
+      },
+      "security": [],
+      "capabilities": [
+        "group video calls",
+        "screen sharing",
+        "no account needed",
+        "self-hosted meetings"
+      ],
+      "tags": [
+        "video call",
+        "conference",
+        "zoom alternative",
+        "meetings",
+        "self-hosted"
+      ],
+      "limits": "On a shared public instance the operator is in the media path unless E2EE is on for every participant."
+    },
+    {
+      "id": "nextcloud",
+      "name": "Nextcloud",
+      "publisher": "Nextcloud GmbH",
+      "glyph": "☁",
+      "category": "files",
+      "platform": "both",
+      "source": "web",
+      "tier": "browser",
+      "oneliner": "Self-hosted files, calendar, and collaboration — your own server, your data.",
+      "license": {
+        "spdx": "AGPL-3.0-only",
+        "class": "strong-copyleft",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true,
+        "trademark": true,
+        "note": "AGPL-3.0 — network copyleft: any modified server you expose must offer its source. 'Nextcloud' is a mark; a rebranded fork must rename."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://nextcloud.com/",
+        "artifact": "https://nextcloud.com/install/",
+        "checksum": null,
+        "signing": {
+          "scheme": "web",
+          "state": "upstream"
+        },
+        "verify": "You (or a provider you choose) run the server. We host no instance and store none of your data."
+      },
+      "privacy": {
+        "level": "metadata-exposed",
+        "stays": "Whatever stays on the server you control.",
+        "leaves": "Everything to the server operator — which is you if self-hosted, or your chosen provider otherwise."
+      },
+      "security": [],
+      "capabilities": [
+        "file sync and share",
+        "calendar and contacts",
+        "collaborative docs",
+        "self-hosted cloud"
+      ],
+      "tags": [
+        "cloud",
+        "files",
+        "self-hosted",
+        "google drive alternative",
+        "collaboration"
+      ],
+      "limits": "Only as private as the server you run it on; AGPL applies if you expose a modified build."
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "publisher": "Spotify AB",
+      "glyph": "♪",
+      "category": "media",
+      "platform": "both",
+      "source": "web",
+      "tier": "browser",
+      "oneliner": "Proprietary music streaming. Listed for reference — we can only link, never host.",
+      "license": {
+        "spdx": "LicenseRef-Proprietary",
+        "class": "proprietary",
+        "foss": false,
+        "redistribute": false,
+        "rebrand": false,
+        "trademark": true,
+        "note": "Closed source. We may not host, mirror, or rebrand it under any circumstances — link or proxy only."
+      },
+      "distribution": {
+        "model": "proxy",
+        "hosted_by_us": false,
+        "upstream": "https://www.spotify.com/",
+        "artifact": "https://open.spotify.com/",
+        "checksum": null,
+        "signing": {
+          "scheme": "none",
+          "state": "vendor"
+        },
+        "verify": "Use the web player, or the community Flathub manifest that DOWNLOADS Spotify's own binary at install (a proxy — even Flathub hosts no binary). We host neither the binary nor a manifest."
+      },
+      "privacy": {
+        "level": "metadata-exposed",
+        "stays": "Nothing you can verify — it is closed source.",
+        "leaves": "Account, listening history, and device telemetry to Spotify. This is not a private app; it is here so the catalog is honest about the boundary."
+      },
+      "security": [],
+      "capabilities": [
+        "stream music",
+        "playlists",
+        "podcasts"
+      ],
+      "tags": [
+        "music",
+        "streaming",
+        "proprietary",
+        "spotify"
+      ],
+      "limits": "PROPRIETARY: closed binary, telemetry you cannot inspect. Structurally link/proxy only — the store will never host it."
+    },
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp",
+      "publisher": "Meta Platforms",
+      "glyph": "✆",
+      "category": "communication",
+      "platform": "mobile",
+      "source": "waydroid-android",
+      "tier": "sloboda-compat",
+      "oneliner": "Proprietary messenger. Listed for reference — bring your own; we can only link.",
+      "license": {
+        "spdx": "LicenseRef-Proprietary",
+        "class": "proprietary",
+        "foss": false,
+        "redistribute": false,
+        "rebrand": false,
+        "trademark": true,
+        "note": "Closed source, Meta-owned. We may never host, mirror, or rebrand it — link only."
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://www.whatsapp.com/",
+        "artifact": "https://www.whatsapp.com/android/",
+        "checksum": null,
+        "signing": {
+          "scheme": "none",
+          "state": "vendor"
+        },
+        "verify": "Install the vendor's own APK / Play build inside Waydroid yourself. We host nothing and endorse nothing about its privacy."
+      },
+      "privacy": {
+        "level": "metadata-exposed",
+        "stays": "Message bodies are E2E encrypted, but that is Meta's own unverifiable claim.",
+        "leaves": "Contacts, metadata (who/when/how often), and device signals to Meta. A phone number is required."
+      },
+      "security": [],
+      "capabilities": [
+        "messaging",
+        "voice and video calls"
+      ],
+      "tags": [
+        "messaging",
+        "chat",
+        "proprietary",
+        "meta"
+      ],
+      "limits": "PROPRIETARY: closed source; message-content encryption is unverifiable and metadata is extensive. Structurally link-only."
+    }
+  ]
+}

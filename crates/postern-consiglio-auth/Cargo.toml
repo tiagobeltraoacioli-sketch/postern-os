@@ -1,0 +1,82 @@
+# Postern Enterprise — "wallet-as-login" (Consiglio edition).
+#
+# Org authentication that uses the Postern PQ wallet as the identity: the server
+# issues a random challenge, the wallet signs it with its hybrid Falcon ‖ ML-DSA
+# key, the server verifies the signature against the ENROLLED public key. No
+# passwords, no shared secret — the private key never leaves the wallet.
+#
+# This crate does NOT roll its own crypto: the signature is verified with the
+# real `bloch_crypto::crypto::verify` (the same hybrid PQ verifier the Bloch-SIS
+# node uses on the consensus path). Client-side signing in production is done by
+# the wallet / `postern-wallet` CLU (bloch-crypto's `wallet::cli`); the
+# `client-demo` feature exposes a thin signer over the SAME primitive so the demo
+# and tests can drive an end-to-end login without duplicating key handling.
+#
+# Honesty: wallet-as-login is novel and UNAUDITED. This is a compiling MVP
+# scaffold (challenge/response + enrollment + replay guard + RBAC gate), NOT a
+# hardened IAM. See lib.rs for the stub-vs-real ledger.
+[package]
+name = "postern-consiglio-auth"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Enterprise wallet-as-login: challenge/response org auth where the Postern PQ wallet (Falcon ‖ ML-DSA) is the identity. Verifies with the real bloch-crypto PQ verifier; reference IAM scaffold, unaudited."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_consiglio_auth"
+
+[features]
+# `server`      — the verifier: challenge issuance, in-memory enrollment store,
+#                 replay-nonce guard, and RBAC session gate. This is the
+#                 relying-party side and is on by default.
+# `client-demo` — a thin challenge signer over `bloch_crypto::crypto::sign`
+#                 (the SAME primitive the wallet uses). Present so the demo/tests
+#                 can complete a login; production signing lives in the wallet.
+default      = ["server", "client-demo"]
+server       = []
+client-demo  = []
+# `verifier-bin` — build the `consiglio-verify` CLI: the REAL hybrid-PQ login
+#                  verifier the console's JS bridge spawns (replaces the JS
+#                  `"SIG(...)"` stub). Opt-in so a plain `cargo test` on the lib
+#                  does not build the extra binary.
+verifier-bin = ["client-demo"]
+
+# The real verifier tool the console JS bridge invokes. Off by default; build
+# with `cargo build --release --features verifier-bin`.
+[[bin]]
+name              = "consiglio-verify"
+path              = "src/bin/consiglio-verify.rs"
+required-features = ["verifier-bin"]
+
+# DEMO-ONLY signer, used by the console self-check to produce a real login
+# attempt for the verifier. Production signing is the wallet's job.
+[[bin]]
+name              = "consiglio-sign"
+path              = "src/bin/consiglio-sign.rs"
+required-features = ["verifier-bin"]
+
+[dependencies]
+# The REAL post-quantum crypto surface: hybrid Falcon-1024 ‖ ML-DSA-65 sign/verify.
+# Same git source + rev every other Postern crate consumes it from
+# (see crates/postern-seal-companion). Default features only (no `node`/RPC).
+#
+# R6 DEP-PIN (single rev-pin coordinator): pinned to ONE merged consensus-bundle
+# commit, NOT a floating branch, so this crate, postern-seal-companion, and the
+# mobile byte-identity golden (mobile/core/Cargo.toml) all resolve to the SAME
+# node bytes.
+#
+# RESOLVED: the rev below is a concrete 40-hex commit and all three Cargo.toml
+# files (this crate, postern-seal-companion, mobile/core) agree on it. The real
+# hybrid-PQ path links and runs: `cargo test -p postern-consiglio-auth` passes
+# 12/12, and `cargo build --release --features verifier-bin --bins` produces the
+# `consiglio-verify` + `consiglio-sign` binaries. This is no longer a placeholder.
+# To advance the pin: bump `rev` here + in the other two Cargo.toml (one string),
+# then `cargo update -p bloch-crypto` to regenerate Cargo.lock.
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+sha3       = "0.10"   # domain-separated login transcript (SHA3-256), matches bloch-crypto
+rand       = "0.9"    # CSPRNG for the challenge nonce
+serde      = { version = "1", features = ["derive"] }  # wire types
+serde_json = "1"
+thiserror  = "2"
+chrono     = { version = "0.4", features = ["serde"] }  # challenge issued_at / expiry

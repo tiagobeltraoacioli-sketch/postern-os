@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<resources>
+    <!-- Porog: the app name for the Postern Container (Android). Slavic for the
+         threshold/porog of the guardian's hut. Name PROPOSED, pending trademark
+         clearance. "Postern" is the suite brand; "Porog" is this app. -->
+    <string name="app_name">Porog</string>
+    <string name="dpc_label">Porog</string>
+    <string name="dpc_description">Porog manages an isolated work profile: separate encrypted storage, screenshots off, an input-method allowlist, Tor-only networking, and a container-only wipe. The single guarded threshold that joins your ordinary phone and a hardened workspace — one door, one device. It attests the phone, not the workspace — hardened, not anonymous. Design only; unaudited.</string>
+
+    <!-- ─────────────────────────────────────────────────────────────────────
+         Onboarding UI copy (Dev 2 / A2). Every user-facing claim here is bound
+         by the honesty rails (scripts/check-trust-labels.sh): Porog attests the
+         PHONE, not the workspace; it is a self-enrolled PROFILE-OWNER DPC, never
+         device-owner; never "Postern OS"; never measured-boot / Postern Seal;
+         distribution is sideload / F-Droid first (no Play Store claims); the
+         names are proposed, pending trademark clearance; SCAFFOLD · UNAUDITED.
+         ───────────────────────────────────────────────────────────────────── -->
+
+    <!-- The mandatory honesty banner. "key-attested" and its qualifier
+         "not a measured-boot workspace" MUST stay in the same string (±3-line
+         rule). Kept verbatim across surfaces. -->
+    <string name="onboarding_honesty_banner">Hardened, not anonymous · key-attested device, not a measured-boot workspace · DESIGN ONLY · UNAUDITED</string>
+
+    <!-- Secondary honesty rows shown under the banner. -->
+    <string name="onboarding_honesty_row_profile">Self-enrolled profile-owner work profile on stock Android — never device-owner, never a new OS, never “Postern OS”.</string>
+    <string name="onboarding_honesty_row_attest">Attests the phone, not the workspace. Not the Postern Seal and not measured boot. A rooted or kernel-compromised host defeats the whole boundary.</string>
+    <string name="onboarding_honesty_row_distribution">Sideload / F-Droid first; no Play Store claims. “Porog” is a proposed name, pending trademark clearance.</string>
+    <string name="onboarding_honesty_row_scaffold">SCAFFOLD · reference-prototype · UNAUDITED · never provisioned on hardware. built ≠ booted, emulator ≠ hardware, self-checked ≠ audited.</string>
+
+    <!-- Screen framing. -->
+    <string name="onboarding_title">Porog</string>
+    <string name="onboarding_subtitle">One guarded threshold between your ordinary phone and a hardened work profile — one door, one device.</string>
+    <string name="onboarding_body">Creating a Porog adds a second, separately encrypted Android work profile that you own on your own stock, un-rooted phone. Nothing is rooted, no OS is replaced, and no Google binaries are installed by Porog.</string>
+
+    <!-- The single one-tap CTA → ACTION_PROVISION_MANAGED_PROFILE. -->
+    <string name="onboarding_cta_create">Create Porog</string>
+    <string name="onboarding_cta_hint">Opens Android’s own provisioning consent screen. You confirm the profile-owner privilege there; Porog cannot grant it to itself.</string>
+
+    <!-- Honest result rendering. Dispatched must NEVER read as "ready". -->
+    <string name="onboarding_result_heading">Provisioning status</string>
+    <string name="onboarding_result_idle">No work profile requested yet.</string>
+    <string name="onboarding_result_dispatched_title">Provisioning dispatched — not ready yet</string>
+    <string name="onboarding_result_dispatched_body">Android accepted the request and is creating the work profile. Enrollment only truly completes inside the new profile (the DPC’s onProfileProvisioningComplete). This screen, on the personal side, cannot and does not confirm the profile is ready.</string>
+    <string name="onboarding_result_cancelled_title">Cancelled</string>
+    <string name="onboarding_result_cancelled_body">You backed out of Android’s provisioning screen. No work profile was created.</string>
+    <string name="onboarding_result_unsupported_title">This device can’t host a Porog</string>
+    <string name="onboarding_result_unsupported_body">Android reports it cannot create a managed profile here (missing FEATURE_MANAGED_USERS, provisioning disallowed, or a work profile already exists). An honest dead-end — Porog does not fake it.</string>
+    <string name="onboarding_result_failed_title">Provisioning failed</string>
+    <string name="onboarding_result_failed_body">Android returned a non-OK result code. No work profile was created.</string>
+    <string name="onboarding_result_failed_code">Result code: %1$d</string>
+    <string name="onboarding_result_unsupported_reason">Reason: %1$s</string>
+
+    <!-- Personal-side Suspend / Resume (quiet-mode) tile. Quiet mode is a
+         parent/personal-context action, toggled from here, not from inside the
+         profile. -->
+    <string name="suspend_tile_title">Pause work profile</string>
+    <string name="suspend_tile_body">Quiet mode stops the work profile’s apps, silences its notifications, and halts its background work. Toggle it from here, on the personal side.</string>
+    <string name="suspend_tile_action_suspend">Pause Porog</string>
+    <string name="suspend_tile_action_resume">Resume Porog</string>
+    <string name="suspend_tile_state_active">State: running (last known)</string>
+    <string name="suspend_tile_state_paused">State: paused (last known)</string>
+    <string name="suspend_tile_state_unknown">State: unknown from the personal side</string>
+    <string name="suspend_tile_caveat">The OS is authoritative for quiet mode. This tile shows the last action you took, not a live cross-profile read — the personal side cannot fully see into the profile it owns.</string>
+    <string name="suspend_tile_request_failed">Android declined or intercepted the quiet-mode request.</string>
+</resources>

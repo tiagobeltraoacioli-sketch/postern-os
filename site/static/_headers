@@ -1,0 +1,103 @@
+# =============================================================================
+# public/_headers — HTTP security headers for the Cloudflare Pages project
+# serving BOTH posternlabs.com AND posternpool.com (same project, same files).
+#
+# Scope & honesty: these headers reduce attack surface (clickjacking, MIME
+# sniffing, referrer leakage, powerful-feature abuse, protocol downgrade). They
+# do NOT make the site "secure" and make no claim about the products or the
+# protocol. Nothing here is confirmed until it is deployed and verified with
+# the checks listed at the bottom of this file.
+#
+# Cloudflare _headers format used below:
+#   - A rule = one path/URL line, then 2-space-indented "Header-Name: value"
+#     lines directly under it, with NO blank line or comment between them.
+#   - Blank line separates rules. Comments start with "#" in column 0 only
+#     (indented "#" comments are avoided to stay parser-safe).
+#   - Multiple matching rules are additive; for the SAME header the more
+#     specific / later rule wins. "/*" is the baseline; "/media/*" only
+#     overrides Cache-Control.
+#   - This file ONLY affects responses from THIS Pages origin. The ISO/.img
+#     downloads live on https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev
+#     and are served with R2's own headers — nothing here touches them.
+# =============================================================================
+
+# --- Baseline rule "/*": applies to every response (HTML, JSON, media). ------
+#
+# Strict-Transport-Security: force HTTPS for a year across every subdomain
+#   (apk.posternlabs.com is already HTTPS-only, so includeSubDomains is safe).
+#   "preload" is INERT until the apex is submitted to https://hstspreload.org;
+#   before submitting confirm (1) the apex serves this exact header, (2)
+#   includeSubDomains is present, (3) EVERY subdomain of each apex is HTTPS-only
+#   forever — preload is effectively irreversible. Cloudflare already 301s
+#   http->https on its own.
+# X-Content-Type-Options: nosniff — no MIME sniffing; declared type is honored.
+# X-Frame-Options: DENY — legacy anti-clickjacking. The modern equivalent,
+#   CSP "frame-ancestors 'none'", SUPERSEDES this and is left to the CSP owner
+#   (the <meta> in each page) to avoid a split policy; this is the old-browser
+#   fallback.
+# Referrer-Policy: no-referrer — matches the site's "zero tracking" posture;
+#   leaks nothing to outbound links or to the demo apps' api.anthropic.com
+#   calls. (Alt if same-origin analytics ever needs it:
+#   strict-origin-when-cross-origin.)
+# Permissions-Policy: "()" disables a feature everywhere. microphone/fullscreen/
+#   autoplay are scoped to (self), NOT disabled, because same-origin demo apps
+#   use them: microphone -> Web Speech API SpeechRecognition (store, sotto,
+#   tolmach, tolmach-subscription, vedetta, onboard) which Chromium gates behind
+#   the microphone permission-policy, so bare microphone=() WOULD BREAK voice
+#   features; fullscreen -> <video> full-screen; autoplay -> same-origin video.
+#   clipboard-write is DELIBERATELY OMITTED (keeps its secure default of self)
+#   because explorer + tolmach use navigator.clipboard.write() for copy buttons.
+#   Tighten microphone to () only if the voice demos are deemed expendable.
+# Cross-Origin-Opener-Policy: same-origin — isolates from cross-origin openers;
+#   safe because outbound links already use rel="noopener".
+# Cross-Origin-Resource-Policy: same-origin — our images/videos/catalog.json are
+#   consumed only same-origin; this stops hot-linking and governs OUR responses
+#   only. It does NOT affect the cross-origin R2 downloads (top-level
+#   navigations) or the apps' outbound api.anthropic.com fetches.
+# NOT set: Cross-Origin-Embedder-Policy. COEP:require-corp would demand CORP/
+#   CORS opt-ins on every cross-origin load and can break the R2 downloads and
+#   the api.anthropic.com fetches; cross-origin isolation buys nothing here.
+# Cache-Control: HTML/JSON revalidate every request (cheap 304s) so header/CSP/
+#   content changes — and a fresh catalog.json (the store fetches it with
+#   cache:"no-cache") — propagate at once. Nothing is auth-gated, so no-store
+#   is unnecessary.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: accelerometer=(), autoplay=(self), bluetooth=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), gamepad=(), geolocation=(), gyroscope=(), hid=(), magnetometer=(), microphone=(self), midi=(), payment=(), serial=(), usb=(), xr-spatial-tracking=(), browsing-topics=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: public, max-age=0, must-revalidate
+
+# --- Static media override: same-origin demo videos. --------------------------
+# Not security-sensitive and large -> cache a day. Filenames are NOT content-
+# hashed, so we avoid "immutable" (a re-uploaded video reusing its name must be
+# picked up on revalidate). Only Cache-Control is overridden; every security
+# header above still applies to these responses.
+/media/*
+  Cache-Control: public, max-age=600, must-revalidate
+
+# =============================================================================
+# PROPOSED Content-Security-Policy — COMMENTED OUT ON PURPOSE. DO NOT ENABLE.
+# -----------------------------------------------------------------------------
+# The active CSP is owned by the <meta http-equiv="Content-Security-Policy"> in
+# each HTML page, and it is intentionally PER-PAGE:
+#   - marketing pages:         connect-src 'none'
+#   - store / sotto / onboard: connect-src 'self' https://api.anthropic.com
+#   - vedetta:                 also several finance API hosts
+# A single origin-wide header CSP cannot express those per-page differences
+# without being loosened to the widest page, and a second CSP here would
+# INTERSECT with the meta CSP and could silently break pages. So CSP stays in
+# <meta>. If the CSP owner ever moves it to a header, the strictest common
+# denominator would look roughly like this (still cannot safely fold in
+# vedetta's per-page connect hosts):
+#
+# /*
+#   Content-Security-Policy: default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; connect-src 'self' https://api.anthropic.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+#
+# Caveat: 'unsafe-inline' for script is required because every page ships inline
+# JS/CSS; removing it needs nonces/hashes wired through build.js (out of scope,
+# and this task must not touch build.js).
+# =============================================================================

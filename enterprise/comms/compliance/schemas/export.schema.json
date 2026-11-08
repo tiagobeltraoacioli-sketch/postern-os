@@ -1,0 +1,34 @@
+{
+  "//": "SPDX-License-Identifier: MIT OR Apache-2.0 — JSON Schema (draft 2020-12) for a data-portability export package (GDPR Art. 20 / LGPD Art. 18 V). Honest scope: an EMPLOYER-served export carries metadata + directory only; E2EE content is exported by the subject from their own client.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://posternlabs.com/schemas/comms/compliance/export.schema.json",
+  "title": "Postern Comms data-subject export package",
+  "type": "object",
+  "required": ["schema", "subjectId", "generatedAt", "servedBy", "records", "honestLimits"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "postern.comms.export/1" },
+    "subjectId": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "servedBy": { "type": "string", "enum": ["employer", "self-serve-client"] },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dataClass", "included", "items"],
+        "additionalProperties": false,
+        "properties": {
+          "dataClass": { "type": "string" },
+          "included": { "type": "boolean" },
+          "reasonIfExcluded": { "type": ["string", "null"] },
+          "items": { "type": "array" }
+        }
+      }
+    },
+    "honestLimits": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    }
+  }
+}

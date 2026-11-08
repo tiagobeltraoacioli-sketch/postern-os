@@ -1,0 +1,436 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT OR Apache-2.0
+  SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+  Consiglio — wallet-as-login + dual-control / SoD approval UX. UX PROTOTYPE.
+  It draws the surface for the host-run postern-consiglio-auth service, whose
+  control.rs ENFORCES the two-person rule at runtime:
+    propose_change (one admin)  -> stages a PendingChange, mutates nothing
+    approve_change (2nd admin)  -> refuses self-approval (DualControl),
+                                   refuses same-duty (SodViolation),
+                                   commits only when the approver is the
+                                   Brewer-Nash SEPARATED counterpart.
+  This page reproduces that gate faithfully as the design of record; the
+  in-page checks are a browser stand-in of the service logic. Wallet-login is
+  simulated: the real hybrid Falcon-1024 || ML-DSA-65 verify is
+  bloch_crypto::crypto::verify inside the service.
+
+  HONESTY: UNAUDITED. Not compliance, not legal advice. No network (connect-src
+  'none'). The primitives here demonstrate the flow; the enforcement is the
+  service's.
+-->
+<html lang="en" data-surface="consiglio">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Consiglio — wallet-login &amp; dual-control · UX prototype · Postern Labs</title>
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#0c0f15;--bg-glow:#10141d;--surface:#14181f;--surface-2:#1a2029;--surface-3:#212934;
+  --border:#29323e;--border-hi:#3a4552;--text:#e7e9ee;--text-dim:#a8adb5;--muted:#79818c;
+  --acc:#5f87d6;--acc-hi:#7ea2e6;--acc-dim:#44619e;--acc-ink:#0d1322;
+  --ok:#63ab7c;--warn:#d08c2e;--err:#d96a63;--radius:14px;--shadow:0 18px 50px rgba(0,0,0,.45);
+}
+:root[data-theme="light"]{
+  --bg:#eff0f4;--bg-glow:#f4f6fa;--surface:#fbfbfd;--surface-2:#eaecf2;--surface-3:#dfe3ec;
+  --border:#d0d5e0;--border-hi:#b5bccd;--text:#22242b;--text-dim:#4f555e;--muted:#767d87;
+  --acc:#35569e;--acc-hi:#2a4680;--acc-dim:#6c83b8;--acc-ink:#f6f8ff;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(44,54,80,.14);
+}
+@media (prefers-color-scheme: light){:root:not([data-theme]){
+  --bg:#eff0f4;--bg-glow:#f4f6fa;--surface:#fbfbfd;--surface-2:#eaecf2;--surface-3:#dfe3ec;
+  --border:#d0d5e0;--border-hi:#b5bccd;--text:#22242b;--text-dim:#4f555e;--muted:#767d87;
+  --acc:#35569e;--acc-hi:#2a4680;--acc-dim:#6c83b8;--acc-ink:#f6f8ff;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(44,54,80,.14);
+}}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:var(--font-ui);background:radial-gradient(1100px 520px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--text);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+a{color:var(--acc-hi);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:940px;margin:0 auto;padding:0 20px}
+.mono{font-family:var(--font-mono)}
+header.site{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
+.site-inner{display:flex;align-items:center;gap:12px;padding:12px 0}
+.wordmark{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:.2em;color:var(--text)}
+.wordmark .tick{color:var(--acc)}
+.byline{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);padding-left:12px}
+.site-actions{margin-left:auto;display:flex;gap:8px}
+.hbtn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim)}
+.hbtn:hover{border-color:var(--border-hi);color:var(--text)}
+.notice{border-bottom:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));background:color-mix(in srgb,var(--warn) 10%,var(--surface));font-size:12.5px;color:var(--text-dim)}
+.notice .wrap{padding:8px 20px}.notice strong{color:var(--warn)}
+main.wrap{padding:20px 20px 48px}
+h1{font-size:23px;margin:.1em 0 .3em}h2{font-size:16px;margin:.1em 0 .5em}
+.lead{color:var(--text-dim);font-size:13.5px;max-width:70ch}
+.lead code,.mini code{color:var(--acc-hi);font-family:var(--font-mono);font-size:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin:14px 0;box-shadow:var(--shadow)}
+.field{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.field label{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.04em;text-transform:uppercase}
+.field input,.field select{background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.row>.field{flex:1 1 180px}
+.btn-acc{background:var(--acc);color:var(--acc-ink);border:1px solid var(--acc);border-radius:10px;padding:9px 16px;font-weight:600}
+.btn-acc:hover{background:var(--acc-hi)}
+.btn-acc:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text-dim)}
+.btn-ghost:hover{border-color:var(--border-hi);color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.mini{font-size:11.8px;color:var(--muted)}
+.hidden{display:none}
+.err{color:var(--err);font-size:12.5px;min-height:1.1em;margin:6px 0}
+
+/* wallet login */
+.session-badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;border:1px solid var(--border);border-radius:999px;padding:5px 12px;color:var(--text-dim)}
+.session-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.session-badge.live{border-color:color-mix(in srgb,var(--ok) 50%,var(--border));color:var(--ok)}
+.session-badge.live .dot{background:var(--ok)}
+.chal{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:11px;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;margin:8px 0}
+.chal b{color:var(--acc-hi)}
+
+/* roster / duties */
+.duties{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12px;margin:6px 0 12px}
+.duty-pill{border:1px solid var(--border-hi);border-radius:999px;padding:4px 11px;color:var(--text-dim)}
+.duty-pill.it{border-color:color-mix(in srgb,var(--acc) 55%,var(--border));color:var(--acc-hi)}
+.duty-pill.co{border-color:color-mix(in srgb,#b98bd6 55%,var(--border));color:#c9a5e0}
+.sep{color:var(--warn);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.pill{display:inline-block;font-family:var(--font-mono);font-size:10.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--border-hi);color:var(--text-dim)}
+.pill.admin{color:var(--acc-hi);border-color:var(--acc-dim)}
+.pill.biz{color:var(--muted)}
+
+/* pending gate */
+.pend{border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));background:color-mix(in srgb,var(--warn) 8%,var(--surface));border-radius:12px;padding:14px 16px;margin:12px 0}
+.pend.committed{border-color:color-mix(in srgb,var(--ok) 55%,var(--border));background:color-mix(in srgb,var(--ok) 8%,var(--surface))}
+.pend-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.pend-summary{font-weight:640;font-size:14px}
+.gate{margin-left:auto;display:flex;align-items:center;gap:10px}
+.progress2{display:flex;gap:6px;align-items:center}
+.slot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border-hi);display:inline-block}
+.slot.filled{background:var(--warn);border-color:var(--warn)}
+.pend.committed .slot.filled{background:var(--ok);border-color:var(--ok)}
+.gate-lbl{font-family:var(--font-mono);font-size:11.5px;color:var(--warn)}
+.pend.committed .gate-lbl{color:var(--ok)}
+.pend-meta{font-size:12.3px;color:var(--text-dim);margin:4px 0}
+.pend-meta b{color:var(--text)}
+.approve-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.approve-row .field{margin:0;flex:1 1 220px}
+.reason{font-size:12.3px;margin:8px 0 0;min-height:1.1em}
+.reason.deny{color:var(--err)}
+.reason.ok{color:var(--ok)}
+
+/* audit log */
+.log{font-family:var(--font-mono);font-size:11.5px;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:8px}
+.log-row{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.log-row:last-child{border-bottom:0}
+.log-row .lt{color:var(--muted)}
+.log-row.deny .lt{color:var(--err)}
+.log-row.commit .lt{color:var(--ok)}
+.log-row .lx{color:var(--text-dim);word-break:break-word}
+.honest{border-left:3px solid var(--acc);padding:8px 0 8px 12px;font-size:12.5px;color:var(--text-dim);background:color-mix(in srgb,var(--acc) 6%,transparent);margin:10px 0}
+.honest b{color:var(--acc-hi)}
+footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:11px;padding:16px 20px;text-align:center;font-family:var(--font-mono);letter-spacing:.05em}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap site-inner">
+  <div class="wordmark">C<span class="tick">·</span>ONSIGLIO</div>
+  <div class="byline">wallet-login · dual-control · UX prototype</div>
+  <div class="site-actions"><a class="hbtn" href="index.html">← hub</a><button class="hbtn" id="themeBtn">theme</button></div>
+</div></header>
+
+<div class="notice"><div class="wrap">
+  <strong>UX prototype — UNAUDITED.</strong> Dual-control / SoD is <strong>enforced at runtime in the console service</strong> (host-run <span class="mono">postern-consiglio-auth</span>); this page shows that real second-approver gate. Not compliance, not legal advice. No network calls.
+</div></div>
+
+<main class="wrap">
+  <h1>Wallet-as-login &amp; the two-person rule</h1>
+  <p class="lead">Control of the wallet key <em>is</em> the login — no passwords, no shared secret. A privileged change then needs <b>two separated people</b>: one proposes, and a second, <b>different</b> admin whose duty is the Brewer–Nash counterpart approves. Neither can act alone.</p>
+
+  <!-- ===== WALLET LOGIN ===== -->
+  <div class="card">
+    <h2>1 · Sign in with your wallet</h2>
+    <p class="lead">The server issues a single-use challenge; your wallet signs a domain-separated transcript with its hybrid <b>Falcon-1024&nbsp;‖&nbsp;ML-DSA-65</b> key; the server verifies it against your <b>enrolled</b> public key. The real verify runs in the service; here it is simulated and labeled.</p>
+    <div class="row">
+      <div class="field"><label for="loginAs">Present wallet as</label><select id="loginAs"></select></div>
+      <button class="btn-acc" id="btnLogin">Present wallet &amp; sign challenge</button>
+      <span class="session-badge" id="sessionBadge"><span class="dot"></span><span id="sessionText">no session</span></span>
+    </div>
+    <div class="chal hidden" id="chalBox"></div>
+    <p class="mini">Anti-replay: the nonce is single-use and retired on consumption. The transcript is domain-separated (<code>consiglio:wallet-login:v1</code>), so a login signature cannot be replayed as a payment or across orgs.</p>
+  </div>
+
+  <!-- ===== ROSTER ===== -->
+  <div class="card">
+    <h2>2 · Admins &amp; separated duties</h2>
+    <div class="duties">
+      <span class="duty-pill it">IT-admin</span>
+      <span class="sep">⟂</span>
+      <span class="duty-pill co">Compliance-officer</span>
+      <span class="mini">— the two duties that must BOTH sign off. Two IT-admins (or two compliance-officers, or a self-approval) can never commit a change.</span>
+    </div>
+    <div style="overflow-x:auto"><table id="roster"><thead><tr><th>Person</th><th>Duty</th><th>Can propose / approve?</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <!-- ===== PROPOSE ===== -->
+  <div class="card">
+    <h2>3 · Propose a privileged change</h2>
+    <p class="lead">A change (offboard a user, or enroll/rotate a wallet) is <b>staged</b> by one admin. <b>Nothing is mutated</b> — it waits for a second, separated approver. Only an admin may propose; a business role cannot.</p>
+    <div class="row">
+      <div class="field"><label for="changeKind">Change</label>
+        <select id="changeKind">
+          <option value="offboard">Offboard user — Rafael Souza (revoke enrollment + sessions)</option>
+          <option value="enroll">Enroll wallet — Priya Nair as engineer</option>
+        </select></div>
+      <button class="btn-acc" id="btnPropose">Propose (stages nothing)</button>
+    </div>
+    <p class="err" id="proposeErr"></p>
+    <p class="mini">Proposing acts as your live session identity. Sign in above first.</p>
+  </div>
+
+  <!-- ===== PENDING QUEUE ===== -->
+  <div class="card">
+    <h2>4 · Pending — awaiting a second, separated approver</h2>
+    <p class="lead">This is the gate. Each change sits at <b>1 of 2</b> until the separated counterpart approves. Try to self-approve, or approve as the same duty, and watch it fail-closed — the store is untouched.</p>
+    <div id="pendingList"></div>
+    <p class="mini" id="pendingEmpty">No pending changes. Sign in and propose one above.</p>
+  </div>
+
+  <!-- ===== AUDIT ===== -->
+  <div class="card">
+    <h2>5 · Attempt &amp; audit trail</h2>
+    <p class="lead">Every propose, refusal, and commit is recorded — with the exact reason the service would return.</p>
+    <div class="log" id="log"></div>
+    <div class="honest"><b>What is real vs stand-in.</b> The two-person rule, self-approval refusal, and separated-duty requirement are <b>enforced at runtime</b> by <code>control.rs</code> in the host-run service — <code>propose_change</code> stages nothing, <code>approve_change</code> returns <code>DualControl</code> on self-approval and <code>SodViolation</code> on same-duty. This page reproduces that gate as the design of record; its checks are a browser stand-in, and wallet signing is simulated (the real hybrid verify is in the service). UNAUDITED.</div>
+  </div>
+</main>
+
+<footer class="site">Consiglio · wallet-as-login · dual-control enforced in the service · UX prototype · no network · not legal advice · UNAUDITED</footer>
+
+<script>
+"use strict";
+/* ============================================================================
+   Browser stand-in of postern-consiglio-auth/src/control.rs — the dual-control
+   + Brewer-Nash SoD gate. The REAL enforcement is the host-run service; this
+   mirrors its decisions faithfully so the second-approver flow can be reviewed.
+   ============================================================================ */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+/* ---- roster (org: acme) ---- */
+var USERS = [
+  { user:"iris",  name:"Iris Tan",     role:"it-admin" },
+  { user:"nadia", name:"Nadia Okoye",  role:"it-admin" },
+  { user:"bruno", name:"Bruno Costa",  role:"compliance-officer" },
+  { user:"ana",   name:"Ana Reis",     role:"engineer" }
+];
+var ORG = "acme";
+function findUser(u){ return USERS.filter(function(x){ return x.user===u; })[0]; }
+function isAdmin(role){ return role==="it-admin" || role==="compliance-officer"; }
+// Brewer-Nash SoD: the separated pair is one IT-admin AND one compliance-officer.
+function sodSeparated(a, b){
+  return (a==="it-admin" && b==="compliance-officer") || (a==="compliance-officer" && b==="it-admin");
+}
+function roleLabel(r){ return r.replace(/-/g," "); }
+
+/* ---- state ---- */
+var S = { session:null, usedNonces:{}, pending:[], seq:0, log:[] };
+
+function nonce(){
+  var b = new Uint8Array(12); (globalThis.crypto||crypto).getRandomValues(b);
+  return Array.from(b).map(function(x){ return x.toString(16).padStart(2,"0"); }).join("");
+}
+function changeId(){
+  var b = new Uint8Array(6); (globalThis.crypto||crypto).getRandomValues(b);
+  return Array.from(b).map(function(x){ return x.toString(16).padStart(2,"0"); }).join("");
+}
+function ts(){ return new Date().toISOString().slice(11,19); }
+function logLine(kind, text){ S.log.unshift({ kind:kind, t:ts(), x:text }); renderLog(); }
+
+/* ---- wallet login (simulated; real verify lives in the service) ---- */
+function fillLoginSelect(){
+  var sel = $("loginAs");
+  sel.innerHTML = USERS.map(function(u){ return '<option value="'+u.user+'">'+esc(u.name)+' — '+esc(roleLabel(u.role))+'</option>'; }).join("");
+}
+$("btnLogin").addEventListener("click", function(){
+  var u = findUser($("loginAs").value);
+  var n = nonce();
+  var iat = Math.floor(Date.now()/1000);
+  var transcript = "consiglio:wallet-login:v1 | "+ORG+" | "+u.user+" | "+n+" | "+iat;
+  // Anti-replay: single-use nonce.
+  if (S.usedNonces[n]){ return; }
+  S.usedNonces[n] = true;
+  S.session = { user:u.user, name:u.name, role:u.role, sid:changeId()+changeId(), nonce:n };
+  $("chalBox").classList.remove("hidden");
+  $("chalBox").innerHTML =
+    "<b>challenge issued</b>\n"+
+    "nonce (single-use): "+n+"\n"+
+    "exp: +120s   org: "+ORG+"   user: "+u.user+"\n"+
+    "<b>signed transcript</b> (domain-separated):\n  "+esc(transcript)+"\n"+
+    "<b>verify</b>: hybrid Falcon-1024 ‖ ML-DSA-65 vs enrolled pubkey → OK (simulated; real verify in service)\n"+
+    "<b>session</b>: sid="+S.session.sid.slice(0,16)+"…  TTL 30m";
+  renderSession();
+  logLine("login", u.name+" ("+roleLabel(u.role)+") signed in by wallet — nonce retired");
+});
+function renderSession(){
+  var b = $("sessionBadge");
+  if (S.session){ b.className="session-badge live"; $("sessionText").textContent = "session: "+S.session.name+" ("+roleLabel(S.session.role)+")"; }
+  else { b.className="session-badge"; $("sessionText").textContent = "no session"; }
+}
+
+/* ---- roster table ---- */
+function renderRoster(){
+  var tb = $("roster").querySelector("tbody"); tb.innerHTML="";
+  USERS.forEach(function(u){
+    var admin = isAdmin(u.role);
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td>'+esc(u.name)+'</td>'+
+      '<td class="mono">'+esc(roleLabel(u.role))+'</td>'+
+      '<td>'+(admin ? '<span class="pill admin">admin · yes</span>' : '<span class="pill biz">business role · no</span>')+'</td>';
+    tb.appendChild(tr);
+  });
+}
+
+/* ---- propose (mirrors control.rs propose_change) ---- */
+$("btnPropose").addEventListener("click", function(){
+  $("proposeErr").textContent="";
+  if (!S.session){ $("proposeErr").textContent="Sign in with a wallet first — proposing acts as your session identity."; return; }
+  if (!isAdmin(S.session.role)){
+    $("proposeErr").textContent="NotAuthorized: only an IT-admin or compliance-officer may propose enroll/offboard.";
+    logLine("deny", "propose refused (NotAuthorized): "+S.session.name+" is a "+roleLabel(S.session.role)+", not an admin");
+    return;
+  }
+  var kind = $("changeKind").value;
+  var summary = kind==="offboard" ? "offboard "+ORG+"/rafael" : "enroll "+ORG+"/priya as engineer";
+  var pc = {
+    id: changeId(),
+    kind: kind,
+    summary: summary,
+    proposer: { user:S.session.user, name:S.session.name, role:S.session.role },
+    createdAt: ts(),
+    committed: false,
+    reason: ""
+  };
+  S.pending.unshift(pc);
+  renderPending();
+  logLine("propose", S.session.name+" ("+roleLabel(S.session.role)+") proposed: "+summary+" — staged, nothing mutated (1 of 2)");
+});
+
+/* ---- approve (mirrors control.rs approve_change, in order) ---- */
+function attemptApprove(pcId, approverUser){
+  var pc = S.pending.filter(function(p){ return p.id===pcId; })[0];
+  if (!pc || pc.committed) return;
+  var approver = findUser(approverUser);
+  // 1. Two-person rule: approver must not be the proposer.
+  if (approver.user === pc.proposer.user){
+    pc.reason = "deny|DualControl: self-approval is refused — a second, distinct admin must approve.";
+    logLine("deny", "approve refused (DualControl): "+approver.name+" cannot approve their own proposal");
+    renderPending(); return;
+  }
+  // 2. Approver must be an admin.
+  if (!isAdmin(approver.role)){
+    pc.reason = "deny|NotAuthorized: only an IT-admin or compliance-officer may approve a privileged change.";
+    logLine("deny", "approve refused (NotAuthorized): "+approver.name+" is a "+roleLabel(approver.role));
+    renderPending(); return;
+  }
+  // 3. Brewer-Nash: proposer + approver must be a SEPARATED pair.
+  if (!sodSeparated(pc.proposer.role, approver.role)){
+    pc.reason = "deny|SodViolation: dual-control requires separated duties — proposer '"+pc.proposer.role+"' and approver '"+approver.role+"' must be one IT-admin AND one compliance-officer.";
+    logLine("deny", "approve refused (SodViolation): "+roleLabel(pc.proposer.role)+" + "+roleLabel(approver.role)+" are not a separated pair");
+    renderPending(); return;
+  }
+  // Passed the gate — commit.
+  pc.committed = true;
+  pc.approver = { user:approver.user, name:approver.name, role:approver.role };
+  var outcome = pc.kind==="offboard"
+    ? "CommitOutcome{ applied:true, sessions_revoked:2 } — enrollment removed, live sessions + challenges revoked"
+    : "CommitOutcome{ applied:true, rotated:false } — wallet enrolled";
+  pc.reason = "ok|"+outcome;
+  logLine("commit", "COMMITTED: "+pc.summary+" — proposer "+pc.proposer.name+" + approver "+approver.name+" (separated). "+outcome);
+  renderPending();
+}
+
+/* ---- render pending ---- */
+function renderPending(){
+  var host = $("pendingList"); host.innerHTML="";
+  $("pendingEmpty").style.display = S.pending.length ? "none" : "block";
+  S.pending.forEach(function(pc){
+    var div = document.createElement("div");
+    div.className = "pend" + (pc.committed ? " committed" : "");
+    var slot2 = pc.committed ? "filled" : "";
+    var gateLbl = pc.committed ? "2 of 2 · committed" : "1 of 2 · pending";
+    var reasonHtml = "";
+    if (pc.reason){
+      var parts = pc.reason.split("|");
+      reasonHtml = '<p class="reason '+(parts[0]==="ok"?"ok":"deny")+'">'+(parts[0]==="ok"?"✓ ":"✗ ")+esc(parts[1])+'</p>';
+    }
+    var approveBlock = pc.committed ? "" :
+      '<div class="approve-row">'+
+        '<div class="field"><label>Approve as (a second, separated admin)</label>'+
+          '<select data-appr="'+pc.id+'">'+USERS.map(function(u){ return '<option value="'+u.user+'">'+esc(u.name)+' — '+esc(roleLabel(u.role))+'</option>'; }).join("")+'</select>'+
+        '</div>'+
+        '<button class="btn-acc" data-approve="'+pc.id+'">Approve &amp; sign</button>'+
+        '<button class="btn-ghost" data-reject="'+pc.id+'">Reject</button>'+
+      '</div>';
+    div.innerHTML =
+      '<div class="pend-head">'+
+        '<span class="pend-summary">'+esc(pc.summary)+'</span>'+
+        '<span class="gate"><span class="progress2"><span class="slot filled"></span><span class="slot '+slot2+'"></span></span><span class="gate-lbl">'+gateLbl+'</span></span>'+
+      '</div>'+
+      '<p class="pend-meta">change id <b>'+esc(pc.id)+'</b> · '+esc(pc.kind)+' · proposed <b>'+esc(pc.createdAt)+'</b> by <b>'+esc(pc.proposer.name)+'</b> ('+esc(roleLabel(pc.proposer.role))+')'+(pc.committed?(' · approved by <b>'+esc(pc.approver.name)+'</b> ('+esc(roleLabel(pc.approver.role))+')'):'')+'</p>'+
+      reasonHtml + approveBlock;
+    host.appendChild(div);
+  });
+}
+$("pendingList").addEventListener("click", function(e){
+  var a = e.target.closest("[data-approve]");
+  if (a){
+    var id = a.getAttribute("data-approve");
+    var sel = $("pendingList").querySelector('[data-appr="'+id+'"]');
+    attemptApprove(id, sel.value);
+    return;
+  }
+  var r = e.target.closest("[data-reject]");
+  if (r){
+    var rid = r.getAttribute("data-reject");
+    S.pending = S.pending.filter(function(p){ return p.id!==rid; });
+    logLine("deny", "change "+rid+" rejected — discarded without applying");
+    renderPending();
+  }
+});
+
+/* ---- render log ---- */
+function renderLog(){
+  var host = $("log"); host.innerHTML="";
+  if (!S.log.length){ host.innerHTML = '<div class="log-row"><span class="lt">—</span><span class="lx">no events yet</span></div>'; return; }
+  S.log.forEach(function(e){
+    var cls = e.kind==="deny" ? "deny" : (e.kind==="commit" ? "commit" : "");
+    var row = document.createElement("div");
+    row.className = "log-row "+cls;
+    row.innerHTML = '<span class="lt">'+esc(e.t)+'</span><span class="lx">'+esc(e.x)+'</span>';
+    host.appendChild(row);
+  });
+}
+
+/* theme */
+$("themeBtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", cur==="light"?"dark":"light");
+});
+
+/* init */
+fillLoginSelect();
+renderRoster();
+renderSession();
+renderPending();
+renderLog();
+</script>
+</body>
+</html>

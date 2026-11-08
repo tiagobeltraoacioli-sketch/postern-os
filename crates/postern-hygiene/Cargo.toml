@@ -1,0 +1,27 @@
+[package]
+name = "postern-hygiene"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs document hygiene — strip the author/company/timestamp metadata that Office/PDF/image files leak. Scrub by default; prove/seal by opt-in."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_hygiene"
+
+[[bin]]
+name = "postern-hygiene"
+path = "src/bin/postern-hygiene.rs"
+
+[dependencies]
+# All permissive. OOXML/ODF are ZIP+XML; we own the scrub in Rust (auditable) —
+# no mat2 (LGPL) / ExifTool (GPL).
+zip = "2"          # MIT — read/rewrite the OOXML package
+quick-xml = "0.41" # MIT — real XML pass for the ODF settings.xml scrub (already in the workspace lock)
+lopdf = "0.43"     # MIT — strip PDF Info dictionary + XMP metadata (>=0.42 fixes RUSTSEC-2026-0187)
+sha3 = "0.10"      # Apache-2.0/MIT — SHAKE-256 for the opt-in provenance digest
+thiserror = "2"
+
+[dev-dependencies]
+# Tests only — the binary's `--json` output stays hand-rolled/std-only; this
+# just gives the black-box CLI tests a real parser to validate it with.
+serde_json = "1"   # MIT/Apache-2.0 — already in the workspace lock

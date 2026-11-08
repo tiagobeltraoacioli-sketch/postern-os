@@ -1,0 +1,60 @@
+# shellcheck shell=sh disable=SC2034
+# ─────────────────────────────────────────────────────────────────────────────
+#  SLOBODA — operator config (sample)
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  HONESTY: this configures the NON-ATTESTABLE Android escape hatch —
+#     "Postern for postmarketOS — community edition". It is NOT "Porog" (the
+#     stock-Android container) and NOT "Postern OS". Entering Android = data
+#     leaves the sealed base; Play Integrity STRONG fails (banking/Wallet/DRM
+#     refuse); NOT covered by the Postern Seal; UNTESTED scaffold (no Waydroid
+#     in the build sandbox). Not legal advice.
+#
+#  Copy to one of (first match wins):
+#     ~/.config/sloboda/sloboda.conf
+#     /etc/sloboda/sloboda.conf
+#  It is sourced as POSIX sh (KEY=VALUE). Anything you don't set keeps the
+#  private, default-safe value baked into the wrapper.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Image system type: the microG-vs-GApps choice. A CONFIG INPUT, not a
+#     hardcode. Default is the PRIVATE, Google-free base.
+#       VANILLA  AOSP, no Google, no microG           (default, most private)
+#       FOSS     microG-preinstalled image            (upstream images flaky)
+#       GAPPS    Google Play Services                 (EXPLICIT, less private)
+PAW_SYSTEM_TYPE=VANILLA
+
+# --- Optionally run the community microG installer (waydroid_script) AFTER a
+#     VANILLA init. 0 = leave it Google-free-and-serviceless. This is a
+#     documented manual step, not automated here.
+PAW_MICROG=0
+
+# --- App-store-first landing package. Aurora Store is account-free delivery
+#     (does NOT defeat Play Integrity). Swap for org.fdroid.fdroid, etc.
+PAW_STORE_PKG=com.aurora.store
+
+# --- Readiness polling.
+PAW_READY_TIMEOUT=90
+PAW_READY_INTERVAL=2
+
+# --- Where host .desktop launchers are written.
+#       Per-user (default): $XDG_DATA_HOME/applications — user-writable, NO root.
+#       System-wide:        /usr/share/applications — needs root/packager; that is
+#                           the NixOS module's job, not the wrapper's. Point this
+#                           there ONLY from the packaged/rooted context; the
+#                           wrapper fails honestly if it cannot write.
+#     After writing/pruning, `sloboda launchers` best-effort runs
+#     `update-desktop-database` so a live shell grid (Phosh) re-indexes promptly.
+# PAW_DESKTOP_DIR=/usr/share/applications
+
+# --- install-watch polling loop (`sloboda install-watch`). No install-event API
+#     exists upstream, so launchers are kept in sync by polling `waydroid app
+#     list` on an interval. PAW_WATCH_ONCE=1 makes it a single bounded pass
+#     (cron-style / one-shot); the default long-runs until stopped.
+PAW_WATCH_INTERVAL=15
+# PAW_WATCH_ONCE=0
+
+# --- Consent-gate privacy-bridge state file. OWNED BY THE CONSENT-GATE
+#     COMPONENT. This wrapper only READS it and treats anything but a first line
+#     of exactly "enabled" as OFF. Do NOT point this at a file this wrapper can
+#     write — the whole point is that the wrapper cannot open the bridge itself.
+# PAW_BRIDGE_STATE=/run/postern/consent/sloboda-bridge.state

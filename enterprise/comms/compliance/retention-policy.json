@@ -1,0 +1,64 @@
+{
+  "//": "SPDX-License-Identifier: MIT OR Apache-2.0 — Postern Comms (Enterprise) retention policy (reference default). NOT LEGAL ADVICE. Windows are conservative defaults; a real deployment sets these with a DPO + legal review. Validate with retention.mjs::validatePolicy and `node --check`-equivalent JSON.parse (see self-check.mjs).",
+  "schema": "postern.comms.retention/1",
+  "org": null,
+  "residencyDefault": "eu",
+  "rules": [
+    {
+      "dataClass": "message.content.e2ee",
+      "channelClass": "*",
+      "retainDays": 365,
+      "retainedBy": "operator",
+      "disclosed": true,
+      "basis": "Operator holds CIPHERTEXT only (cannot read it); ciphertext blob deleted after the window. Delivery/continuity purpose."
+    },
+    {
+      "dataClass": "message.content.e2ee",
+      "channelClass": "ephemeral",
+      "retainDays": 0,
+      "retainedBy": "employee-device",
+      "disclosed": true,
+      "basis": "Ephemeral channels: operator retains no ciphertext; only the participants' devices hold it (their own disclosed policy)."
+    },
+    {
+      "dataClass": "message.metadata",
+      "channelClass": "*",
+      "retainDays": 90,
+      "retainedBy": "operator",
+      "disclosed": true,
+      "basis": "Routing/delivery + abuse-prevention; minimised to sender/recipient/channel/timestamp/size."
+    },
+    {
+      "dataClass": "presence.status",
+      "channelClass": "*",
+      "retainDays": 0,
+      "retainedBy": "none",
+      "disclosed": true,
+      "basis": "Minimisation default: presence is ephemeral, not logged over time."
+    },
+    {
+      "dataClass": "directory.identity",
+      "channelClass": "*",
+      "retainDays": null,
+      "retainedBy": "operator",
+      "disclosed": true,
+      "basis": "Employment record: kept for the employment relationship; erasure may be overridden by an independent legal-obligation (document in ROPA)."
+    },
+    {
+      "dataClass": "audit.admin-action",
+      "channelClass": "*",
+      "retainDays": 730,
+      "retainedBy": "operator",
+      "disclosed": true,
+      "basis": "Accountability of admin acts (legal-obligation / legitimate-interest). Append-only + tamper-evident; employee-visible."
+    },
+    {
+      "dataClass": "device.managed-config",
+      "channelClass": "*",
+      "retainDays": null,
+      "retainedBy": "operator",
+      "disclosed": true,
+      "basis": "Active managed configuration; removed when the device is deprovisioned."
+    }
+  ]
+}

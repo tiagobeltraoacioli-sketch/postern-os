@@ -1,0 +1,41 @@
+# bloch-l2-anchor — L2V0 Bloch-anchor envelope codec (SCAFFOLD).
+#
+# HONESTY (non-negotiable, mirrored in the crate docs):
+#   * SCAFFOLD, UNAUDITED, NOT A WORKING L2. This crate is the wire codec +
+#     extraction rules for the L2V0 COMMIT anchor envelope from
+#     docs/specs/BLOCH-L2-EVM-DESIGN.md — nothing more. No sequencer, no
+#     prover, no node, no bridge.
+#   * ZERO consensus change. The envelope is an OFF-consensus reader
+#     convention riding the script_pubkey of an ordinary zero-value Bloch
+#     TxOutput. Bloch nodes never parse this; a malformed envelope is a
+#     layer no-op and NEVER invalidates the carrying Bloch transaction.
+#   * Bloch stays ownerless. Anyone can run an independent anchor reader
+#     over this convention; no party (Postern included) is privileged.
+#
+# Standalone-workspace pattern (same as crates/bloch-tokens): its own empty
+# [workspace] table so it builds and tests offline with ZERO dependencies,
+# outside the frozen root members list.
+[package]
+name = "bloch-l2-anchor"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "SCAFFOLD — unaudited, not a working L2. Strict encode/decode + extraction rules for the L2V0 Bloch-anchor COMMIT envelope (off-consensus reader convention, zero consensus change; Bloch nodes never parse this)."
+
+# Deliberately empty: this crate is its own workspace root (re-homeable,
+# offline-buildable, zero deps).
+[workspace]
+
+[dependencies]
+
+[features]
+# OFF BY DEFAULT — the default build stays zero-dependency and offline, exactly
+# as the crate docs promise. `http` enables the real read-only Bloch JSON-RPC
+# client (`source::HttpBlockSource`). It pulls in NO third-party crates: the
+# HTTP/1.1 POST and the minimal JSON reader are hand-rolled on `std` only, so
+# even `--features http` builds offline with zero external deps. It is READ-ONLY
+# (getblockcount / getblockhash / getblockbyheight) and touches the network only
+# to READ from a node you point it at (your own local node or a read-only public
+# node) — it never writes, restarts, or reconfigures anything.
+http = []

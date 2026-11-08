@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "SPDX-License-Identifier: MIT OR Apache-2.0",
+  "$id": "postern.enterprise.support-intake/v1",
+  "title": "Postern Enterprise support-intake ticket",
+  "description": "Privacy-preserving support-intake record. Minimal data by construction: we sell work and assurance, NOT customer surveillance. No telemetry, no product usage data, no PII beyond a single contact handle the customer volunteers. Fields marked forbidden MUST NOT appear.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ticket_id", "opened_at", "org_ref", "severity", "summary"],
+  "properties": {
+    "ticket_id": {
+      "type": "string",
+      "pattern": "^PE-[0-9]{4}-[0-9]{4,}$",
+      "description": "Operator-assigned id, e.g. PE-2026-0001. Not derived from any customer data."
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC timestamp the ticket was opened."
+    },
+    "org_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Opaque contract/organisation reference (e.g. a licence id or short code). NOT a person, NOT an email. Ties the ticket to an SLA tier without identifying individuals."
+    },
+    "contact": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "OPTIONAL single reply handle the customer volunteers (email or alias). Store the minimum needed to reply; nothing else. Omit if the customer uses a shared channel."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["sev1", "sev2", "sev3", "sev4"],
+      "description": "sev1 critical/outage, sev2 major, sev3 minor, sev4 question/info. Drives the SLA response target (see sla-policy.yaml)."
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["community", "eval", "business", "enterprise"],
+      "default": "eval",
+      "description": "Support entitlement. community = best-effort only; eval = free 6-month evaluation; business/enterprise = paid SLA."
+    },
+    "component": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "OPTIONAL free-text component name the customer chooses (e.g. 'deployment', 'signing', 'node'). Customer-supplied label, not collected telemetry."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "One-line description the customer writes. No auto-captured logs."
+    },
+    "details": {
+      "type": "string",
+      "maxLength": 8000,
+      "description": "OPTIONAL customer-authored detail. Customer decides what to include; we collect nothing automatically."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "acknowledged", "in_progress", "waiting_customer", "resolved", "closed"],
+      "default": "open"
+    },
+    "acknowledged_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When first substantive response was sent. Used for SLA response-time tracking."
+    },
+    "resolved_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "retention_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3650,
+      "default": 365,
+      "description": "How long the operator keeps this record before deletion. Minimise. No indefinite retention."
+    },
+    "forbidden_do_not_collect": {
+      "type": "array",
+      "description": "Documentation-only marker of data this scaffold deliberately does NOT collect: telemetry, product usage/analytics, IP addresses, device fingerprints, keystroke/session capture, or any PII beyond the single volunteered contact handle.",
+      "items": { "type": "string" },
+      "default": [
+        "telemetry",
+        "product-usage-analytics",
+        "ip-address",
+        "device-fingerprint",
+        "session-capture",
+        "extra-pii"
+      ]
+    }
+  }
+}

@@ -1,0 +1,97 @@
+# Postern Labs — owned privacy/security PRODUCTS built on the Bloch-SIS-PoW
+# protocol. This is a virtual workspace (no root package): each product is a
+# member crate. The protocol itself (node, PoW, coherence, PQ crypto) lives in
+# the OWNERLESS Bloch-SIS-PoW repo and is consumed here as a git dependency.
+[workspace]
+resolver = "2"
+members = [
+    "crates/postern-core",
+    # postern-trail — the ONE shared append-only, SHAKE-256 hash-chained audit
+    # trail, extracted from yagabona ("glowing skull") and ezekiel1 ("rims full
+    # of eyes") so the two chains can never drift into incompatible canonical
+    # forms. Owns the canonical JSON + schema version; both consume it.
+    "crates/postern-trail",
+    # postern-policy — the ONE shared CONSENT kernel, extracted from yagabona and
+    # ezekiel1 (which reimplemented the same fail-closed Decision, RFC-3339 grant
+    # Expiry, revocation-as-never-given, and enforcement-boundary caveat in
+    # parallel). Owns the typed EnforcementMode so the honest "userland check,
+    # not a kernel boundary" caveat is ONE type both consume.
+    "crates/postern-policy",
+    "crates/postern-tor",
+    "crates/postern-hygiene",
+    "crates/postern-messenger",
+    "crates/postern-vault",
+    "crates/postern-quarantine",
+    "crates/postern-seal-companion",
+    "crates/postern-courier",
+    "crates/postern-keys",
+    "crates/postern-panic",
+    # Postern Office (codename "Svitok") — the Postern-branded desktop shell
+    # over UNMODIFIED-LibreOffice aggregation (shell/theme/templates only).
+    # Ships the office-session panic-lock eviction: documents sealed at rest
+    # with the postern-core seal, a secured plaintext-while-editing scratch
+    # that is secure-deleted + key-evicted on panic(). Additive, unaudited.
+    "crates/postern-office",
+    # Postern Enterprise (Consiglio) — wallet-as-login: org auth using the
+    # Postern PQ wallet as the identity. Additive, feature-gated, unaudited.
+    "crates/postern-consiglio-auth",
+    "crates/postern-sdk",
+    # Yagabona — privacy-first scheduled-task agent daemon (Izbushka manifests,
+    # Threshold Test, glowing-skull audit trail). Additive, unaudited draft.
+    "crates/yagabona",
+    # Ezekiel 1 — access-layer governance engine for Consiglio (wheels-within-
+    # wheels no-widening layers, Brewer-Nash Chinese walls, firmament tenant
+    # isolation, fail-closed per-access eval, rims-full-of-eyes audit trail).
+    # Declares the sweeps Yagabona runs. Additive, unaudited draft.
+    "crates/ezekiel1",
+    "mobile/core",
+    "desktop/src-tauri",
+]
+
+# These integration crates each carry their OWN empty `[workspace]` so they build
+# and test standalone (and are re-homeable). They are NOT members of this root
+# workspace. Now that a root member (`desktop/src-tauri`) path-depends on the two
+# shipped crates (`integration/pairing`, `integration/signer-protocol`), cargo
+# must be told they are separate workspace roots living inside this directory tree
+# — otherwise it errors "multiple workspace roots found in the same workspace".
+# `exclude` does exactly that WITHOUT touching the frozen `members` list; the path
+# deps still resolve as external packages. (`mobile/signer` + `integration/
+# interop-test` are likewise standalone; excluded for the same reason/clarity.)
+exclude = [
+    # bloch-tokens — reference indexer for the NEUTRAL TKV0 token standard
+    # (docs/specs/BLOCH-PERMISSIONLESS-TOKENS-L2.md). Deliberately NOT a
+    # postern-* product crate: it implements an ownerless, off-consensus
+    # convention anyone can reimplement. Standalone workspace so it is
+    # re-homeable to a neutral repo.
+    "crates/bloch-tokens",
+    "integration/pairing",
+    "integration/signer-protocol",
+    "integration/interop-test",
+    "mobile/signer",
+    # bloch-data (data/postern-data) — the Postern → Filecoin user-backup
+    # SCAFFOLD (DATA0 anchor + PBM0/PBP0 codecs + StorageBackend/Sealer seams,
+    # zero-dep, UNAUDITED). Now path-dep'd by desktop/src-tauri's Encrypted
+    # Backup pane; excluded for the same reason as the integration crates — it
+    # carries its own empty [workspace], which would otherwise collide here as a
+    # second workspace root. The path dep still resolves as an external package.
+    "data/postern-data",
+]
+
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+
+# Argon2id at the RFC 9106 at-rest tier (64 MiB, t = 3) is unusably slow in an
+# unoptimized build; keep the KDF itself optimized in dev/test so the test
+# suite stays fast without lowering the production parameters.
+[profile.dev.package.argon2]
+opt-level = 3
+
+# The Bloch protocol crate (`bloch`) pulls pqcrypto-mldsa/-falcon, which need the
+# seeded-RNG fork of pqcrypto-internals (Wallet::from_seed → with_seeded_rng).
+# A [patch] only applies from the workspace ROOT — the patch declared inside the
+# `bloch` git dependency does NOT propagate here — so we re-point it at the same
+# vendored fork, sourced from the Bloch-SIS-PoW repo.
+[patch.crates-io]
+pqcrypto-internals = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  ─────────────────────────────────────────────────────────────────────────────
+  SLOBODA — Waydroid gateway control surface (dependency-free, no build step)
+  ─────────────────────────────────────────────────────────────────────────────
+  ⚠  HONESTY: this page opens the NON-ATTESTABLE Android escape-hatch tier.
+     Entering Android = DATA LEAVES the sealed base. Play Integrity STRONG WILL
+     FAIL (banking / Google Wallet / DRM refuse to run). NOT covered by the
+     Postern Seal. The coin is worthless; personal use is free. This is an
+     UNTESTED scaffold — there is no Waydroid in the build sandbox, and this
+     page CANNOT talk to Waydroid: it only COMPOSES the commands the
+     `sloboda` wrapper runs. Not legal advice.
+
+  CSP: this UI makes NO network calls at all (no api host, no analytics). It
+  reads nothing and sends nothing. script-src/style-src keep 'unsafe-inline'
+  for this hand-maintained, no-build file; there is no remote origin to reach.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sloboda — Waydroid gateway · Postern Labs</title>
+<style>
+/* ============================================================
+   SLOBODA · Postern Labs
+   The escape-hatch gateway. It wears EMBER — a caution accent,
+   because this is the non-attestable tier (Sotto brass, Vedetta
+   steel-blue, Store amethyst, Tolmach verdigris, Sarto madder;
+   Android wears ember, deliberately a warning colour).
+   ============================================================ */
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --bg:#0d1014; --bg-glow:#1a1310; --surface:#14181f; --surface-2:#1a2029;
+  --surface-3:#212934; --border:#29323e; --border-hi:#3a4552;
+  --text:#ece7e2; --text-dim:#a8adb5; --muted:#79818c;
+
+  --acc:#e0964e; --acc-hi:#f0b271; --acc-dim:#a86a34; --acc-ink:#1e130a; /* ember */
+  --ok:#63ab7c; --warn:#d9a441; --err:#e0655c;
+  --shadow:0 18px 50px rgba(0,0,0,.45); --radius:14px;
+}
+:root[data-theme="light"] {
+  --bg:#f2efe9; --bg-glow:#f7f1ea; --surface:#fbfaf7; --surface-2:#efeae2;
+  --surface-3:#e5ded3; --border:#d8d1c4; --border-hi:#c2b8a8;
+  --text:#241f1a; --text-dim:#514c44; --muted:#78736a;
+  --acc:#a75f1e; --acc-hi:#8a4d13; --acc-dim:#c3894f; --acc-ink:#fff6ec;
+  --ok:#2f7a4d; --warn:#8a5f12; --err:#b1443d;
+  --shadow:0 14px 40px rgba(70,52,32,.13);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]){
+    --bg:#f2efe9; --bg-glow:#f7f1ea; --surface:#fbfaf7; --surface-2:#efeae2;
+    --surface-3:#e5ded3; --border:#d8d1c4; --border-hi:#c2b8a8;
+    --text:#241f1a; --text-dim:#514c44; --muted:#78736a;
+    --acc:#a75f1e; --acc-hi:#8a4d13; --acc-dim:#c3894f; --acc-ink:#fff6ec;
+    --ok:#2f7a4d; --warn:#8a5f12; --err:#b1443d; --shadow:0 14px 40px rgba(70,52,32,.13);
+  }
+}
+*{box-sizing:border-box} html,body{margin:0;padding:0}
+body{font-family:var(--font-ui);background:radial-gradient(1100px 520px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--text);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+::selection{background:var(--acc);color:var(--acc-ink)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+
+header.site{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
+.site-inner{display:flex;align-items:center;gap:12px;padding:12px 0}
+.wordmark{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:.28em;text-indent:.28em;white-space:nowrap}
+.wordmark .tick{color:var(--acc)}
+.byline{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);padding-left:12px;margin-top:2px}
+.site-actions{margin-left:auto;display:flex;gap:8px}
+.hbtn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;color:var(--text-dim);transition:border-color .15s,color .15s,background .15s}
+.hbtn:hover{border-color:var(--border-hi);color:var(--text);background:var(--surface-2)}
+
+/* honesty banner */
+.honesty{border:1px solid color-mix(in srgb,var(--err) 45%,var(--border));border-left:4px solid var(--err);background:color-mix(in srgb,var(--err) 8%,var(--surface));border-radius:var(--radius);padding:16px 18px;margin:20px 0}
+.honesty h2{margin:0 0 8px;font-family:var(--font-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--err)}
+.honesty p{margin:0 0 8px;font-size:13.5px;color:var(--text-dim)}
+.honesty p:last-child{margin-bottom:0}
+.honesty strong{color:var(--text)}
+
+.hero{padding:26px 0 4px}
+.hero h1{margin:0 0 6px;font-size:25px;letter-spacing:-.01em;font-weight:650}
+.hero h1 em{font-style:normal;color:var(--acc)}
+.hero p.sub{margin:0;max-width:680px;color:var(--text-dim);font-size:14.5px}
+
+section.panel{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:18px;margin:16px 0}
+section.panel > h3{margin:0 0 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+.field label,.field .flabel{display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:7px}
+.field{margin-bottom:14px}
+.radio-card{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:8px;cursor:pointer}
+.radio-card:has(input:checked){border-color:var(--acc);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.radio-card input{margin-top:3px;accent-color:var(--acc)}
+.radio-card .rc-t{font-size:14px}
+.radio-card .rc-d{font-size:12px;color:var(--muted)}
+.rc-t .tag{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;padding:1px 6px;border-radius:5px;border:1px solid var(--border);margin-left:6px;text-transform:uppercase;color:var(--muted)}
+.rc-t .tag.safe{border-color:color-mix(in srgb,var(--ok) 55%,var(--border));color:var(--ok)}
+.rc-t .tag.risk{border-color:color-mix(in srgb,var(--warn) 55%,var(--border));color:var(--warn)}
+input[type="text"]{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;color:var(--text);font-family:var(--font-mono);font-size:13px}
+input[type="text"]:focus{border-color:var(--acc);outline:none}
+.check{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;padding:6px 13px;font-size:13px;color:var(--text-dim);cursor:pointer}
+.check:has(input:checked){border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.check input{accent-color:var(--acc);margin:0}
+
+/* command cards */
+.cmd{border:1px solid var(--border);border-radius:12px;background:var(--surface-2);padding:12px 14px;margin-bottom:10px}
+.cmd .ctop{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.cmd .cname{font-size:14.5px;font-weight:600}
+.cmd .cwhat{font-size:12.5px;color:var(--muted)}
+.cmd .crow{display:flex;gap:8px;align-items:stretch}
+.cmd code{flex:1;font-family:var(--font-mono);font-size:12.5px;color:var(--acc-hi);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;overflow-x:auto;white-space:pre;display:block}
+.cmd .cbtn{flex:none;border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:0 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
+.cmd .cbtn:hover{border-color:var(--acc);color:var(--acc)}
+.cmd.kill{border-color:color-mix(in srgb,var(--err) 45%,var(--border))}
+.cmd.kill .cname{color:var(--err)}
+
+/* works table */
+table.works{border-collapse:collapse;width:100%;font-size:13px;margin-top:4px}
+table.works th,table.works td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
+table.works th{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);background:var(--surface-2)}
+table.works td .y{color:var(--ok);font-weight:700}
+table.works td .n{color:var(--err);font-weight:700}
+
+.note{font-size:12.5px;color:var(--muted);line-height:1.6}
+.note code{font-family:var(--font-mono);color:var(--acc);font-size:11.5px}
+.bridge{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--text-dim)}
+.bridge .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.bridge.off .dot{background:var(--ok)}
+
+footer.site{padding:16px 0 30px;text-align:center;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Sloboda">SLOBODA</div>
+    <div class="byline">Postern Labs · Waydroid gateway · non-attestable tier</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="honesty" role="alert">
+    <h2>⚠ Read this before you enter Android</h2>
+    <p><strong>This is the non-attestable escape-hatch tier.</strong> It runs a full Google/AOSP Android
+    userland in a Waydroid container. <strong>Entering Android means data leaves the sealed base.</strong></p>
+    <p><strong>Play Integrity STRONG will fail.</strong> Banking apps, Google Wallet/Pay, and DRM video
+    (Widevine L1) detect the environment and refuse to run. That is by design, not a bug we can fix.</p>
+    <p><strong>Not covered by the Postern Seal.</strong> The Android image is mutable state pulled at
+    <code>waydroid init</code>, so <code>os_roothash</code> says nothing about what runs inside it.
+    The coin is worthless; personal use is free. This is not legal advice.</p>
+    <p><strong>UNTESTED scaffold.</strong> There is no Waydroid in the build sandbox, so nothing here has
+    ever booted an Android container. This page cannot talk to Waydroid — it only <em>composes</em> the
+    commands the <code>sloboda</code> wrapper runs on-device.</p>
+  </div>
+
+  <section class="hero">
+    <h1>The <em>escape hatch</em>, honestly labeled.</h1>
+    <p class="sub">Pick the image posture, then copy the exact commands the gateway wrapper runs to start
+    the container, land on the app store, or pull the kill-switch. Default posture is the private,
+    Google-free base. Nothing on this page touches the network.</p>
+  </section>
+
+  <!-- IMAGE POSTURE -->
+  <section class="panel">
+    <h3>1 · Image posture (microG vs GApps is your choice)</h3>
+    <div class="grid2">
+      <div class="field">
+        <span class="flabel">System type — passed to <code>waydroid init -s</code></span>
+        <label class="radio-card"><input type="radio" name="sys" value="VANILLA" checked>
+          <div><div class="rc-t">VANILLA <span class="tag safe">private default</span></div>
+          <div class="rc-d">AOSP with no Google and no microG. Most private base.</div></div></label>
+        <label class="radio-card"><input type="radio" name="sys" value="FOSS">
+          <div><div class="rc-t">FOSS <span class="tag risk">flaky images</span></div>
+          <div class="rc-d">microG-preinstalled image. Upstream images are often unavailable — prefer VANILLA + the microG step.</div></div></label>
+        <label class="radio-card"><input type="radio" name="sys" value="GAPPS">
+          <div><div class="rc-t">GAPPS <span class="tag risk">less private</span></div>
+          <div class="rc-d">Google Play Services. Explicit opt-in — plants Google's blobs in the container.</div></div></label>
+      </div>
+      <div>
+        <div class="field">
+          <span class="flabel">Options</span>
+          <label class="check"><input type="checkbox" id="optMicrog"> add microG after a VANILLA init (separate community step)</label>
+        </div>
+        <div class="field">
+          <label for="storePkg">App-store-first landing package</label>
+          <input type="text" id="storePkg" value="com.aurora.store" spellcheck="false" autocomplete="off">
+          <p class="note" style="margin-top:7px">Aurora Store delivers APKs account-free. It does <strong>not</strong>
+          defeat Play Integrity — protected apps still refuse once installed.</p>
+        </div>
+        <div class="field">
+          <span class="flabel">Privacy bridge (consent-gate owned)</span>
+          <div class="bridge off" id="bridge"><span class="dot"></span>
+            <span>Default-safe: <strong>OFF</strong>. The wrapper only <em>reads</em> the consent-gate
+            toggle at <code>/run/postern/consent/sloboda-bridge.state</code>; it never opens the bridge itself.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMMANDS -->
+  <section class="panel">
+    <h3>2 · Commands the gateway runs</h3>
+    <div id="cmds"></div>
+    <p class="note">Every launcher and command routes through <code>sloboda</code> so the honesty
+    posture banner always shows first. Run <code>sloboda doctor</code> to check readiness without
+    touching Waydroid.</p>
+  </section>
+
+  <!-- WHAT WORKS -->
+  <section class="panel">
+    <h3>3 · What runs, and what refuses</h3>
+    <table class="works">
+      <thead><tr><th>App class</th><th>In this tier</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>FOSS / casual / utility apps</td><td><span class="y">works</span></td><td>No integrity gate.</td></tr>
+        <tr><td>Messengers that don't gate on integrity</td><td><span class="y">works</span></td><td>Run normally in the container.</td></tr>
+        <tr><td>Banking, Google Wallet/Pay</td><td><span class="n">refuses</span></td><td>Play Integrity STRONG needs a hardware TEE keymaster + locked bootloader — unreachable in a container.</td></tr>
+        <tr><td>DRM video (Widevine L1)</td><td><span class="n">refuses / SD-only</span></td><td>No L1 provisioning; drops to L3 or blocks playback.</td></tr>
+        <tr><td>Apps needing DEVICE integrity (A13+)</td><td><span class="n">usually refuses</span></td><td>Key/ID attestation via the Play binary is out of reach on Waydroid.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+
+<footer class="site wrap">Sloboda · non-attestable · Play Integrity STRONG fails · data leaves the sealed base · UNTESTED scaffold · personal-free</footer>
+
+<script>
+"use strict";
+(function () {
+  // Theme toggle — mirrors the other Postern apps (auto → light → dark).
+  var LS_THEME = "sloboda.theme";
+  var btnTheme = document.getElementById("btnTheme");
+  function applyTheme() {
+    var t = "auto";
+    try { t = localStorage.getItem(LS_THEME) || "auto"; } catch (e) {}
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.dataset.theme = t;
+    btnTheme.textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+    btnTheme.setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+  }
+  btnTheme.addEventListener("click", function () {
+    var cur = "auto";
+    try { cur = localStorage.getItem(LS_THEME) || "auto"; } catch (e) {}
+    var next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+    try { localStorage.setItem(LS_THEME, next); } catch (e) {}
+    applyTheme();
+  });
+  applyTheme();
+
+  // Compose the command list from the current posture. Pure string building —
+  // no eval, no network. These are the literal commands the wrapper runs.
+  var cmds = document.getElementById("cmds");
+  function sys() {
+    var r = document.querySelector('input[name="sys"]:checked');
+    return r ? r.value : "VANILLA";
+  }
+  function storePkg() {
+    var v = (document.getElementById("storePkg").value || "").trim();
+    // Keep it to a plausible package token so the composed command is safe to copy.
+    return /^[A-Za-z0-9_.]+$/.test(v) ? v : "com.aurora.store";
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  function build() {
+    var s = sys();
+    var micro = document.getElementById("optMicrog").checked;
+    var pkg = storePkg();
+    var initCmd = "PAW_SYSTEM_TYPE=" + s + (micro ? " PAW_MICROG=1" : "") + " sloboda init";
+    var list = [
+      ["init", "provision the image (" + s + ")", initCmd],
+      ["start", "start container + wait-for-ready", "sloboda start"],
+      ["store", "app-store-first landing", "PAW_STORE_PKG=" + pkg + " sloboda store"],
+      ["ui", "enter the full Android UI", "sloboda show"],
+      ["app", "single-app launch", "sloboda app " + pkg],
+      ["launchers", "write host .desktop icons for installed apps", "sloboda launchers"],
+      ["status", "state + honest posture", "sloboda status"],
+      ["kill", "KILL-SWITCH: stop everything + clear session state", "sloboda kill"]
+    ];
+    var html = "";
+    list.forEach(function (c) {
+      var isKill = c[0] === "kill";
+      html += '<div class="cmd' + (isKill ? " kill" : "") + '">' +
+        '<div class="ctop"><span class="cname">' + esc(c[0]) + '</span>' +
+        '<span class="cwhat">' + esc(c[1]) + '</span></div>' +
+        '<div class="crow"><code>' + esc(c[2]) + '</code>' +
+        '<button class="cbtn" data-copy="' + esc(c[2]) + '">copy</button></div></div>';
+    });
+    cmds.innerHTML = html;
+  }
+  build();
+
+  // Wire inputs to rebuild; wire copy buttons (event-delegated).
+  document.querySelectorAll('input[name="sys"]').forEach(function (el) {
+    el.addEventListener("change", build);
+  });
+  document.getElementById("optMicrog").addEventListener("change", build);
+  document.getElementById("storePkg").addEventListener("input", build);
+  cmds.addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-copy]");
+    if (!b) return;
+    var text = b.getAttribute("data-copy");
+    var done = function () { var t = b.textContent; b.textContent = "copied"; setTimeout(function () { b.textContent = t; }, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { done(); });
+    } else {
+      done();
+    }
+  });
+})();
+</script>
+</body>
+</html>

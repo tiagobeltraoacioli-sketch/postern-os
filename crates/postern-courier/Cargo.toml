@@ -1,0 +1,99 @@
+[package]
+name = "postern-courier"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs Courier — the HYBRID post-quantum payload seal (ML-KEM-1024 + X25519, HKDF combiner) for serverless person-to-person file drop, so a recorded circuit yields no payload plaintext to a harvest-now-decrypt-later adversary (size/timing still visible). Optional ML-DSA-87 sender authentication and a recipient-side anti-replay window are available opt-in (both UNAUDITED, like the seal's own PQ legs). Transport (ephemeral Tor onion hosting) is an opt-in, UNAUDITED reference-prototype behind the `onion-transport` feature; the wire frame itself still has no auth/replay protection of its own."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_courier"
+
+# The human-runnable live onion-drop CLI (examples/onion_drop.rs): seal + sign
+# + publish + serve once on the sender side; the FULL verified-receive
+# pipeline (verify FIRST → replay guard → open, via `fetch_signed_verified`)
+# on the recipient side. Prints the crate's honest-limits text verbatim on
+# every startup — UNAUDITED reference-prototype end to end; the onion address
+# crypto is classical Tor (the PQ hybrid protects the payload, not circuit
+# metadata); a successful round-trip proves plumbing, never anonymity or
+# security. `required-features` keeps default builds/tests Tor-free;
+# `test = true` runs the example's OFFLINE unit tests (arg parsing, hex codec,
+# honest-text guard) under `cargo test --features onion-transport` — no test
+# in the example opens a circuit. The live two-terminal round-trip is a
+# documented MANUAL step (see the example's module docs), not a CI gate.
+[[example]]
+name = "onion_drop"
+required-features = ["onion-transport"]
+test = true
+
+[dependencies]
+# ML-KEM-1024 key encapsulation (FIPS-203) — the post-quantum leg of the hybrid.
+# Same PQ family the node uses. RustCrypto pure-Rust impl (pre-1.0, unaudited —
+# which is exactly why the X25519 leg exists); its `DecapsulationKey` is
+# `ZeroizeOnDrop` (the `zeroize` feature), so the secret key is scrubbed from RAM
+# on drop. Apache-2.0/MIT.
+ml-kem = { version = "0.2", features = ["zeroize"] }
+# ML-DSA-87 (FIPS-204) — the opt-in sender-authentication signature leg
+# (`sender_auth` module): a signature over the sealed transcript so `open`
+# succeeding can also mean "sealed by this verified sender", not just
+# "opened with this recipient key". RustCrypto pure-Rust impl (pre-1.0,
+# UNAUDITED — same caveat as `ml-kem` above); `zeroize` wipes the signing
+# key's seed on drop. `alloc`+`getrandom` (both default features, kept
+# explicit) provide keygen from the OS CSPRNG and heap-backed signing/
+# verifying key types; `pkcs8` is left off (unused here). Apache-2.0/MIT.
+ml-dsa = { version = "0.1", default-features = false, features = ["alloc", "getrandom", "zeroize"] }
+# X25519 — the classical leg of the hybrid KEM (X-Wing-style combiner). Mature,
+# widely deployed dalek implementation; secrets are zeroize-on-drop. BSD-3-Clause.
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+# HKDF-SHA-256 — the KEM combiner KDF (never use a raw KEM secret as an AEAD key).
+hkdf = "0.12"
+sha2 = "0.10"
+# CSPRNG for keygen + encapsulation randomness (OS entropy via getrandom → OsRng).
+rand_core = { version = "0.6", features = ["getrandom"] }
+# The AEAD seal over the KEM shared secret is the canonical Postern seal (postern-core).
+postern-core = { path = "../postern-core" }
+thiserror = "2"
+zeroize = "1"               # wipe the derived AEAD key + raw KEM shared secret from RAM
+
+# --- transport (optional) ----------------------------------------------------
+# The real ephemeral-Tor-onion-service drop, behind the `onion-transport`
+# feature. OFF by default: the crypto seal above is usable standalone and the
+# default test suite stays offline + fast. Turning it on pulls `postern-tor`'s
+# onion-service HOSTING path (the whole arti HS-server stack) plus a tokio I/O
+# surface for framing bytes on the accepted stream.
+postern-tor = { path = "../postern-tor", optional = true, features = ["onion-service"] }
+tokio = { version = "1", optional = true, default-features = false, features = ["io-util", "time"] }
+# rustls with EXACTLY ONE crypto-provider backend (`ring` — permissive:
+# ISC/MIT-style, already in this workspace's tree) — arti's TLS goes through
+# `futures-rustls`, which enables NO provider feature and expects the
+# APPLICATION to pick one; without this, `rustls` 0.23 panics at the first
+# live TLS handshake ("Could not automatically determine the process-level
+# CryptoProvider"), found the first time the live onion round-trip was
+# actually run (2026-07-16, see evidence/live-onion-drop.evidence).
+# `transport::ensure_rustls_crypto_provider` installs it explicitly and
+# idempotently. Provider selection only — this changes no gating, no crypto
+# claims, and nothing about the (unchanged, offline-green) default build,
+# which never compiles this dep.
+rustls = { version = "0.23", optional = true, default-features = false, features = ["ring", "std"] }
+
+[features]
+# Wire the courier seal to a real ephemeral Tor onion-service drop
+# (`transport` module). UNAUDITED reference-prototype; see the module docs for
+# the honest limits (descriptor-publish latency, key custody, the frame itself
+# has no auth/replay protection beyond a size cap — a recipient wanting either
+# opts into `sender_auth::SignedSealedPayload` + `replay::ReplayGuard`). OFF by
+# default.
+onion-transport = ["dep:postern-tor", "dep:tokio", "dep:rustls"]
+# TEST-ONLY: expose `drop_transport::MockDrop` (the in-memory stored-bytes
+# drop implementing the DropSender/DropFetcher seam) to DOWNSTREAM test
+# builds — e.g. the planned Tauri/mobile shells unit-testing their receive
+# plumbing offline. It moves no bytes anywhere and is not a transport of any
+# kind; never enable it in a shipping build. Inside this crate the mock is
+# already available under `cfg(test)` without the feature. Adds no
+# dependencies.
+mock-transport = []
+
+[dev-dependencies]
+# The async framing round-trip + the ignored live-network test need a runtime.
+# `time` + `test-util` back the paused-clock timeout test (drop-I/O deadline
+# fires without a real wall-clock wait).
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util", "time", "test-util"] }

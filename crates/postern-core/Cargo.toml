@@ -1,0 +1,18 @@
+[package]
+name = "postern-core"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs core crypto — the one canonical AEAD seal (XChaCha20-Poly1305, nonce‖ciphertext) and memory-hard KDF (Argon2id) shared by every Postern product, so none can drift on wire format or parameters."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_core"
+
+[dependencies]
+chacha20poly1305 = "0.10"   # XChaCha20-Poly1305 AEAD (24-byte nonce)
+argon2 = "0.5"              # Argon2id passphrase KDF (memory-hard)
+hkdf = "0.12"               # HKDF-SHA-256 subkey derivation (key commitment + context binding)
+sha2 = "0.10"               # hash for HKDF
+subtle = "2"                # constant-time key-commitment comparison
+zeroize = { version = "1", features = ["derive"] }
+thiserror = "2"

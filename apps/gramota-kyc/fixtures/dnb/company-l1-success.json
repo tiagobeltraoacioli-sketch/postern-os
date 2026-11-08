@@ -1,0 +1,16 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs (companyinfo_L1_v1 Data Block); NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "https://directplus.documentation.dnb.com/openAPI.html?apiID=companyinfo (Company Information, Level 1)",
+  "transactionDetail": { "transactionID": "SYNTHETIC-TXN-0001", "transactionTimestamp": "2026-07-01T00:00:00.000Z" },
+  "organization": {
+    "duns": "804735132",
+    "primaryName": "Acme Widgets LLC",
+    "registeredName": "Acme Widgets LLC",
+    "primaryAddress": {
+      "addressCountry": { "isoAlpha2Code": "US", "name": "United States" },
+      "addressRegion": { "name": "California" },
+      "addressLocality": { "name": "San Francisco" }
+    },
+    "dunsControlStatus": { "operatingStatus": { "description": "Active" } }
+  }
+}

@@ -1,0 +1,33 @@
+# Fly config — Postern Cloud (reference-prototype, UNAUDITED staging demo).
+# Runs the hosted LICENSE service. VENDOR_PUBLIC_KEY is a staged Fly secret
+# (fail-closed without it). Hosted = LESS private than self-hosting; no private
+# key ships; not production.
+app = "postern-cloud-demo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Containerfile"
+
+[env]
+  POSTERN_SERVICE = "license"
+  PORT = "8080"
+  POSTERN_TELEMETRY = "off"
+  ALLOWED_ORIGIN = "*"   # demo: allow the public posture/health endpoints to be read cross-origin
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

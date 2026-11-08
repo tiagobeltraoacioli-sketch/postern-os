@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  android-common — shared managed-profile plumbing (library module).
+
+  Intentionally declares NO components. The DeviceAdminReceiver and the
+  provisioning Activity are ABSTRACT here; each consuming app (Porog, NoporIS)
+  registers its own concrete subclass in its own manifest, with its own
+  BIND_DEVICE_ADMIN receiver and device-admin policy resource. This library
+  supplies the shared behaviour, not the declared surface.
+
+  DESIGN ONLY · UNAUDITED · never provisioned on hardware.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

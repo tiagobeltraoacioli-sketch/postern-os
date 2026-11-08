@@ -1,0 +1,60 @@
+# Ezekiel 1 — the access-layer governance engine for Consiglio.
+#
+# "Wheels within wheels" (nested access layers that may never widen themselves),
+# "rims full of eyes" (a SHAKE-256 hash-chained audit trail that sees every
+# grant and denial), the "firmament" (tenant isolation — no data, metadata, or
+# derived signal crosses it), and the "spirit in the wheels" (per-access,
+# fail-closed evaluation). Ezekiel *declares*; Yagabona *runs* the scheduled
+# sweeps it emits as Izbushka manifests.
+#
+# Two editions: Personal (parental control only — parent->child levels, no
+# spying) and Business (a multi-level no-read-up/no-write-down lattice, Chinese
+# walls under Brewer-Nash, and firmament-grade tenant isolation on the
+# customer's own infrastructure — no Postern server).
+#
+# Honesty: UNAUDITED draft. Firmament isolation is enforced *by construction*
+# inside a single process — it is not an OS/kernel boundary. See README.
+[package]
+name = "ezekiel1"
+version = "0.1.0"
+edition = "2021"
+description = "Ezekiel 1 — access-layer governance engine for Consiglio. Nested no-widening layers (wheels within wheels), Bell-LaPadula lattice, Brewer-Nash Chinese walls, firmament tenant isolation, fail-closed per-access evaluation, and a SHAKE-256 hash-chained audit trail (rims full of eyes). Emits Izbushka manifests for Yagabona. UNAUDITED draft."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "ezekiel1"
+# `cdylib` so `cargo build --target wasm32-unknown-unknown` emits a `.wasm`
+# module for wasm-bindgen; `rlib` so the native binary, tests, and sibling
+# crates keep linking the library normally. No effect on the default build.
+crate-type = ["cdylib", "rlib"]
+
+# The native fixture runner for the WASM<->native parity harness. It emits the
+# crate's decisions for `wasm/fixtures.json`; `wasm/parity.mjs` runs the SAME
+# fixtures through the compiled WASM and asserts equality. Native-only (no wasm
+# dep), so `cargo test`/`cargo build` always builds it.
+[[bin]]
+name = "ezekiel1-parity"
+path = "src/bin/ezekiel1-parity.rs"
+
+[features]
+# Compiles the `#[wasm_bindgen]` surface (crate::wasm). Off by default: the
+# native build and `cargo test -p ezekiel1` never pull in wasm-bindgen.
+wasm = ["dep:wasm-bindgen"]
+
+[dependencies]
+postern-trail = { path = "../postern-trail" }       # the ONE shared SHAKE-256 hash-chained audit trail
+postern-policy = { path = "../postern-policy" }     # the ONE shared consent kernel (Decision, Expiry, EnforcementMode)
+serde = { version = "1", features = ["derive"] }   # policy + trail content (de)serialization
+toml = "0.8"                                        # policy documents + emitted Izbushka manifests
+serde_json = "1"                                    # canonical JSON for the policy hash
+sha3 = "0.10"                                       # SHAKE-256 XOF for the policy hash
+time = { version = "0.3", features = ["parsing", "formatting"] } # RFC 3339 grant expiry
+thiserror = "2"                                     # typed errors (matches sibling crates)
+# wasm-bindgen — ONLY under `--features wasm`. The browser console loads the
+# compiled module and drives its access decisions from this crate. Pinned to
+# match the installed `wasm-bindgen` CLI (the versions must agree exactly).
+wasm-bindgen = { version = "0.2.126", optional = true }
+
+[dev-dependencies]
+tempfile = "3"                                       # isolated trails in tests
+time = { version = "0.3", features = ["macros"] }    # datetime! literals for deterministic tests

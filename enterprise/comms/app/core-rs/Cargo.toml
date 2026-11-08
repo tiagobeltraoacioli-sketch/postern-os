@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# Bloch org-messenger — thin Rust core. Standalone crate (own workspace) so it
+# `cargo check`s on its own. It REFERENCES the Postern Messenger E2EE core by
+# path (crates/postern-messenger) to bind conversations to its SecurityTier
+# wall — it does NOT fork it and does NOT enable the heavy `matrix` feature.
+
+[package]
+name = "bloch-comms-core"
+version = "0.1.0"
+edition = "2021"
+description = "Bloch org internal messenger — thin Rust core over the Postern Messenger E2EE tier wall (Business edition only). UNAUDITED reference prototype."
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Standalone: do not get absorbed into the repo root workspace.
+[workspace]
+
+[dependencies]
+# The E2EE core, referenced (not forked). Default features only — the SecurityTier
+# wall + megolm_reference; NOT the `matrix` feature (that pulls matrix-sdk).
+postern-messenger = { path = "../../../../crates/postern-messenger" }
+# Same major as the messenger crate uses — one copy in the lockfile.
+thiserror = "2"

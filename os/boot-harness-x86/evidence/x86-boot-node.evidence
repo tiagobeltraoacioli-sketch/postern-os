@@ -1,0 +1,20 @@
+# Postern OS - QEMU-x86_64 boot evidence (node ISO) - manual harness-equivalent run
+# UNAUDITED / SCAFFOLD. built!=booted; QEMU!=hardware; repro-by-design!=reproduced.
+# Harness fell back to cdrom mode (kernel-path bug, fixed in-repo); this run
+# replays its kernel+initrd branch verbatim with the corrected paths.
+variant     : node (.#iso, prior-green store ISO; CURRENT tree build is red)
+timestamp   : 2026-07-14T19:31:32Z
+host        : Linux 6.12.91-fly x86_64
+qemu        : QEMU emulator version 10.0.8 (Debian 1:10.0.8+ds-0+deb13u1+b2)
+machine     : -machine q35,accel=tcg -cpu max -m 3072 -smp 2
+iso_path    : /nix/store/b4kik0zalx9jmwbb4ifaiz5800hdhfk9-nixos-minimal-25.05.20260102.ac62194-x86_64-linux.iso/iso/nixos-minimal-25.05.20260102.ac62194-x86_64-linux.iso
+iso_sha256  : 8f575705fd437314c9f2dd4a873d523890294b36e3fc323df54cbfea026c0f4b
+kernel      : /nix/tmp/x86kern/bzImage (from ISO boot/nix/store/fgl673j31yjpahgsfa88llvsw83cbbnf-linux-6.12.63/bzImage)
+initrd      : /nix/tmp/x86kern/initrd (from ISO boot/nix/store/zgd05qsimxj0jn9b8kxqk0l0hz7hw0v2-initrd-linux-6.12.63/initrd)
+append      : init=/nix/store/y0fl7akrksdbnay01ik0572lbsq08r6d-nixos-system-postern-os-25.05.20260102.ac62194/init root=LABEL=nixos-minimal-25.05-x86_64 boot.shell_on_fail nohibernate lsm=landlock,yama,bpf loglevel=7 console=ttyS0,115200
+markers     : /root/blochchk/os/boot-harness-x86/success-markers-x86.txt
+grader      : /root/blochchk/os/boot-harness/check-boot-log.sh (Dev O4, read-only)
+log         : /root/x86-boot.log
+boot_mode   : kernel+initrd (serial forced) [manual, harness-equivalent]
+boot_rc     : 124
+check_rc    : 0

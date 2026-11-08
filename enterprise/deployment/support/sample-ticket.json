@@ -1,0 +1,15 @@
+{
+  "ticket_id": "PE-2026-0001",
+  "opened_at": "2026-07-12T14:03:00Z",
+  "org_ref": "lic-8f3a2c",
+  "contact": "ops@example-operator.invalid",
+  "severity": "sev2",
+  "tier": "business",
+  "component": "deployment",
+  "summary": "Container fails health check after config mount change",
+  "details": "After switching config to a read-only mount the service exits at start. Attaching our own redacted logs.",
+  "status": "open",
+  "acknowledged_at": null,
+  "resolved_at": null,
+  "retention_days": 365
+}

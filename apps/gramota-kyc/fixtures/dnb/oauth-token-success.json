@@ -1,0 +1,7 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs; NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "https://directplus.documentation.dnb.com/ (OAuth2 client-credentials token response, v3/token)",
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.SYNTHETIC.SIGNATURE",
+  "expires_in": 86400,
+  "token_type": "bearer"
+}

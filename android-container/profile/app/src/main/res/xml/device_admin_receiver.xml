@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  Device-admin policy declaration for PosternDeviceAdminReceiver.
+
+  These are the policies the DPC MAY exercise as profile owner. Declaring a policy
+  here does not exercise it; the baseline lockdown is applied in code
+  (dpc/LockdownPolicy.kt) once we become profile owner.
+
+  DESIGN ONLY · UNAUDITED · never provisioned on hardware.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- Container-only wipe (profile-scoped wipeData) — no personal-data loss. -->
+        <wipe-data />
+        <!-- Force a work-challenge / lock-quality on the managed profile. -->
+        <limit-password />
+        <watch-login />
+        <!-- Re-lock (evict keys, seal vault) — used by the Panic Lock path. -->
+        <force-lock />
+        <!-- Disable framework features inside the profile (e.g. screen capture). -->
+        <disable-keyguard-features />
+    </uses-policies>
+</device-admin>

@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-release-manifest — DEV/TESTING-ONLY signed release manifest
+# (name/size/SHA-256 per artifact + a detached HYBRID Falcon-1024‖ML-DSA-87
+# signature over the manifest bytes) for packaging/build-signed-bundle.sh.
+#
+# STANDALONE crate: like packaging/tuf-channel, this crate carries its OWN
+# empty [workspace] table so it is intentionally NOT a member of the ancestor
+# bloch-protocol workspace (whose `members` list is frozen/off-limits) — it
+# builds and tests in isolation and stays re-homeable. The root Cargo.toml is
+# deliberately untouched: no root member path-depends on this crate, so the
+# root `exclude` list does not need to name it either (same as tuf-channel).
+#
+# REUSE, NOT DUPLICATION: the hybrid signer lives in crates/postern-release
+# (also a standalone workspace root) and is consumed here as a plain path
+# dependency. This crate adds ONLY the JSON release-manifest schema and the
+# fail-closed against-directory re-check; all Falcon-1024 + ML-DSA-87
+# (AND-of-both) signing/verifying is postern_release::sign, unmodified.
+#
+# HONESTY: dev keys only, UNAUDITED (pqcrypto-falcon wraps unaudited PQClean C;
+# ml-dsa is pre-1.0), LOCAL metadata only — no live update server exists. The
+# hybrid signature COMPLEMENTS (does not replace) the repo's existing
+# minisign(Ed25519) release convention, and proves origin+integrity of the
+# manifest only — not attestation, not reproducibility, not an audit.
+#
+# Permissive-only dependency tree (MIT/Apache-2.0/BSD/ISC/Unlicense/Zlib/
+# Unicode/CC0 via PQClean) — NO GPL/AGPL anywhere.
+
+[workspace]
+
+[package]
+name = "postern-release-manifest"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "DEV-ONLY signed release manifest (name/size/SHA-256 + detached hybrid Falcon-1024‖ML-DSA-87 signature via postern-release) for the packaging bundle pipeline. UNAUDITED; dev keys only; no live update endpoint; complements, does not replace, minisign."
+
+[lib]
+name = "postern_release_manifest"
+path = "src/lib.rs"
+
+[[bin]]
+name = "postern-release-manifest"
+path = "src/bin/postern-release-manifest.rs"
+
+[dependencies]
+# The existing hybrid Falcon-1024 + ML-DSA-87 signer (MIT OR Apache-2.0),
+# reused as-is — see the header comment. It is its own workspace root; a path
+# dependency across workspace roots resolves it as an external package.
+postern-release = { path = "../../crates/postern-release" }
+# JSON schema for release-manifest.json (both MIT OR Apache-2.0).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# RFC 3339 `created_at` timestamps (Unlicense OR MIT) — same crate the
+# sibling tuf-channel already uses for TUF expiries.
+jiff = "0.2"
+# SHA-256 of artifacts (RustCrypto, MIT OR Apache-2.0) + hex encoding.
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "2"
+
+[dev-dependencies]
+# Throwaway bundle dirs for tests/roundtrip.rs — keeps fixtures out of the
+# repo tree, same rationale as postern-release's own dev-dependency.
+tempfile = "3"

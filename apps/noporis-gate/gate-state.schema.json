@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://posternlabs.com/schema/noporis-gate.state.v1.json",
+  "title": "NoporIS Gate — guarded-crossing consent state (v1)",
+  "description": "The single local state file the NoporIS bridge wrapper reads to decide (a) whether the user has consented to STAND ON the bridge between two personas (a near/clean side and a far Google-Play side, both persisting), and (b) which per-capability crossings are currently lent across. EVERY crossing defaults to DENY (never given). The wrapper MUST treat a missing file, an unparseable file, or any missing field as full-deny + not-consented. The kill-switch drops the span but NEVER destroys sealed wallet state on the near side (sealedWallet.preserved is fixed true). The far/Google-Play side is the LESS-PRIVATE, NON-ATTESTABLE side by construction — it phones home to Google; there is no Tor rail and no Seal here. NoporIS is an app on stock Android, NOT 'Postern OS'; a rooted/compromised host defeats the separation. Nothing here is telemetry; this file never leaves the device. Canonical path (documented, not enforced by this schema): /var/lib/postern/noporis-gate/state.json (0600, root-owned). UNTESTED: the wrapper that consumes this file does not exist yet. Reference-prototype, UNAUDITED. The coin is not a security. Not legal advice.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "tier", "consent", "crossings", "killSwitch", "sealedWallet"],
+  "properties": {
+    "schema": {
+      "const": "postern.noporis-gate.state",
+      "description": "Discriminator so the wrapper can refuse a foreign file outright."
+    },
+    "version": {
+      "const": 1,
+      "description": "State schema version. Bump on any breaking change; the wrapper must full-deny on an unknown version."
+    },
+    "tier": {
+      "const": "non-attestable",
+      "description": "Honesty rail: the far (Google-Play) side is ALWAYS the non-attestable side. It is not covered by any Postern Seal and reflects no measured boot. The value is fixed so no code path can silently relabel it as attested."
+    },
+    "lang": {
+      "type": "string",
+      "enum": ["pt-BR", "en"],
+      "default": "en",
+      "description": "Last UI language the operator selected. Cosmetic; the wrapper may ignore it."
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "scope"],
+      "description": "First-entry consent to STAND ON the bridge. The user read the honest disclosure (the far side is less-private, phones home to Google, non-attestable) and accepted. Default DENY: not standing on the bridge unless entered on purpose.",
+      "properties": {
+        "accepted": {
+          "type": "boolean",
+          "default": false,
+          "description": "True only after the operator read the honest disclosure and accepted. Default DENY."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["session", "persistent"],
+          "default": "session",
+          "description": "'session' = consent valid for this boot only (re-ask next boot); 'persistent' = remembered across boots until revoked. Default is the safer 'session'."
+        },
+        "acceptedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp of acceptance, or null. Local record only."
+        }
+      }
+    },
+    "crossings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clipboard", "files", "mic", "camera", "location"],
+      "description": "Per-capability crossings — each a deliberate hand-over lent across the bridge between the two personas. A crossing is a covert channel if silently on, so each defaults to DENY (never given) and is only ever open by an explicit, disclosed toggle the user throws, and is individually revocable. The wrapper maps an open crossing to the concrete cross-profile plumbing (framework cross-profile intent/clipboard/file controls, device passthrough) and exposes NOTHING for a closed/absent crossing. Anti-round-up: nothing crosses that the user did not hand across.",
+      "properties": {
+        "clipboard": { "$ref": "#/definitions/crossing", "description": "Clipboard hand-over across the two personas. Default DENY." },
+        "files":     { "$ref": "#/definitions/crossing", "description": "Shared files/folder hand-over across the two personas. Default DENY." },
+        "mic":       { "$ref": "#/definitions/crossing", "description": "Microphone hand-over. Default DENY." },
+        "camera":    { "$ref": "#/definitions/crossing", "description": "Camera hand-over. Default DENY." },
+        "location":  { "$ref": "#/definitions/crossing", "description": "Location/GPS hand-over. Default DENY." }
+      }
+    },
+    "killSwitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engaged"],
+      "description": "Operator kill-switch — DROPS THE SPAN. When engaged, the wrapper MUST stop the far side entirely and refuse to lend any crossing until disengaged. Engaging is always allowed and NEVER destroys sealed wallet state on the near side (see sealedWallet). The near side (the door, keys) is untouched; disengaging restores the prior consented posture.",
+      "properties": {
+        "engaged": {
+          "type": "boolean",
+          "default": false,
+          "description": "True = span dropped, far side stopped, nothing crosses. Default not-engaged so a fresh file does not wedge a legitimately-entered bridge; crossings still lend ONLY if consent.accepted is also true."
+        },
+        "engagedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp the kill-switch was last engaged, or null."
+        }
+      }
+    },
+    "sealedWallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved"],
+      "description": "Invariant rail: cutting the bridge must never destroy the sealed wallet/keys on the near side. 'preserved' is fixed true (never taken from input, like 'tier'); no state file and no kill-switch path can clear it. The door and its keys survive the span dropping.",
+      "properties": {
+        "preserved": {
+          "const": true,
+          "description": "Fixed true. The sealed wallet on the near side is never destroyed by the bridge, its crossings, or the kill-switch."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["open"],
+      "description": "One per-capability crossing. DENY by default; open only by an explicit, disclosed, individually-revocable toggle.",
+      "properties": {
+        "open": {
+          "type": "boolean",
+          "default": false,
+          "description": "True = this capability is lent across the bridge right now. Default DENY. Any value that is not exactly true is treated as never-given."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["session", "persistent"],
+          "default": "session",
+          "description": "'session' = the hand-over lasts this boot only; 'persistent' = remembered until revoked. A revoked or expired crossing collapses to 'never given'. Default is the safer 'session'."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["near-to-far", "far-to-near"],
+          "default": "near-to-far",
+          "description": "The DPM (data-policy / crossing-direction) lane this crossing authorises — read by the cross-persona bridge glue (apps/noporis-bridge-glue). A crossing authorises exactly ONE lane, never both: 'near-to-far' = the clean/near side hands the capability to the Google-Play/far side; 'far-to-near' = the far side pushes it INTO the hardened near side (the more dangerous ingest lane, so it must be chosen on purpose). Mirrors the signed per-direction ConsentRecord: clipboard near→far does NOT authorise clipboard far→near. Missing/unknown collapses to 'near-to-far' (single lane, never widened). Optional so pre-direction state files still validate; the wrapper treats an absent value as 'near-to-far'."
+        },
+        "openedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp the crossing was opened, or null when closed. Local record only."
+        }
+      }
+    }
+  }
+}

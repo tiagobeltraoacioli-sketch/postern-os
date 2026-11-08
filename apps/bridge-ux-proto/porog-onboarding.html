@@ -1,0 +1,324 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Porog — onboarding & honest attestation posture (UX prototype)</title>
+<!--
+  Porog onboarding UX PROTOTYPE — surface design only, UNAUDITED. Self-contained.
+  The load-bearing honesty: Porog is a KEY-ATTESTED DEVICE, NOT a measured-boot
+  workspace. Android Key Attestation measures the PHONE, never the workspace. No
+  Postern Seal, no os_roothash, no measured boot covers Porog. Play Integrity
+  STRONG will fail on rooted / unlocked / custom-ROM devices and we REPORT the
+  real verdict — no padlock theater, no spoofing. Porog runs on STOCK Android:
+  no root, no OS replacement, self-enrolled DPC. Never "Postern OS".
+  The on-device provisioning + StrongBox path DO NOT EXIST HERE (UNTESTED).
+-->
+<style>
+  :root{
+    --bg:#0d1014; --panel:#161b21; --panel2:#1e242c; --panel3:#252d37; --line:#2b333d;
+    --ink:#e7edf3; --dim:#95a2af; --faint:#69737e;
+    --door:#5aa9e6; --door-bg:#0f2436; --door-line:#2c5f86;
+    --true:#3fb27f; --true-bg:#12241c; --true-line:#255c44;
+    --cant:#e08a3a; --cant-bg:#2a1d0e; --cant-line:#7a4f1c; --cant-ink:#f4c88a;
+    --fail:#e0544a; --fail-bg:#2a1513; --fail-line:#7a2a24;
+    --focus:#5aa9e6; --shadow:0 10px 40px rgba(0,0,0,.5);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#e9edf2; --panel:#ffffff; --panel2:#f1f4f8; --panel3:#e7ecf2; --line:#d3dbe4;
+      --ink:#14202b; --dim:#54606e; --faint:#8593a1;
+      --door:#2b6cb0; --door-bg:#e8f1fb; --door-line:#a9cdec;
+      --true:#1d8a5c; --true-bg:#e7f6ee; --true-line:#a9dcc3;
+      --cant:#b56612; --cant-bg:#fdf1df; --cant-line:#e6bd7c; --cant-ink:#8a5410;
+      --fail:#c23a30; --fail-bg:#fdecea; --fail-line:#f0b6b0;
+      --focus:#2b6cb0; --shadow:0 10px 40px rgba(20,40,60,.15);
+    }
+  }
+  :root[data-theme="dark"]{color-scheme:dark;} :root[data-theme="light"]{color-scheme:light;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:460px;margin:0 auto;padding:16px 14px 56px;}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 12px;}
+  .top h1{font-size:17px;margin:0;}
+  .top .sub{color:var(--dim);font-size:12px;margin:1px 0 0;}
+  .themebtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel2);color:var(--dim);border-radius:8px;padding:5px 9px;}
+
+  /* stepper */
+  .steps{display:flex;gap:6px;margin:0 0 14px;}
+  .steps .s{flex:1;height:4px;border-radius:2px;background:var(--line);}
+  .steps .s.done{background:var(--door);}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 12px;
+    box-shadow:var(--shadow);}
+  .card h2{font-size:16px;margin:0 0 6px;display:flex;align-items:center;gap:8px;}
+  .card p{color:var(--dim);font-size:13px;margin:0 0 10px;}
+  .card p.ink{color:var(--ink);}
+
+  .doormark{width:44px;height:44px;border-radius:12px;background:var(--door-bg);border:1px solid var(--door-line);
+    display:flex;align-items:center;justify-content:center;color:var(--door);flex:0 0 auto;}
+  .btn{font:inherit;font-size:14px;font-weight:700;cursor:pointer;border-radius:11px;padding:12px 16px;
+    border:1px solid var(--door);background:var(--door);color:#04121e;width:100%;}
+  .btn.ghost{background:var(--panel2);color:var(--ink);border-color:var(--line);}
+  .btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .btnrow{display:flex;gap:9px;margin-top:6px;}
+  .btnrow .btn{width:auto;flex:1;}
+
+  /* the honest posture card — what IS and what is NOT proven */
+  .posture{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0 0;}
+  .posture .ph{padding:11px 13px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px;}
+  .posture .ph.is{background:var(--true-bg);color:var(--true);border-bottom:1px solid var(--true-line);}
+  .posture .ph.isnt{background:var(--cant-bg);color:var(--cant-ink);border-bottom:1px solid var(--cant-line);border-top:1px solid var(--line);}
+  .posture ul{list-style:none;margin:0;padding:8px 13px 12px;}
+  .posture li{font-size:12.5px;color:var(--ink);padding:5px 0 5px 22px;position:relative;line-height:1.4;}
+  .posture li::before{position:absolute;left:0;top:4px;font-weight:800;}
+  .posture .is li::before{content:"✓";color:var(--true);}
+  .posture .isnt li::before{content:"✕";color:var(--cant);}
+  .posture li b{color:var(--ink);}
+
+  .qual{background:var(--cant-bg);border:1px solid var(--cant-line);color:var(--cant-ink);border-radius:10px;
+    padding:11px 13px;font-size:13px;margin:12px 0;line-height:1.45;}
+  .qual b{color:var(--cant-ink);}
+
+  /* tier simulator */
+  .seg{display:flex;gap:6px;margin:8px 0 4px;flex-wrap:wrap;}
+  .seg button{flex:1;min-width:96px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;
+    padding:8px 6px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);}
+  .seg button.sel{border-color:var(--door);color:var(--ink);background:var(--door-bg);}
+  .seg button:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+
+  .verdict{border-radius:12px;padding:13px 14px;margin:12px 0 0;border:1px solid var(--line);background:var(--panel2);}
+  .verdict .vtop{display:flex;align-items:center;gap:10px;}
+  .verdict .vmark{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:15px;flex:0 0 auto;}
+  .verdict .vname{font-weight:800;font-size:14px;}
+  .verdict .vtier{font-size:11px;color:var(--dim);margin-top:1px;}
+  .verdict .vbody{font-size:12.5px;color:var(--ink);margin-top:9px;line-height:1.45;}
+  .verdict.tier-strong .vmark{background:var(--true-bg);color:var(--true);border:1px solid var(--true-line);}
+  .verdict.tier-strong{border-color:var(--true-line);}
+  .verdict.tier-tee .vmark{background:var(--door-bg);color:var(--door);border:1px solid var(--door-line);}
+  .verdict.tier-tee{border-color:var(--door-line);}
+  .verdict.tier-fail .vmark{background:var(--fail-bg);color:var(--fail);border:1px solid var(--fail-line);}
+  .verdict.tier-fail{border-color:var(--fail-line);}
+  .verdict.tier-none .vmark{background:var(--panel3);color:var(--dim);}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid currentColor;}
+
+  /* NO padlock — we deliberately do not draw a lock icon on any verdict */
+  .nolock{font-size:11px;color:var(--faint);margin-top:9px;font-style:italic;}
+
+  .foot{color:var(--faint);font-size:11px;margin:16px 2px 0;line-height:1.55;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Porog — the guarded door</h1>
+      <p class="sub">A locked-down work profile you enroll yourself, on the phone you already own</p>
+    </div>
+    <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle theme">◐ theme</button>
+  </div>
+
+  <div class="steps" id="steps">
+    <span class="s done"></span><span class="s"></span><span class="s"></span><span class="s"></span>
+  </div>
+
+  <!-- STEP 1 — what Porog is -->
+  <div class="card" id="step1">
+    <h2><span class="doormark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M4 21h16M14 12h.5"/></svg>
+    </span>A door, not a new phone</h2>
+    <p class="ink">Porog self-enrolls a <b>managed work profile</b> on your <b>stock, un-rooted Android</b>.
+      No root, no OS replacement, no unlock. Your wallet-side apps live behind that door; the rest of your
+      phone is untouched.</p>
+    <div class="qual" role="note">
+      <b>Read this once, plainly.</b> Porog is a <b>key-attested device — not a measured-boot workspace.</b>
+      It attests the <b>phone</b> (its keystore, boot and patch state), and it is <b>not a measured-boot
+      workspace</b>: it says nothing about the code or contents inside the profile. There is <b>no Postern
+      Seal, no measured boot, no os_roothash</b> here — that belongs to Postern OS Mobile alone. A rooted or
+      kernel-compromised host defeats the whole boundary. <b>Hardened, not anonymous. UNAUDITED.</b>
+    </div>
+    <button class="btn" id="go1" type="button">I understand — set up the door</button>
+  </div>
+
+  <!-- STEP 2 — enroll / provision -->
+  <div class="card hide" id="step2">
+    <h2>Enroll the work profile</h2>
+    <p>Android provisions a managed profile you own (<code>ACTION_PROVISION_MANAGED_PROFILE</code>). It stays
+      on your device — <b>no data leaves</b>, nothing is sent to a server. You can wipe just this profile at
+      any time, leaving the rest of the phone intact.</p>
+    <p class="ink">What the door locks down inside itself: screenshots, IME leakage, cross-profile clipboard,
+      unknown-source installs — configured by the DPC, not by root.</p>
+    <div class="btnrow">
+      <button class="btn ghost" id="back2" type="button">Back</button>
+      <button class="btn" id="go2" type="button">Provision the profile</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 — attestation, honest -->
+  <div class="card hide" id="step3">
+    <h2>Attestation — shown only where it's true</h2>
+    <p>Porog can prove hardware facts about <b>this phone</b> with Android Key Attestation, backed by StrongBox
+      where the chip exists (a TEE fallback where it doesn't). We show the <b>tier you actually got</b> — and
+      we never draw a padlock the device didn't earn.</p>
+
+    <div style="font-size:12px;color:var(--dim);margin:10px 0 2px;">Simulate this device's hardware:</div>
+    <div class="seg" id="tierSeg">
+      <button data-tier="strong" class="sel" type="button">StrongBox HSM</button>
+      <button data-tier="tee" type="button">TEE fallback</button>
+      <button data-tier="fail" type="button">Unlocked / rooted</button>
+    </div>
+
+    <div class="verdict tier-strong" id="verdict">
+      <div class="vtop">
+        <div class="vmark" id="vMark">✓</div>
+        <div><div class="vname" id="vName"></div><div class="vtier" id="vTier"></div></div>
+      </div>
+      <div class="vbody" id="vBody"></div>
+      <div class="nolock">No padlock is drawn here — a padlock on an unearned tier is theater we reject. The words above are the real verdict.</div>
+    </div>
+
+    <div class="posture">
+      <div class="ph is">What this attestation PROVES</div>
+      <ul class="is" id="provesList"></ul>
+      <div class="ph isnt">What it does NOT prove — ever</div>
+      <ul class="isnt">
+        <li>That the <b>workspace</b> ran unmodified — attestation measures the phone, <b>not</b> the code inside the profile.</li>
+        <li>Any <b>measured-boot / Postern Seal / os_roothash</b> property — Porog is <b>not a measured-boot workspace</b>.</li>
+        <li>That the wallet key lives in StrongBox — StrongBox is classical P-256; it <b>wraps</b> the post-quantum key at rest, it does <b>not</b> hold or sign it.</li>
+        <li>That a <b>rooted host</b> is defeated — a kernel compromise crosses this boundary.</li>
+      </ul>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn ghost" id="back3" type="button">Back</button>
+      <button class="btn" id="go3" type="button">Continue</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 — Play Integrity reality -->
+  <div class="card hide" id="step4">
+    <h2>Play Integrity — the honest reality</h2>
+    <p>Play Integrity is a <b>second, independent signal</b> from Google, layered on top of Key Attestation.
+      We <b>report the real verdict</b> and never spoof it. STRONG <b>will fail</b> for many of the people who
+      most want Porog — that failing result is honest, not a bug.</p>
+
+    <div style="font-size:12px;color:var(--dim);margin:10px 0 2px;">Simulate the device's Play Integrity result:</div>
+    <div class="seg" id="piSeg">
+      <button data-pi="strong" class="sel" type="button">STRONG</button>
+      <button data-pi="device" type="button">DEVICE</button>
+      <button data-pi="basic" type="button">BASIC</button>
+      <button data-pi="none" type="button">No token (microG)</button>
+    </div>
+    <div class="verdict" id="piVerdict">
+      <div class="vtop">
+        <div class="vmark" id="piMark"></div>
+        <div><div class="vname" id="piName"></div><div class="vtier" id="piTier"></div></div>
+      </div>
+      <div class="vbody" id="piBody"></div>
+    </div>
+    <p style="font-size:12px;color:var(--dim);margin-top:12px;">The cryptographic anchor is Key Attestation, which
+      works even with no Google Play at all. Play Integrity never gates you out — a custom-ROM user who fails STRONG
+      can still present a valid device attestation.</p>
+    <div class="btnrow">
+      <button class="btn ghost" id="back4" type="button">Back</button>
+      <button class="btn" id="done4" type="button">Finish — enter the door</button>
+    </div>
+  </div>
+
+  <p class="foot">
+    Porog is the guarded <b>door</b>; <b>NoporIS</b> is the guarded <b>bridge</b> — different products, one shared
+    signer. Trust roots here rest on <b>Google's CA + the OEM</b> — a real third-party dependency; the
+    self-sovereign answer is Postern OS Mobile, not Porog. “Play Integrity”, “Google Play”, “Android”,
+    “StrongBox” are named nominatively; no affiliation, no fake attestation. “Porog” is a proposed name pending
+    trademark clearance. Reference-prototype, UNAUDITED — <b>built ≠ booted</b>. The coin is not a security;
+    personal use is free; not legal advice.
+  </p>
+</div>
+
+<script type="module">
+const $ = (id)=>document.getElementById(id);
+const stepEls = ["step1","step2","step3","step4"].map($);
+let step = 0;
+function show(n){
+  step = n;
+  stepEls.forEach((el,i)=>el.classList.toggle("hide", i!==n));
+  document.querySelectorAll("#steps .s").forEach((s,i)=>s.classList.toggle("done", i<=n));
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+$("go1").onclick=()=>show(1);
+$("back2").onclick=()=>show(0); $("go2").onclick=()=>show(2);
+$("back3").onclick=()=>show(1); $("go3").onclick=()=>show(3);
+$("back4").onclick=()=>show(2);
+$("done4").onclick=()=>{ $("done4").textContent="Door open (prototype — nothing booted)"; $("done4").disabled=true; };
+
+/* ---- Key-Attestation tier: report the tier actually obtained ---- */
+const TIERS = {
+  strong:{ cls:"tier-strong", mark:"✓", name:"StrongBox key attestation — Genuine",
+    tier:"security level: StrongBox · verified boot · device locked",
+    body:"A key provably resident in this phone's discrete hardware security module, on a Google-CA-rooted chain, with your fresh nonce echoed. This is a <b>key-attested device</b> — and still <b>not a measured-boot workspace</b>.",
+    proves:["A key bound to a <b>discrete HSM</b> (StrongBox), side-channel resistant.","<b>verified boot = Verified</b>, bootloader locked, OS patch level (anti-rollback).","The attesting app is Porog (package + signing digest pinned)."] },
+  tee:{ cls:"tier-tee", mark:"~", name:"TEE key attestation — Genuine (fallback tier)",
+    tier:"security level: TrustedEnvironment · no StrongBox chip on this device",
+    body:"No discrete StrongBox chip here, so the key lives in the TEE instead. Honest downgrade: the UI says <b>TEE tier, not StrongBox</b>. Still a <b>key-attested device</b>, still <b>not a measured-boot workspace</b>.",
+    proves:["A hardware-backed key in the <b>TEE</b> (not the discrete HSM).","<b>verified boot = Verified</b>, device locked, patch level present.","The attesting app is Porog (package + signing digest pinned)."] },
+  fail:{ cls:"tier-fail", mark:"✕", name:"Attestation FAILS — unlocked / rooted device",
+    tier:"verified boot ≠ Verified · fail-closed → Unverified",
+    body:"The bootloader is unlocked or the device is rooted, so verified boot is not <b>Verified</b>. We <b>fail closed</b> — no attestation is asserted. We do not fake one. Hardened requires a locked, certified device; this isn't one.",
+    proves:["<b>Nothing is asserted</b> — fail-closed is the honest result.","No pinned root or a broken chain ⇒ <b>Unverified</b>, never accepted.","We never spoof a verdict to paper over this."] },
+};
+function renderTier(t){
+  const d = TIERS[t], v = $("verdict");
+  v.className = "verdict "+d.cls;
+  $("vMark").textContent = d.mark; $("vName").innerHTML = d.name; $("vTier").textContent = d.tier;
+  $("vBody").innerHTML = d.body;
+  $("provesList").innerHTML = d.proves.map(x=>`<li>${x}</li>`).join("");
+}
+$("tierSeg").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{ $("tierSeg").querySelectorAll("button").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); renderTier(b.dataset.tier); };
+});
+renderTier("strong");
+
+/* ---- Play Integrity: report the real verdict, never gate hard ---- */
+const PI = {
+  strong:{ cls:"tier-strong", mark:"✓", name:"MEETS_STRONG_INTEGRITY",
+    tier:"stock · locked bootloader · Play-certified · hardware-backed",
+    body:"The strongest signal — achievable only on a stock, locked, Play-certified device. Reported as-is; still just a <b>signal</b>, not the trust anchor." },
+  device:{ cls:"tier-tee", mark:"~", name:"MEETS_DEVICE_INTEGRITY",
+    tier:"genuine Android device, Play-enabled — the realistic baseline",
+    body:"A genuine, Play-enabled device that isn't reaching STRONG. We say so plainly — bootloader / certification state is usually why — and we do not pretend it is STRONG." },
+  basic:{ cls:"tier-none", mark:"·", name:"MEETS_BASIC_INTEGRITY",
+    tier:"weak signal — may pass emulators / uncertain devices",
+    body:"Treat this as barely a signal. Reported honestly; it changes nothing about the cryptographic anchor." },
+  none:{ cls:"tier-none", mark:"—", name:"No token — microG / Google-free device",
+    tier:"absence of a signal — NOT a failure",
+    body:"A Google-free device can't produce a Play Integrity token at all. We treat that as <b>absence of a signal</b>, not failure, and fall back to Key Attestation as the sole anchor." },
+};
+function renderPI(k){
+  const d = PI[k], v = $("piVerdict");
+  v.className = "verdict "+d.cls;
+  $("piMark").textContent = d.mark; $("piName").textContent = d.name; $("piTier").textContent = d.tier;
+  $("piBody").innerHTML = d.body;
+}
+$("piSeg").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{ $("piSeg").querySelectorAll("button").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); renderPI(b.dataset.pi); };
+});
+renderPI("strong");
+
+$("themeBtn").onclick = ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+};
+show(0);
+</script>
+</body>
+</html>

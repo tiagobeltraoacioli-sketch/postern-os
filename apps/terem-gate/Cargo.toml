@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# terem-gate — the Terem (desktop guest sandbox) DATA-CROSSING consent tier.
+#
+# SCAFFOLD / reference-prototype — UNAUDITED. Certifies nothing.
+#
+# This crate is the fifth `terem-gate` consent tier `docs/os-portal-v2/
+# 02-security-consent-privacy.md` §3 and `docs/os-portal-v2/B-sandbox-consent.md`
+# §2 specify: the five guest<->host bridges (clipboard, sharedFolder, network,
+# usb, audio) that cross Terem's KVM/QEMU or container guest boundary, each
+# deny-by-default, per-direction, individually revocable. It REUSES, unchanged in
+# shape, the signed `ConsentRecord` model `apps/noporis-bridge-glue/src/
+# consent_record.rs` already implements and tests: signature -> instance binding
+# -> direction -> capability -> time-box, HOST-only-minted. The guest is not a
+# second physical device (host+guest are co-resident on one machine), so the
+# pairing/transport layer NoporIS needs is dropped; every other rail is kept.
+#
+# RAILS (carry on every surface): reference-prototype, UNAUDITED; the Terem guest
+# is the non-attestable tier, by construction, forever (`02-security-consent-
+# privacy.md` SS6); every bridge is CLOSED by default and stays closed until an
+# explicit, disclosed, individually-revocable consent opens it; only the HOST
+# mints a `ConsentRecord`, the guest can only ever ASK
+# (`ConsentRequest` carries no signature field, by construction); USB device
+# identity (vendor:product:serial) is firmware-reported and spoofable by a
+# BadUSB-class device -- an allowlist convenience, not a cryptographic identity;
+# a `sharedFolder.hostPath` overlapping Terem's own state/audit/WINEPREFIX dirs
+# is rejected at mint time, fail-closed; a rooted/compromised host defeats every
+# boundary here, same as every other Postern bridge product; the coin (BLCH) is
+# not a security and buys no software.
+
+[package]
+name = "terem-gate"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY -- unaudited Terem (desktop guest sandbox) consent tier: the five guest<->host bridges (clipboard, sharedFolder, network, usb, audio), each deny-by-default, per-direction, individually revocable, reusing noporis-bridge-glue's signed ConsentRecord model (signature -> instance binding -> direction -> capability -> time-box). HOST-only-minted; the guest can only ask. Not secure, not deployed."
+publish = false
+
+# Standalone by design (mirrors apps/noporis-bridge-glue): this crate owns its
+# own empty `[workspace]` so it builds/tests alone, without folding into the
+# ancestor bloch-protocol virtual workspace.
+[workspace]
+
+[lib]
+name = "terem_gate"
+path = "src/lib.rs"
+
+[dependencies]
+# Ed25519 signatures for the ConsentRecord -- pure-Rust RustCrypto/dalek, no
+# unsafe in our crate. REFERENCE: a classical key standing in for the host's
+# real on-device signer.
+ed25519-dalek = "2"
+# OS entropy for minting the host-side signing key.
+getrandom = "0.2"
+# Typed, fail-closed errors (house style).
+thiserror = "2"
+# The ONE shared append-only, SHAKE-256 hash-chained audit trail
+# (yagabona/ezekiel1's extracted mechanism, `apps/noporis-bridge-glue` reuses
+# the same crate). The Terem audit ledger is TeremAuditRecord over this -- size
+# + digest of anything content-bearing, never raw bytes.
+postern-trail = { path = "../../crates/postern-trail" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"

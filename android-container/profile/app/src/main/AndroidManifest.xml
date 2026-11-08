@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  Postern Container — DPC / managed-profile app shell. DESIGN ONLY · UNAUDITED.
+  A self-enrolled Device Policy Controller that provisions an Android managed
+  profile (work profile). No root, no OS replacement. Attests the phone, not the
+  workspace. Hardened, not anonymous.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Managed-profile provisioning + StrongBox live entirely in platform APIs;
+         no dangerous runtime permissions are requested by the DPC shell itself.
+         The always-on Tor lockdown VPN is configured via DevicePolicyManager
+         (setAlwaysOnVpnPackage) and pointed at Orbot — wired by Dev A-workspace,
+         not declared here. -->
+
+    <!-- SEAM (Dev 3): re-run the cross-profile reconcile after a reboot. Required by
+         the BridgeStateReceiver stanza below. Non-dangerous, install-time. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PosternContainer">
+
+        <!-- Onboarding entry point ("Create Postern Container"). Runs in the
+             PERSONAL profile to trigger provisioning, then hands off inside. -->
+        <activity
+            android:name=".provision.ProvisioningActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- The Device Policy Controller. Becomes PROFILE OWNER of the managed
+             profile on ACTION_PROVISION_MANAGED_PROFILE completion. BIND_DEVICE_ADMIN
+             ensures only the system can bind it. -->
+        <receiver
+            android:name=".dpc.PosternDeviceAdminReceiver"
+            android:description="@string/dpc_description"
+            android:label="@string/dpc_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <!-- Fired when the managed profile has been created and this app is
+                     its profile owner; onProfileProvisioningComplete runs here. -->
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ── Cross-profile reconcile trigger ────────────────────────────────────
+             BridgeStateReceiver re-runs the cross-profile reconcile on boot and on
+             the explicit BRIDGE_STATE_CHANGED signal that GateStateWriter (the sole
+             writer of files/porog-gate/state.json) sends after each atomic state
+             write — always with setPackage(), so the signal stays app-internal.
+
+             exported=false: the system still delivers the protected BOOT_COMPLETED
+             broadcast to non-exported receivers, and the package-targeted
+             state-change signal crosses processes but never leaves this app; third
+             parties cannot poke the reconciler.
+
+             LOCKED_BOOT_COMPLETED is deliberately NOT registered: the gate state
+             lives in CE-encrypted filesDir (unreadable before unlock) and this
+             receiver is not directBootAware, so that branch could never actually
+             run — the retained DPM lockdown baseline holds fail-closed until
+             unlock, then BOOT_COMPLETED re-derives everything.
+             DESIGN ONLY · UNAUDITED. -->
+        <receiver
+            android:name=".dpc.BridgeStateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="labs.postern.container.action.BRIDGE_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>

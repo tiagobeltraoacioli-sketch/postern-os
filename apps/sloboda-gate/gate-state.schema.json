@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://posternlabs.com/schema/sloboda-gate.state.v1.json",
+  "title": "Sloboda Gate — persisted toggle state (v1)",
+  "description": "The single local state file the Waydroid wrapper reads to decide (a) whether the user has consented to enter the NON-ATTESTABLE Android tier, and (b) which host<->container bridges are exposed. EVERY bridge defaults to DENY. The wrapper MUST treat a missing file, an unparseable file, or any missing field as full-deny + not-consented. Nothing here is telemetry; this file never leaves the device. Canonical path (documented, not enforced by this schema): /var/lib/postern/sloboda-gate/state.json (0600, root-owned). UNTESTED: the wrapper that consumes this file does not exist yet.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "tier", "consent", "bridges", "egress", "killSwitch"],
+  "properties": {
+    "schema": {
+      "const": "postern.sloboda-gate.state",
+      "description": "Discriminator so the wrapper can refuse a foreign file outright."
+    },
+    "version": {
+      "const": 1,
+      "description": "State schema version. Bump on any breaking change; the wrapper must full-deny on an unknown version."
+    },
+    "tier": {
+      "const": "non-attestable",
+      "description": "Honesty rail: this tier is ALWAYS the non-attestable Waydroid tier. It is not covered by the Postern Seal (os_roothash). The value is fixed so no code path can silently relabel it as attested."
+    },
+    "lang": {
+      "type": "string",
+      "enum": ["pt-BR", "en"],
+      "default": "en",
+      "description": "Last UI language the operator selected. Cosmetic; the wrapper may ignore it."
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "scope"],
+      "description": "First-entry consent gate result. The gate-store containerAllowed() 'requireConsent' flag (default true) decides whether the wrapper enforces this before starting the container; a NixOS module (postern.slobodaCompat) may expose it as an explicit operator override.",
+      "properties": {
+        "accepted": {
+          "type": "boolean",
+          "default": false,
+          "description": "True only after the operator read the honest disclosure and accepted. Default DENY."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["session", "persistent"],
+          "default": "session",
+          "description": "'session' = consent is valid for this boot only (re-ask next boot); 'persistent' = remembered across boots until revoked. Default is the safer 'session'."
+        },
+        "acceptedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp of acceptance, or null. Local record only."
+        }
+      }
+    },
+    "bridges": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clipboard", "files", "mic", "camera", "location"],
+      "description": "Per-capability host<->Android bridges. Each is a covert-channel if silently on, so each defaults to DENY and is only ever true by an explicit, disclosed toggle. The wrapper maps each true value to the concrete plumbing (e.g. clipboard -> wl-clipboard bridge; the rest -> Waydroid/LXC device passthrough) and exposes NOTHING for a false/absent value.",
+      "properties": {
+        "clipboard": { "type": "boolean", "default": false, "description": "Host<->container clipboard sync (wl-clipboard). Default DENY." },
+        "files":     { "type": "boolean", "default": false, "description": "Shared files folder passthrough into the container. Default DENY." },
+        "mic":       { "type": "boolean", "default": false, "description": "Microphone passthrough. Default DENY." },
+        "camera":    { "type": "boolean", "default": false, "description": "Camera passthrough. Default DENY." },
+        "location":  { "type": "boolean", "default": false, "description": "Location/GPS passthrough. Default DENY." }
+      }
+    },
+    "egress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["torOnly", "torBootstrapped"],
+      "description": "Network-egress posture for the container. Honesty rail: egress is ALWAYS Tor-only. torOnly is fixed true (never taken from input, like tier) so no state file can downgrade to a clearnet path. torBootstrapped is the live signal, written by the wrapper/Tor-glue (over postern-tor), that a Tor circuit is up; until it is true the wrapper MUST hold all container traffic (fail-closed — a half-open Tor is treated as no Tor). Tor here is CLIENT-ONLY and reduces network metadata; it does NOT make the container anonymous against a compromised host.",
+      "properties": {
+        "torOnly": {
+          "const": true,
+          "description": "Fixed true. Egress is Tor-only by design; there is no supported clearnet path for the container."
+        },
+        "torBootstrapped": {
+          "type": "boolean",
+          "default": false,
+          "description": "True ONLY while postern-tor reports a usable circuit. Default false = no egress. The wrapper flips this from the Tor-glue's live bootstrap state and MUST re-deny egress the moment Tor drops."
+        }
+      }
+    },
+    "killSwitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engaged"],
+      "description": "Operator kill-switch. When engaged, the wrapper MUST stop the Waydroid container (waydroid session stop / container down) and refuse to start it until disengaged. Engaging is always allowed and never destroys wallet state in the sealed base.",
+      "properties": {
+        "engaged": {
+          "type": "boolean",
+          "default": false,
+          "description": "True = container must be down. Default is not-engaged so a fresh file does not wedge a legitimately-enabled container; the container still starts ONLY if consent.accepted is also true."
+        },
+        "engagedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp the kill-switch was last engaged, or null."
+        }
+      }
+    }
+  }
+}

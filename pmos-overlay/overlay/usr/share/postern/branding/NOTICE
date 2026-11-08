@@ -1,0 +1,12 @@
+Postern for postmarketOS -- branding assets
+============================================
+
+This directory holds Postern branding assets (wallpaper, icons) referenced
+by /etc/postern/branding.conf. It is EMPTY of binary assets in the scaffold;
+drop real files here and point branding.conf at them before shipping.
+
+Hard rule (../../../etc/motd, ../../HONESTY.md): branding must always read as
+"Postern for postmarketOS", never "Postern OS". Do NOT overwrite pmOS's
+/etc/os-release, boot splash, or any surface that would imply this is a
+distribution or an attestable image. This is the lower-trust, non-attestable
+tier and is not covered by the Postern Seal.

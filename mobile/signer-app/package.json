@@ -1,0 +1,19 @@
+{
+  "name": "postern-signer-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference driver UI for the Postern phone-as-signer flow. A framework-free web UI + a thin Node bridge that DRIVES postern-mobile-signer (it reimplements no crypto). REFERENCE DRIVER, not a shipped phone app; mobile OS image UNBOOTED; software keystore, not hardware; per-sign presence; unaudited scaffold.",
+  "license": "MIT OR Apache-2.0",
+  "type": "commonjs",
+  "bin": {
+    "postern-signer-app": "bridge/server.js"
+  },
+  "scripts": {
+    "start": "node bridge/server.js",
+    "build-engine": "cargo build --manifest-path signer-cli/Cargo.toml",
+    "check": "node --check bridge/server.js && node --check bridge/signer-bridge.js && node --check web/app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

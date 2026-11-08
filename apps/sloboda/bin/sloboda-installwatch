@@ -1,0 +1,17 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────
+#  SLOBODA — install-watch service entrypoint
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  HONESTY: NON-ATTESTABLE tier. Surfaces installed Android apps as host
+#     .desktop launchers that call `waydroid app launch`. Entering Android =
+#     data leaves the sealed base; STRONG integrity fails; not Sealed; UNTESTED
+#     (no Waydroid here); personal-free; not legal advice.
+#
+#  Thin wrapper so a service manager (systemd/OpenRC) has a stable entrypoint.
+#  All logic lives in `sloboda install-watch`. A ready-to-install USER unit ships
+#  at share/systemd/user/sloboda-installwatch.service (user scope, no root).
+# ─────────────────────────────────────────────────────────────────────────────
+set -eu
+_iw_self="$0"
+_iw_dir="$(unset CDPATH; cd -- "$(dirname -- "$_iw_self")" && pwd)"
+exec "$_iw_dir/sloboda" install-watch "$@"

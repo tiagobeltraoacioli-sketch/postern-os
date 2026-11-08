@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# noporis-tor-glue — reference-prototype PER-PERSONA Tor identity glue for NoporIS.
+#
+# NoporIS is the guarded bridge between TWO personas on one stock-Android handset:
+# a clean/business persona and a Google-Play persona. This crate gives EACH
+# persona its OWN circuit-isolated Tor identity (postern-tor `for_identity()`), so
+# the two worlds' egress does not trivially correlate AT THE TOR LAYER (shared
+# circuit / shared exit / shared-timing).
+#
+# HONEST LIMIT, pinned in code: per-persona Tor isolation does NOT stop
+# device-level or network-level correlation — same public IP (unless every persona
+# is fully Tor-routed), same IMEI / SIM / phone number / hardware serial. And the
+# Google-Play persona's GMS egress is OUT OF SCOPE for containment: it phones home
+# regardless of anything here. NoporIS sells SEPARATION + convenience, NOT privacy
+# on the Google side. "Hardened, not anonymous." UNAUDITED reference-prototype.
+#
+# This crate is GLUE ONLY. It composes two existing crates without editing either:
+#   - postern-tor    — the in-process, CLIENT-ONLY Tor layer (arti wrapper).
+#   - postern-policy — the one shared, fail-closed consent kernel + honest labels.
+# It is NOT the N-channel bridge glue (apps/noporis-bridge-glue), and it is NEVER
+# "Postern OS" — NoporIS is an app on stock Android.
+
+[package]
+name = "noporis-tor-glue"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Reference-prototype per-persona Tor identity glue for NoporIS: gives each of the two personas (clean + Google-Play) its own circuit-isolated postern-tor identity so their egress does not correlate at the Tor layer. Glue only — does not modify postern-tor internals. Hardened, not anonymous; the Google-Play persona's GMS egress is out of scope for containment. UNAUDITED."
+
+# Standalone workspace: like porog-tor-glue and the integration/* crates, this
+# reference shim carries its OWN empty [workspace] so it builds/checks on its own
+# and does NOT join the root `members` list (owned by other devs).
+[workspace]
+
+[features]
+default = []
+# The live Tor path pulls arti (heavy) — OFF by default, exactly like
+# postern-tor's own live bootstrap is an ignored test, and porog-tor-glue's `live`.
+# The pure per-persona policy logic (what CI checks fast, and where the honesty
+# rails live) compiles and tests WITHOUT it.
+live = ["dep:postern-tor", "dep:arti-client", "dep:tokio"]
+
+[dependencies]
+# The consent kernel is light (time + thiserror) and always compiled: the
+# fail-closed egress Decision and the honest EnforcementMode label come from it.
+postern-policy = { path = "../../crates/postern-policy" }
+thiserror = "2"
+
+# Live Tor path — feature-gated so the default check stays fast.
+postern-tor = { path = "../../crates/postern-tor", optional = true }
+arti-client = { version = "0.44", default-features = false, features = ["tokio", "rustls"], optional = true }
+tokio = { version = "1", features = ["io-util", "net", "rt"], optional = true }

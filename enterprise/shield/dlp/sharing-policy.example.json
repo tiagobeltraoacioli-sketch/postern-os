@@ -1,0 +1,30 @@
+{
+  "schema": "bloch.shield.dlp.sharing-policy/1",
+  "org": "Acme Ltda.",
+  "grants": [
+    {
+      "class": "internal",
+      "destination": "acme-legal-outside-counsel",
+      "verdict": "allow",
+      "expires": "2027-01-01T00:00:00Z",
+      "dpa": true,
+      "note": "Outside counsel under engagement + DPA; internal working docs may be shared without a warn."
+    },
+    {
+      "class": "confidential",
+      "destination": "acme-payroll-processor",
+      "verdict": "allow",
+      "expires": "2027-01-01T00:00:00Z",
+      "dpa": true,
+      "note": "Vetted payroll processor under a signed data-processing agreement (LGPD Art. 39 / GDPR Art. 28)."
+    },
+    {
+      "class": "confidential",
+      "destination": "acme-analytics-vendor",
+      "verdict": "warn",
+      "expires": "2026-10-01T00:00:00Z",
+      "dpa": true,
+      "note": "Time-boxed pilot; warns (employee sees it, it is logged) rather than silently allowing."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Never commit generated signing key material. gen-dev-signing-keys.sh writes
+# its dev-sample / DO-NOT-SHIP placeholder keys here by default; even though
+# they are throwaway keys, key material must never land in the tree.
+dev-keys-DO-NOT-SHIP/
+notarize.env
+*.minisign.key
+*.falcon.sec
+*.mldsa.seed

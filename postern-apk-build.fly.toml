@@ -1,0 +1,22 @@
+# Alpine apk build host on Fly (Firecracker microVM). Builds the "Postern for
+# postmarketOS" overlay packages with abuild. Alpine base + a volume at /root so
+# the signing key (~/.abuild), aports checkout, and built packages (~/packages)
+# persist. Idles on tail -f so we can `fly ssh console` in and drive abuild.
+# NOTE: x86_64 here; aarch64 apks need qemu/binfmt cross or pmbootstrap (later).
+app = "postern-apk-build"
+primary_region = "gru"
+
+[build]
+  image = "alpine:latest"
+
+[processes]
+  app = "tail -f /dev/null"
+
+[mounts]
+  source = "apkbuild"
+  destination = "/root"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory = "2gb"

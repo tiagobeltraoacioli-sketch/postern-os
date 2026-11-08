@@ -1,0 +1,42 @@
+#!/usr/sbin/nft -f
+# Postern for postmarketOS -- default firewall ruleset.
+# Community, NON-attestable tier. UNBOOTED: this file has NOT been loaded by a
+# real `nft` (nft is not present on the authoring host). Validate on device with
+#   nft -c -f /etc/nftables.d/postern.nft
+#
+# Posture: a wallet-carrying phone should accept nothing inbound it did not ask
+# for. Default-deny inbound, allow loopback, allow replies to our own outbound,
+# allow all outbound (the node/apps reach the network via the Arti SOCKS proxy
+# on loopback). No forwarding -- this is an endpoint, not a router.
+
+flush ruleset
+
+table inet postern {
+	chain input {
+		type filter hook input priority filter; policy drop;
+
+		# Established/related replies to traffic we initiated.
+		ct state established,related accept
+		ct state invalid drop
+
+		# Loopback (Arti SOCKS, node<->wallet IPC) -- trusted.
+		iif "lo" accept
+
+		# Minimal ICMP/ICMPv6 for path MTU + neighbor discovery.
+		ip protocol icmp icmp type { echo-request, destination-unreachable, time-exceeded, parameter-problem } accept
+		ip6 nexthdr icmpv6 icmpv6 type { echo-request, destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } accept
+
+		# Everything else inbound is dropped by policy above.
+	}
+
+	chain forward {
+		# Not a router.
+		type filter hook forward priority filter; policy drop;
+	}
+
+	chain output {
+		# Allow all outbound; privacy routing is enforced in userspace by the
+		# Arti proxy + node require_proxy, not by dropping packets here.
+		type filter hook output priority filter; policy accept;
+	}
+}

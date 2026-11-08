@@ -1,0 +1,1919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  Content-Security-Policy — defense-in-depth, not "security" on its own.
+
+  script-src pins the ONE executable inline <script> (below) by sha256 hash,
+  so 'unsafe-inline' is dropped. The command anchors on the script's
+  "use strict" prologue so it never matches this comment's own <script> text.
+  RECOMPUTE after ANY edit to the executable script (this file is served
+  verbatim — no build step — so the served bytes == these bytes):
+
+    node -e 'const f=require("fs").readFileSync("apps/ezekiel1/index.html","utf8");const s=f.indexOf("<script>\n\"use strict")+8;const e=f.indexOf("</script>",s);console.log("sha256-"+require("crypto").createHash("sha256").update(f.slice(s,e),"utf8").digest("base64"))'
+
+  script-src also allows 'self' and 'wasm-unsafe-eval' — and ONLY for this: the
+  co-located Rust access engine, compiled to WebAssembly from crates/ezekiel1 and
+  loaded as ezekiel1-engine.js + ezekiel1.wasm beside this file. 'self' admits the
+  engine's wasm-bindgen glue; 'wasm-unsafe-eval' lets the browser compile the
+  module (WebAssembly compilation, NOT eval() of JS). Both are same-origin only.
+
+  style-src keeps 'unsafe-inline' on purpose: the script writes style="" via
+  innerHTML and there are static inline style="" attributes, so a hash-only
+  style policy would be brittle in this hand-maintained, no-build-step file.
+
+  connect-src 'self' — the console makes NO cross-origin request: no Postern
+  server, no telemetry, no phone-home, no assistant. The ONE fetch it makes is a
+  same-origin GET of ezekiel1.wasm (the local engine); no user data is ever sent
+  anywhere. Every byte of policy stays in this browser (localStorage) or on your
+  own disk. The Rust engine is now literally the authority — it runs HERE, in
+  WebAssembly, and its verdicts ARE this console's verdicts (parity-proven
+  against `cargo test` in crates/ezekiel1/wasm/). This page DECLARES, and the
+  crate DECIDES.
+
+  frame-ancestors is INERT in <meta> — the clickjacking defense must be an
+  HTTP response header, set in _headers alongside this file.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2fCAOixmOcTkmWtdJ95bj9/Bek5XPPTUxFUD/RZERWk=' 'self' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'none'; font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Ezekiel 1 — access-layer governance · Postern Labs</title>
+<style>
+/* ============================================================
+   EZEKIEL 1 · Postern Labs
+   The access-layer governance console for Consiglio. Two editions
+   share one engine: PERSONAL (parental control — parent→child only)
+   and BUSINESS (nested layers · Chinese walls · tenant isolation).
+   Fail-closed. SHAKE-256 hash-chained trail (engine-verified).
+   Motif — wheels within wheels · rims full of eyes · the firmament
+   as a separation line — carried as honest UI structure.
+   (Sotto brass · Vedetta steel-blue · Tolmach verdigris · Store
+   amethyst · Chiave iris · Consiglio cobalt · Izbushka ember-gold —
+   Ezekiel wears beryl, "the colour of the wheels", 1:16.)
+   Only network call: a same-origin GET of the local ezekiel1.wasm
+   engine (connect-src 'self'). No cross-origin, no telemetry.
+   NOT LEGAL ADVICE — this console demonstrates controls that ENABLE
+   governance; governance itself needs an owner's judgement + counsel.
+   ============================================================ */
+
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — the shared Postern graphite/ink base (= --ps-* in
+     apps/_design-system/tokens.css, un-prefixed like gramota/izbushka). */
+  --bg:        #0d1014;
+  --bg-glow:   #10141b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e8ec;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --acc:       #3fb6ad;   /* beryl — Ezekiel's own accent (ps-accent-beryl) */
+  --acc-hi:    #63d3ca;
+  --acc-dim:   #2c7f79;
+  --acc-ink:   #06110f;
+
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+
+:root[data-theme="light"] {
+  --bg:        #f0eff3;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #eceae2;
+  --surface-3: #e3e0d5;
+  --border:    #d5d0c4;
+  --border-hi: #bdb7a8;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --acc:       #157e77;   /* beryl, light voicing (ps-accent-beryl) */
+  --acc-hi:    #0f645e;
+  --acc-dim:   #4fa39c;
+  --acc-ink:   #f2fbfa;
+
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(40,50,64,.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0eff3; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#eceae2;
+    --surface-3:#e3e0d5; --border:#d5d0c4; --border-hi:#bdb7a8;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --acc:#157e77; --acc-hi:#0f645e; --acc-dim:#4fa39c; --acc-ink:#f2fbfa;
+    --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(40,50,64,.14);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--acc); color: var(--acc-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+code, .mono { font-family: var(--font-mono); }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.gyre { width: 30px; height: 30px; flex: none; color: var(--acc); }
+.wordmark {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 700;
+  letter-spacing: .3em; text-indent: .3em; color: var(--text);
+  user-select: none; white-space: nowrap;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+  border-left: 1px solid var(--border); padding-left: 12px; margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .05em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn.sm { padding: 4px 9px; font-size: 10.5px; }
+
+/* ---------- draft banner ---------- */
+.draft {
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--border));
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+  border-radius: 12px; padding: 12px 15px; margin: 18px 0 4px;
+  font-size: 13px; color: var(--text-dim); line-height: 1.6;
+}
+.draft b.tag {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; font-weight: 700; color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  border-radius: 6px; padding: 3px 8px; margin-right: 8px; white-space: nowrap;
+}
+.draft code { color: var(--acc); font-size: 12px; }
+
+/* ---------- hero + edition toggle ---------- */
+.hero { padding: 24px 0 6px; }
+.hero h1 { margin: 0 0 6px; font-size: 25px; letter-spacing: -.01em; font-weight: 650; }
+.hero h1 em { font-style: normal; color: var(--acc); }
+.hero p.sub { margin: 0; max-width: 700px; color: var(--text-dim); font-size: 14px; }
+
+.edition-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 12px 14px; margin: 16px 0 8px;
+  box-shadow: var(--shadow);
+}
+.edition-bar .elabel {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+.seg button {
+  background: var(--surface-2); border: 0; padding: 9px 18px;
+  font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .06em;
+  color: var(--text-dim); border-right: 1px solid var(--border);
+  transition: background .15s, color .15s;
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--acc); color: var(--acc-ink); font-weight: 700; }
+.seg button:not([aria-pressed="true"]):hover { color: var(--text); background: var(--surface-3); }
+.edition-bar .edesc { font-size: 12.5px; color: var(--text-dim); flex: 1 1 240px; min-width: 0; }
+.edition-bar .edesc b { color: var(--acc); font-weight: 600; }
+
+/* ---------- panels ---------- */
+.panel {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 18px; margin: 14px 0;
+}
+.panel > h2 {
+  margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 9px;
+}
+.panel > h2 .num {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; font-weight: 700;
+  color: var(--acc); border: 1px solid color-mix(in srgb, var(--acc) 50%, var(--border));
+  border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+}
+.panel > .lead { margin: 0 0 14px; font-size: 13px; color: var(--text-dim); max-width: 720px; }
+.panel > .lead code { color: var(--acc); font-size: 12px; }
+.panel[hidden] { display: none; }
+
+.legalflag {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; font-weight: 700; color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+}
+
+/* ---------- the firmament divider ---------- */
+.firmament {
+  display: flex; align-items: center; gap: 14px; margin: 30px 0 8px;
+  color: var(--muted); user-select: none;
+}
+.firmament .line { flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--acc-dim), transparent); }
+.firmament .caption {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--acc-dim); white-space: nowrap;
+}
+
+/* ---------- generic form bits ---------- */
+.field { margin-bottom: 14px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.field input[type="text"], .field select, .field textarea {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px 10px; color: var(--text); font-size: 13.5px;
+}
+.field textarea { min-height: 58px; resize: vertical; font-family: var(--font-mono); font-size: 12.5px; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--acc); outline: none; }
+.field .fhelp { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > .field { flex: 1 1 150px; margin-bottom: 0; }
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-acc:disabled { opacity: .5; cursor: not-allowed; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chk {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; color: var(--text-dim); cursor: pointer;
+}
+.chk:has(input:checked) { border-color: var(--acc); color: var(--text);
+  background: color-mix(in srgb, var(--acc) 10%, transparent); }
+.chk input { accent-color: var(--acc); margin: 0; }
+.chk.disabled { opacity: .4; cursor: not-allowed; }
+
+.inline-err {
+  display: none; margin-top: 10px; padding: 9px 12px;
+  border: 1px solid var(--err); border-radius: 9px;
+  background: color-mix(in srgb, var(--err) 10%, var(--surface));
+  color: var(--err); font-size: 12.5px; line-height: 1.5;
+}
+.inline-err[data-on="1"] { display: block; }
+.inline-err code { color: var(--err); font-weight: 700; }
+.inline-ok {
+  display: none; margin-top: 10px; padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--ok) 55%, var(--border)); border-radius: 9px;
+  background: color-mix(in srgb, var(--ok) 9%, var(--surface));
+  color: var(--ok); font-size: 12.5px;
+}
+.inline-ok[data-on="1"] { display: block; }
+
+/* ---------- children (personal) ---------- */
+.child-card {
+  border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+  margin-bottom: 12px; background: var(--surface-2);
+}
+.child-card .cc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.child-card .cc-head h3 { margin: 0; font-size: 14.5px; }
+.child-card .cc-head .cc-del { margin-left: auto; }
+.child-card .sub { font-size: 11px; font-family: var(--font-mono); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); margin: 12px 0 6px; }
+
+/* ---------- refusal panel (fail-closed constructs) ---------- */
+.refused { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.refuse-card {
+  border: 1px dashed var(--border); border-radius: 11px; padding: 12px 13px;
+  background: repeating-linear-gradient(135deg,
+    color-mix(in srgb, var(--muted) 5%, var(--surface)) 0 8px,
+    var(--surface) 8px 16px);
+  opacity: .82; position: relative;
+}
+.refuse-card h4 {
+  margin: 0 0 5px; font-size: 13px; color: var(--muted);
+  display: flex; align-items: center; gap: 7px;
+}
+.refuse-card .lock { color: var(--err); font-size: 13px; }
+.refuse-card p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.refuse-card .verdict {
+  display: inline-block; margin-top: 8px;
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; font-weight: 700; color: var(--err);
+  border: 1px solid color-mix(in srgb, var(--err) 55%, var(--border));
+  border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+}
+
+/* ---------- layers tree (business) ---------- */
+.tree { font-family: var(--font-mono); font-size: 12.5px; }
+.node {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 12px; margin: 6px 0; background: var(--surface-2);
+}
+.node.root { border-color: color-mix(in srgb, var(--acc) 45%, var(--border));
+  background: color-mix(in srgb, var(--acc) 7%, var(--surface-2)); }
+.node .n-name { color: var(--acc); font-weight: 700; }
+.node .n-tenant { color: var(--muted); font-size: 11px; }
+.node .n-scopes { color: var(--text-dim); font-size: 11.5px; margin-top: 3px; overflow-wrap: anywhere; }
+.node .n-scopes .sc { color: var(--text); }
+.node.dim { opacity: .3; }
+.kids { margin-left: 18px; border-left: 1px solid var(--border); padding-left: 12px; }
+
+/* ---------- walls (business) ---------- */
+.wall-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; margin-top: 12px; }
+.vol {
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px;
+  font-size: 12.5px; background: var(--surface-2);
+}
+.vol .v-name { font-weight: 600; }
+.vol .v-class { font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+.vol .v-state { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em;
+  margin-top: 8px; text-transform: uppercase; }
+.vol[data-st="open"]   { }
+.vol[data-st="open"]   .v-state { color: var(--ok); }
+.vol[data-st="bound"]  { border-color: color-mix(in srgb, var(--acc) 55%, var(--border)); }
+.vol[data-st="bound"]  .v-state { color: var(--acc); }
+.vol[data-st="walled"] { border-color: color-mix(in srgb, var(--err) 55%, var(--border));
+  background: color-mix(in srgb, var(--err) 7%, var(--surface-2)); }
+.vol[data-st="walled"] .v-state { color: var(--err); }
+
+/* ---------- tenants ---------- */
+.tenant-note {
+  font-size: 12.5px; color: var(--text-dim); margin-top: 10px;
+  border-left: 3px solid var(--acc); padding-left: 11px;
+}
+
+/* ---------- TOML + validation ---------- */
+.split { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 820px) { .split { grid-template-columns: 1.1fr .9fr; } }
+pre.toml {
+  margin: 0; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 11px; padding: 13px 14px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--text-dim);
+  white-space: pre;
+}
+pre.toml .k { color: var(--acc); }
+pre.toml .s { color: var(--text); }
+pre.toml .h { color: var(--muted); font-style: italic; }
+pre.toml .t { color: var(--acc-hi); font-weight: 700; }
+
+.verdict-box { border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+.verdict-head {
+  display: flex; align-items: center; gap: 9px; padding: 10px 13px;
+  border-bottom: 1px solid var(--border); font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+}
+.verdict-head .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.verdict-box[data-verdict="accept"] .verdict-head { background: color-mix(in srgb, var(--ok) 10%, var(--surface)); }
+.verdict-box[data-verdict="accept"] .dot { background: var(--ok); }
+.verdict-box[data-verdict="accept"] .vv { color: var(--ok); }
+.verdict-box[data-verdict="reject"] .verdict-head { background: color-mix(in srgb, var(--err) 10%, var(--surface)); }
+.verdict-box[data-verdict="reject"] .dot { background: var(--err); }
+.verdict-box[data-verdict="reject"] .vv { color: var(--err); }
+.check { display: grid; grid-template-columns: 20px 1fr; gap: 9px; padding: 9px 13px;
+  border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.check:last-child { border-bottom: 0; }
+.check .m { text-align: center; font-family: var(--font-mono); font-weight: 700; }
+.check.pass .m { color: var(--ok); }
+.check.fail .m { color: var(--err); }
+.check.info .m { color: var(--muted); }
+.check .c-label { color: var(--text); }
+.check .c-detail { color: var(--muted); font-size: 11.5px; }
+.engine-note {
+  font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.55;
+  border-top: 1px dashed var(--border); padding-top: 10px;
+}
+.engine-note b { color: var(--text-dim); }
+
+/* engine provenance badge — the system status-strip voice (mono, bordered,
+   semantic border via color-mix like the shared .pill/.ps-badge family).
+   The script recolors the border --ok (Rust/WASM) or --warn (JS mirror). */
+.engine-badge {
+  display: inline-block; margin: 0 0 10px; padding: 6px 10px; max-width: 100%;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .02em;
+  color: var(--muted); line-height: 1.6; overflow-wrap: anywhere;
+}
+.engine-badge code { color: var(--acc); font-size: 10.5px; }
+
+/* ---------- trail viewer (rims full of eyes) ---------- */
+.trail-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  padding: 9px 13px; margin-bottom: 12px; font-family: var(--font-mono); font-size: 11.5px;
+}
+.trail-head .th-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }
+.trail-head .th-v { color: var(--ok); font-weight: 700; letter-spacing: .06em; }
+.trail-head .th-k { color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.trail-head .th-note { font-family: var(--font-ui); font-size: 12px; color: var(--text-dim);
+  letter-spacing: normal; flex: 1 1 220px; min-width: 0; }
+.trail { font-family: var(--font-mono); font-size: 11.5px; }
+.a-row {
+  display: grid; grid-template-columns: 26px 34px 1fr; gap: 10px;
+  border-bottom: 1px solid var(--border); padding: 8px 2px; align-items: start;
+}
+.a-row:last-child { border-bottom: 0; }
+.a-eye { color: var(--acc-dim); font-size: 13px; line-height: 1.4; text-align: center; }
+.a-seq { color: var(--muted); text-align: right; }
+.a-body .a-act { color: var(--acc); }
+.a-body .a-detail { color: var(--text-dim); overflow-wrap: anywhere; }
+.a-body .a-meta { color: var(--muted); font-size: 10.5px; margin-top: 2px; overflow-wrap: anywhere; }
+.a-body .a-hash { color: var(--acc-dim); }
+
+/* ---------- scheduled jobs (Izbushka manifests) ---------- */
+.jobs { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 720px) { .jobs { grid-template-columns: 1fr 1fr; } }
+.job {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface-2);
+}
+.job .j-head {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+  border-bottom: 1px solid var(--border); font-size: 12.5px;
+}
+.job .j-head .j-badge {
+  margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; font-weight: 700; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+}
+.job pre.toml { border: 0; border-radius: 0; background: transparent; font-size: 11px; }
+
+/* ---------- footer ---------- */
+footer.site {
+  padding: 20px 0 30px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em;
+  color: var(--muted); text-transform: uppercase; line-height: 1.8;
+}
+footer.site .sov { color: var(--acc-dim); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 620px) { .byline { display: none; } .hero h1 { font-size: 21px; } }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap site-inner">
+    <!-- the gyre: wheels within wheels, a rim of eyes -->
+    <svg class="gyre" viewBox="0 0 40 40" fill="none" stroke="currentColor" aria-hidden="true">
+      <circle cx="20" cy="20" r="17" stroke-width="1.4"/>
+      <circle cx="20" cy="20" r="11" stroke-width="1.4"/>
+      <circle cx="20" cy="20" r="5" stroke-width="1.4"/>
+      <circle cx="20" cy="3.2" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="36.8" cy="20" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="20" cy="36.8" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="3.2" cy="20" r="1.4" fill="currentColor" stroke="none"/>
+    </svg>
+    <div class="wordmark" aria-label="Ezekiel 1">EZEKIEL<span class="tick">·</span>1</div>
+    <div class="byline">Postern Labs · access-layer governance for Consiglio</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnErase">Erase</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="draft">
+    <b class="tag">Reference prototype · unaudited</b>
+    Demonstrates controls that <b>enable</b> compliance; it is <b>NOT</b> compliance. In the
+    <b>business</b> edition three things are now <b>enforced in this page</b> with real WebCrypto
+    <b>Ed25519</b> (offline — the crypto makes no network call): the corporate-license
+    <code>verifyChain</code> gate (bad chain → demo-only, never <code>corporate-master</code>),
+    device sub-token minting, and the runtime access decision (Bell–LaPadula no-read-up/no-write-down
+    + Brewer–Nash walls, fail-closed). What stays engine-authoritative: policy <b>application</b> and
+    the <code>SHAKE-256</code> audit trail — Web Crypto has no SHAKE-256, so the trail digests below
+    remain a <b>display stand-in</b> the Ezekiel Rust engine recomputes. Policy lives only in this
+    browser and on your disk. <span class="legalflag">Not legal advice</span>
+  </div>
+
+  <section class="hero">
+    <h1>Author access <em>layers</em>. Watch the <em>wheels within wheels</em>.</h1>
+    <p class="sub">One engine, two editions. <b>Personal</b> is parental control and nothing more —
+      parent&nbsp;→&nbsp;child levels and time windows, no spying, and it <em>refuses</em> to render any
+      corporate construct. <b>Business</b> nests access layers (no layer widens its parent), raises
+      Brewer–Nash Chinese walls between conflict classes, and isolates each tenant to its own strand.
+      Everything fails closed.</p>
+  </section>
+
+  <div class="edition-bar" role="group" aria-label="Edition">
+    <span class="elabel">Edition</span>
+    <div class="seg" id="editionSeg">
+      <button type="button" data-ed="personal" aria-pressed="true">personal · parental</button>
+      <button type="button" data-ed="business" aria-pressed="false">business · consiglio</button>
+    </div>
+    <span class="eddesc" id="editionDesc"></span>
+  </div>
+
+  <!-- ================= PERSONAL EDITION ================= -->
+  <section class="panel" id="pPersonal">
+    <h2><span class="num">P·1</span> Access levels for a child</h2>
+    <p class="lead">Define what each child may reach — <b>content categories</b>, <b>app surfaces</b>,
+      and <b>time windows</b>. This is <b>parent → child</b> only. There is no monitoring feed, no
+      location, no message capture: a level says what is <em>allowed</em>, never what is <em>watched</em>.</p>
+    <div id="childList"></div>
+    <div class="row" style="margin-top:6px; align-items:flex-end;">
+      <div class="field" style="flex:1 1 200px; margin:0;">
+        <label for="newChildName">Add a child</label>
+        <input type="text" id="newChildName" placeholder="name (e.g. Mira)" autocomplete="off">
+      </div>
+      <button class="btn-acc" id="btnAddChild">Add level</button>
+    </div>
+    <div class="inline-err" id="childErr"></div>
+  </section>
+
+  <section class="panel" id="pRefused">
+    <h2><span class="num">P·2</span> Refused here — fail closed</h2>
+    <p class="lead">Personal edition is not a small business console. The engine <b>rejects</b> these
+      constructs outright when <code>edition = "personal"</code>; the UI greys them and refuses to render an
+      editor. Switch to <b>business</b> for these.</p>
+    <div class="refused">
+      <div class="refuse-card">
+        <h4><span class="lock">⊘</span> Multi-tenant scoping</h4>
+        <p>A home is one household, not many tenants sharing a strand. No tenant partitioning exists here.</p>
+        <span class="verdict">reject · personal</span>
+      </div>
+      <div class="refuse-card">
+        <h4><span class="lock">⊘</span> Chinese wall (Brewer–Nash)</h4>
+        <p>Conflict-of-interest walls are a corporate control. A parent is not walled from their own child.</p>
+        <span class="verdict">reject · personal</span>
+      </div>
+      <div class="refuse-card">
+        <h4><span class="lock">⊘</span> Inverted control</h4>
+        <p>No child-supervises-parent or peer-surveillance layer. Authority flows one way: guardian → minor.</p>
+        <span class="verdict">reject · personal</span>
+      </div>
+      <div class="refuse-card">
+        <h4><span class="lock">⊘</span> Nested widening layers</h4>
+        <p>No sub-layer machinery that could grant more than its parent. Levels are flat and additive-down only.</p>
+        <span class="verdict">reject · personal</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BUSINESS EDITION ================= -->
+  <section class="panel" id="pLayers" hidden>
+    <h2><span class="num">B·1</span> Nested access layers</h2>
+    <p class="lead">Every layer names its parent. The engine's cardinal rule:
+      <b>no layer widens its parent</b> — a child's scopes must all be <em>covered</em> by the parent
+      (<code>read:*</code> covers <code>read:eu</code>; <code>*</code> covers anything). A layer that
+      exceeds its parent is rejected before it can exist.</p>
+    <div class="field" style="margin-bottom:12px;">
+      <span class="flabel">Layer tree — current tenant view</span>
+      <div class="tree" id="layerTree"></div>
+    </div>
+    <div class="row" style="align-items:flex-start;">
+      <div class="field" style="flex:1 1 130px;">
+        <label for="nlParent">Parent</label>
+        <select id="nlParent"></select>
+      </div>
+      <div class="field" style="flex:1 1 130px;">
+        <label for="nlName">New layer name</label>
+        <input type="text" id="nlName" placeholder="eu-interns" autocomplete="off">
+      </div>
+      <div class="field" style="flex:2 1 220px;">
+        <label for="nlScopes">Scopes (comma-separated)</label>
+        <input type="text" id="nlScopes" placeholder="read:eu-customers, write:reports" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn-acc" id="btnAddLayer">Add layer (validated)</button>
+    <div class="inline-err" id="layerErr"></div>
+    <div class="inline-ok" id="layerOk"></div>
+  </section>
+
+  <section class="panel" id="pWalls" hidden>
+    <h2><span class="num">B·2</span> Chinese walls · Brewer–Nash <span class="legalflag">Legal: DPO/counsel</span></h2>
+    <p class="lead">Conflict classes group competitors. The rule is <b>history-based and mandatory</b>:
+      the first member a subject touches <b>binds</b> them; every competitor in that class is then
+      <b>permanently barred</b> — there is no override button, and each binding is logged with a
+      justification. Unbinding is an audited act, not a click.</p>
+    <div class="row" style="align-items:flex-end;">
+      <div class="field" style="flex:1 1 130px;">
+        <label for="wallSubject">Acting subject</label>
+        <select id="wallSubject"></select>
+      </div>
+      <div class="field" style="flex:1 1 150px;">
+        <label for="wallMember">Touch member</label>
+        <select id="wallMember"></select>
+      </div>
+      <div class="field" style="flex:2 1 220px;">
+        <label for="wallJust">Justification (required, logged)</label>
+        <input type="text" id="wallJust" placeholder="engagement #4417, signed conflict check" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn-acc" id="btnTouch">Bind / touch (audited)</button>
+    <div class="inline-err" id="wallErr"></div>
+    <div class="wall-grid" id="wallGrid"></div>
+    <p class="engine-note">A wall is a technical <b>plus</b> contractual <b>plus</b> supervisory control.
+      The engine never releases a barred layer's keys — but no software stops a human photographing a
+      screen. The console demonstrates and audits the model; it does not replace the covenant.</p>
+  </section>
+
+  <section class="panel" id="pTenants" hidden>
+    <h2><span class="num">B·3</span> Per-tenant scoping — firmament-grade isolation</h2>
+    <p class="lead">Each tenant sees <b>only its own strand</b> of the layer tree. Selecting a tenant
+      re-scopes every panel above and below the firmament: the tree, the subjects, the trail. The
+      governor's <code>all</code> view is the only place strands are seen side by side.</p>
+    <div class="field" style="max-width:280px;">
+      <label for="tenantSel">Viewing as tenant</label>
+      <select id="tenantSel"></select>
+    </div>
+    <div class="tenant-note" id="tenantNote"></div>
+  </section>
+
+  <section class="panel" id="pLicense" hidden>
+    <h2><span class="num">B·4</span> Corporate license — import &amp; device sub-mint <span class="legalflag">real Ed25519 · offline</span></h2>
+    <p class="lead">Paste the vendor-signed <b>master bundle</b> from <code>/license/master</code> (via Gramota or the Business console). Ezekiel 1 runs the real
+      <b><code>verifyChain</code></b> gate <b>offline</b> (WebCrypto Ed25519 — makes no network call): a valid <code>vendor&nbsp;→&nbsp;master</code> chain with a 9-digit DUNS
+      unlocks <b>corporate-master</b> and derives the tenant id <code>t-fnv1a64(org,duns)</code>. Anything else stays a <b>demo-only</b> preview — fail-closed, never
+      <code>corporate-master</code>. The personal (parental) edition is unaffected and never imports anything.</p>
+    <div class="field">
+      <label for="licBundle">Master bundle JSON</label>
+      <textarea id="licBundle" placeholder='{ "master_token": { ... }, "master_sig": "…", "master_private_key_pkcs8": "…" }' style="min-height:120px;"></textarea>
+      <div class="fhelp">The bundle's <code>master_private_key_pkcs8</code> is kept <b>in memory only</b> — never written to <code>localStorage</code>, never sent anywhere. It signs device sub-tokens locally.</div>
+    </div>
+    <div class="row" style="align-items:center;">
+      <button class="btn-acc" id="btnImportLicense">Verify &amp; import (offline)</button>
+      <button class="hbtn" id="btnClearLicense">Clear license</button>
+    </div>
+    <div class="inline-err" id="licErr"></div>
+    <div class="inline-ok" id="licOk"></div>
+    <div class="verdict-box" id="licStatusBox" data-verdict="reject" style="margin-top:14px;">
+      <div class="verdict-head"><span class="dot"></span><span class="vv" id="licStatusLabel">demo-only — no license imported</span></div>
+      <div id="licStatusBody" style="padding:9px 13px;"></div>
+    </div>
+
+    <div id="deviceMintWrap" hidden>
+      <div class="firmament" aria-hidden="true"><span class="line"></span><span class="caption">device sub-tokens · chained under the master</span><span class="line"></span></div>
+      <p class="lead">Mint a signed <b>device sub-token</b> (Ed25519, signed by the org master key) carrying a BLP <b>clearance</b>. Each sub has <code>sub.exp&nbsp;≤&nbsp;master.exp</code>;
+        the device app verifies the offline chain <code>vendor&nbsp;→&nbsp;master&nbsp;→&nbsp;sub</code>. Editing a minted token's clearance breaks its signature.</p>
+      <div class="row" style="align-items:flex-end;">
+        <div class="field" style="flex:1 1 150px;"><label for="devLabel">Device / seat label</label><input type="text" id="devLabel" placeholder="ana-laptop" autocomplete="off"></div>
+        <div class="field" style="flex:1 1 120px;"><label for="devClearance">Clearance</label><select id="devClearance"></select></div>
+        <button class="btn-acc" id="btnMintDevice">Mint device sub-token</button>
+      </div>
+      <div class="inline-err" id="devErr"></div>
+      <div id="deviceList"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="pBLP" hidden>
+    <h2><span class="num">B·5</span> Bell–LaPadula clearance lattice <span class="legalflag">MLS · read-only lattice</span></h2>
+    <div id="engineBadge" class="engine-badge">engine: loading…</div>
+    <p class="lead">Every subject carries a <b>clearance</b>; every layer carries a data <b>classification</b> (public → secret). The mandatory rules are enforced at the
+      access-decision point below — <b>no read up</b> (a subject may not read data above its clearance) and <b>no write down</b> (a subject may not write into a layer
+      below its clearance, preventing exfiltration). The decision also consults the Brewer–Nash walls (B·2): a barred conflict class denies outright. All fail closed.</p>
+    <div class="field" style="margin-bottom:12px;">
+      <span class="flabel">Lattice — subjects × layers (read-only)</span>
+      <div id="blpLattice"></div>
+    </div>
+    <div class="row" style="align-items:flex-end;">
+      <div class="field" style="flex:1 1 130px;"><label for="acSubject">Subject</label><select id="acSubject"></select></div>
+      <div class="field" style="flex:1 1 130px;"><label for="acLayer">Target layer</label><select id="acLayer"></select></div>
+      <div class="field" style="flex:1 1 110px;"><label for="acMode">Mode</label><select id="acMode"><option value="read">read</option><option value="write">write</option></select></div>
+      <button class="btn-acc" id="btnDecide">Decide (runtime)</button>
+    </div>
+    <div class="verdict-box" id="acVerdictBox" data-verdict="accept" style="margin-top:12px;">
+      <div class="verdict-head"><span class="dot"></span><span class="vv" id="acVerdictLabel">—</span></div>
+      <div id="acCheckList"></div>
+    </div>
+    <p class="engine-note">When the badge above shows <b>Rust / WASM</b>, this verdict's <b>Bell–LaPadula floor</b> (no-read-up / no-write-down) and <b>Brewer–Nash wall</b> are computed by
+      the real <code>crates/ezekiel1</code> engine running in-page as WebAssembly — the same code <code>cargo test</code> exercises (parity-proven in <code>crates/ezekiel1/wasm/</code>). Each
+      engine-decided check is marked <code>· engine</code>. If the module can't load, the page falls back to a JS mirror of the same rules and the badge says so. The clearance carried
+      here is written into the Ezekiel TOML (<code>[[subject]].clearance</code>, <code>[[layer]].level</code>) so the engine's floor is exercised end-to-end.</p>
+  </section>
+
+  <!-- ================= THE FIRMAMENT ================= -->
+  <div class="firmament" aria-hidden="true">
+    <span class="line"></span>
+    <span class="caption">the firmament · above: what is declared · below: what is recorded</span>
+    <span class="line"></span>
+  </div>
+
+  <!-- ================= TOML + VALIDATION ================= -->
+  <section class="panel" id="pPolicy">
+    <h2><span class="num">§</span> Policy — Ezekiel TOML &amp; validation preview</h2>
+    <p class="lead">The policy rendered in the engine's <b>Ezekiel TOML</b> format, with a validation
+      verdict shown <b>before apply</b>. This preview mirrors the engine's reject rules in JS — the
+      <b>Rust engine is authoritative</b> and re-checks everything on apply.</p>
+    <div class="split">
+      <pre class="toml" id="tomlOut" aria-label="Policy as Ezekiel TOML"></pre>
+      <div class="verdict-box" id="verdictBox" data-verdict="accept">
+        <div class="verdict-head"><span class="dot"></span><span class="vv" id="verdictLabel">—</span></div>
+        <div id="checkList"></div>
+        <div style="padding:0 13px 13px;">
+          <p class="engine-note" id="policyEngineNote"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TRAIL VIEWER ================= -->
+  <section class="panel" id="pTrail">
+    <h2><span class="num">◉</span> Trail viewer — rims full of eyes</h2>
+    <p class="lead">The append-only audit trail. Every governance act — a layer added, a wall bound, a
+      grant expired — lands here in order, each entry naming the hash of the one before it.</p>
+    <div class="trail-head">
+      <span class="th-dot"></span>
+      <span class="th-k">chain</span>
+      <span class="th-v" id="trailVerdict">INTACT · engine-verified</span>
+      <span class="th-note">The digests shown are a <b>non-cryptographic display stand-in</b>. The engine
+        chains the real trail with <code style="font-size:11px;color:var(--acc)">SHAKE-256</code>; Web
+        Crypto has no SHAKE, so the browser cannot recompute it — this viewer <b>displays</b> the engine's
+        verdict, it does not verify.</span>
+    </div>
+    <div class="trail" id="trailList"></div>
+  </section>
+
+  <!-- ================= SCHEDULED JOBS ================= -->
+  <section class="panel" id="pJobs">
+    <h2><span class="num">⌂</span> Scheduled policy jobs — Izbushka manifests</h2>
+    <p class="lead">Recurring governance work is handed to <b>Yagabona</b> as <b>Izbushka manifests</b>
+      (one door per house). These are shown as they would be <em>declared</em> — this console
+      <b>displays, it does not execute</b>. The daemon reads the real TOML and runs it under its own
+      expiring grant.</p>
+    <div class="jobs" id="jobList"></div>
+  </section>
+
+  <!-- ============ PRIVACY (honest, static — no script; CSP script-hash unaffected) ============ -->
+  <details class="privacy" style="margin:26px 0 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-dim); padding:0 16px;">
+    <summary style="cursor:pointer; padding:14px 2px; color:var(--text); font-weight:600;">Privacy — what leaves this device</summary>
+    <div style="padding:2px 0 16px; line-height:1.55;">
+      <p style="margin:0 0 10px;"><strong style="color:var(--text)">Nothing of yours leaves.</strong> The only network request this console makes is a same-origin GET of the local <code>ezekiel1.wasm</code> engine served beside this page (<code>connect-src 'self'</code>) — no cross-origin request, no Postern server, no telemetry, no phone-home. Your policy state persists only in this browser's <code>localStorage</code>, on your machine, and is never sent anywhere. There is no BYO-key or AI path here; nothing you declare is sent to any model.</p>
+      <p style="margin:0 0 10px;"><strong style="color:var(--text)">The honest caveat:</strong> this is defense-in-depth, <em>not</em> "100% private" and <em>not</em> "100% secure." <code>localStorage</code> is readable by anyone who can open this browser profile or unlock this device, and a compromised browser or OS can read it too. No web page can promise otherwise.</p>
+      <p style="margin:0;"><strong style="color:var(--text)">Advisory only.</strong> This page declares and displays the access policy; the Rust engine on Postern OS is the authority that actually enforces it, fail-closed. Sovereignty stays with the data owner.</p>
+    </div>
+  </details>
+
+</main>
+
+<footer class="site wrap">
+  Ezekiel 1 · access-layer governance for Consiglio<br>
+  <span class="sov">sovereignty to the data owner · no Postern server · no telemetry · your policy, your trail, your machine</span>
+</footer>
+
+<!-- The Ezekiel 1 Rust engine, compiled to WebAssembly (crates/ezekiel1, feature
+     "wasm"). wasm-bindgen `no-modules` glue; defines the global `wasm_bindgen`.
+     Same-origin (script-src 'self'); assembled beside this file together with
+     ezekiel1.wasm. If absent (opened as a bare file://, or not yet assembled),
+     the console falls back to its in-page JS mirror and says so. -->
+<script src="ezekiel1-engine.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   EZEKIEL 1 — console logic. Access decisions are driven by the
+   REAL Rust engine (crates/ezekiel1) compiled to WebAssembly and
+   loaded above: the Bell-LaPadula no-read-up/no-write-down floor
+   and the Brewer-Nash Chinese-wall verdict are computed by the
+   crate, in-page, offline. Its verdicts ARE this console's
+   verdicts (parity-proven vs `cargo test` in crates/ezekiel1/wasm).
+   If the WASM engine cannot load, the page falls back to a JS
+   mirror of the same rules and labels every verdict accordingly.
+   No cross-origin network. State persists to localStorage.
+   ============================================================ */
+
+/* ---------- the Rust/WASM engine seam ----------
+   EZ1 holds the crate's exported decision functions once the module
+   initialises. Until then (and if it never loads) EZ1_READY stays false and
+   callers use the JS mirror. Init is async but decisions are user-triggered,
+   so the engine is ready well before the first click on a normal local serve. */
+let EZ1 = null;          // the crate's { blp_may_read, blp_may_write, wall_barred, evaluate, validate_policy, engine_version }
+let EZ1_READY = false;   // true once the WASM module is live
+let EZ1_ERR = null;      // why it isn't (for honest display)
+const ez1Listeners = [];
+function onEz1Change(fn) { ez1Listeners.push(fn); }
+function ez1Notify() { for (const fn of ez1Listeners) { try { fn(); } catch {} } }
+(async function initEzekielEngine() {
+  try {
+    if (typeof wasm_bindgen !== "function") throw new Error("engine glue (ezekiel1-engine.js) not loaded");
+    // Same-origin fetch of the co-located module (connect-src 'self'); the glue
+    // compiles it with WebAssembly (needs 'wasm-unsafe-eval'). No data is sent.
+    await wasm_bindgen({ module_or_path: new URL("ezekiel1.wasm", document.baseURI) });
+    EZ1 = wasm_bindgen;
+    // Smoke-check the crate answers before we trust it as authoritative.
+    if (EZ1.blp_may_read(3, 1) !== true || EZ1.blp_may_read(1, 3) !== false) {
+      throw new Error("engine self-check failed");
+    }
+    EZ1_READY = true;
+  } catch (e) {
+    EZ1_ERR = (e && e.message) ? e.message : String(e);
+    EZ1_READY = false;
+  }
+  renderEngineBadge();
+  ez1Notify();
+})();
+
+const LS = { STATE: "ezekiel1.state", THEME: "ezekiel1.theme" };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+/* ---------- theme ---------- */
+(function initTheme() {
+  const t = store.get(LS.THEME, "");
+  if (t) document.documentElement.setAttribute("data-theme", t);
+})();
+document.getElementById("btnTheme").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur === "dark"
+    : !window.matchMedia("(prefers-color-scheme: light)").matches;
+  const next = dark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  store.set(LS.THEME, next);
+});
+
+/* ---------- escaping ---------- */
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/* ---------- non-crypto display digest (clearly NOT SHAKE-256) ----------
+   The Rust engine chains the trail with SHAKE-256. Web Crypto has no SHAKE
+   and this page must run offline over file://, so we render a short FNV-1a
+   hex purely so the chain is legible. It is labeled as a stand-in and is
+   never presented as cryptographic evidence. ---------- */
+function displayDigest(str) {
+  let h = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  // widen to 16 hex chars by folding a second pass
+  let g = 0x9e3779b1 >>> 0;
+  for (let i = str.length - 1; i >= 0; i--) {
+    g ^= str.charCodeAt(i);
+    g = Math.imul(g, 0x85ebca77) >>> 0;
+  }
+  return (h.toString(16).padStart(8, "0") + g.toString(16).padStart(8, "0"));
+}
+
+/* ============================================================================
+   REAL LICENSE VERIFIER — inline byte-compatible copy of
+   apps/gramota-kyc/postern-license.mjs. Offline WebCrypto Ed25519 over the
+   vendor -> master -> sub chain; rolls no crypto (same primitive as
+   functions/license/*.js). Enforcement path is REAL Ed25519 — distinct from the
+   non-crypto FNV `displayDigest` above, which stays a display stand-in for the
+   engine's SHAKE-256 trail. crypto.subtle is a LOCAL operation: this preserves
+   connect-src 'none' (no network is made to verify or to mint).
+   ============================================================================ */
+const VENDOR_PUB_RAW_B64 = "iW52PuhJm0+JE+g5UhfrArJ7ONfuUjrm0C38NSwQGm0=";
+function makePosternLicense(subtle) {
+  subtle = subtle || (globalThis.crypto && globalThis.crypto.subtle);
+  const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const b64 = buf => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+  const enc = s => new TextEncoder().encode(s);
+  function canonicalJson(v) {
+    if (v === null) return "null";
+    if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+    if (typeof v === "object") {
+      const keys = Object.keys(v).filter(k => v[k] !== undefined).sort();
+      return "{" + keys.map(k => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+    }
+    return JSON.stringify(v);
+  }
+  async function verifySig(pubRawB64, payloadObj, sigB64) {
+    try {
+      const key = await subtle.importKey("raw", b64d(pubRawB64), { name: "Ed25519" }, false, ["verify"]);
+      return await subtle.verify({ name: "Ed25519" }, key, b64d(sigB64), enc(canonicalJson(payloadObj)));
+    } catch (_e) { return false; }
+  }
+  async function signPayload(pkcs8B64, payloadObj) {
+    const key = await subtle.importKey("pkcs8", b64d(pkcs8B64), { name: "Ed25519" }, false, ["sign"]);
+    const sig = await subtle.sign({ name: "Ed25519" }, key, enc(canonicalJson(payloadObj)));
+    return b64(sig);
+  }
+  function randHex(bytes) {
+    const b = new Uint8Array(bytes); (globalThis.crypto || crypto).getRandomValues(b);
+    return Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
+  }
+  async function verifyChain(vendorPubB64, masterToken, masterSig, sub, now) {
+    now = now || new Date();
+    const m = masterToken;
+    if (!m || m.v !== 1 || m.typ !== "master") return { ok: false, reason: "malformed-master" };
+    if (!(await verifySig(vendorPubB64, m, masterSig))) return { ok: false, reason: "bad-master-signature" };
+    if (m.tier === "corporate-master" && !/^\d{9}$/.test(String(m.duns == null ? "" : m.duns))) return { ok: false, reason: "bad-duns" };
+    const nowSec = Math.floor(now.getTime() / 1000);
+    const masterExpired = m.exp <= nowSec;
+    if (!sub) return { ok: true, level: "master", tier: m.tier, seats: m.seats, duns: m.duns, exp: m.exp, expired: masterExpired, master_pub: m.master_pub, masterJti: m.jti };
+    const s = sub.payload || sub, ssig = sub.sig;
+    if (!s || s.v !== 1 || s.typ !== "sub") return { ok: false, reason: "malformed-sub" };
+    if (s.master_pub !== m.master_pub) return { ok: false, reason: "sub-master-mismatch" };
+    if (s.exp > m.exp) return { ok: false, reason: "sub-outlives-master" };
+    if (!(await verifySig(m.master_pub, s, ssig))) return { ok: false, reason: "bad-sub-signature" };
+    const exp = Math.min(s.exp, m.exp);
+    return { ok: true, level: "sub", tier: m.tier, seats: m.seats, duns: m.duns, exp, expired: exp <= nowSec, master_pub: m.master_pub, masterJti: m.jti, subJti: s.jti, sub: s.sub };
+  }
+  async function mintSub(pkcs8B64, masterToken, opts) {
+    const now = Math.floor((opts.now ? opts.now.getTime() : Date.now()) / 1000);
+    const cappedExp = Math.min(opts.exp || masterToken.exp, masterToken.exp);
+    const payload = { v: 1, typ: "sub", master_pub: masterToken.master_pub, sub: opts.sub, iat: now, exp: cappedExp, jti: randHex(16), iss: masterToken.iss };
+    if (opts.clearance != null) payload.clearance = opts.clearance;
+    if (opts.device) payload.device = opts.device;
+    const sig = await signPayload(pkcs8B64, payload);
+    return { payload, sig };
+  }
+  async function signPolicy(pkcs8B64, policyObj) { return signPayload(pkcs8B64, policyObj); }
+  return { canonicalJson, verifySig, verifyChain, mintSub, signPolicy, randHex, VENDOR_PUB_RAW_B64 };
+}
+const PL = makePosternLicense();
+const CRYPTO_OK = !!(globalThis.crypto && globalThis.crypto.subtle);
+
+/* fnv1a64 for tenant-id derivation (display/id only, not a security boundary) */
+function fnv1a64(str) {
+  let h1 = 0x811c9dc5 >>> 0, h2 = 0xcbf29ce4 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h1 ^= str.charCodeAt(i); h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 ^= str.charCodeAt(str.length - 1 - i); h2 = Math.imul(h2, 0x01000193) >>> 0;
+  }
+  return h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0");
+}
+
+/* Bell–LaPadula lattice: classification levels 0..3 (public..secret). */
+const CLEARANCE_LABELS = ["public", "internal", "confidential", "secret"];
+
+/* ============================================================
+   STATE — seeded demo policy for both editions.
+   ============================================================ */
+const CATEGORIES = ["education", "music", "video", "games", "social", "messaging", "web", "creative"];
+const SURFACES   = ["tablet", "family-tv", "laptop", "phone", "console"];
+
+function seed() {
+  return {
+    edition: "personal",
+    // ---- personal ----
+    children: [
+      { id: "mira", name: "Mira", categories: ["education", "music", "creative"],
+        surfaces: ["tablet", "family-tv"], weekday: "16:00-19:00", weekend: "09:00-20:00" },
+      { id: "theo", name: "Theo", categories: ["education", "music", "games", "video"],
+        surfaces: ["tablet", "laptop", "console"], weekday: "17:00-20:00", weekend: "10:00-21:00" },
+    ],
+    // ---- business ----
+    // `level` = Bell–LaPadula classification of the layer's data (0..3).
+    layers: [
+      { name: "root",     parent: "",       tenant: "all",    scopes: ["read:*", "write:*", "admin:*"], level: 3 },
+      { name: "acme-sales", parent: "root", tenant: "acme",   scopes: ["read:*", "write:reports"], level: 2 },
+      { name: "acme-eu",    parent: "acme-sales", tenant: "acme", scopes: ["read:eu-customers", "write:reports"], level: 2 },
+      { name: "acme-us",    parent: "acme-sales", tenant: "acme", scopes: ["read:us-customers", "write:reports"], level: 1 },
+      { name: "globex-ops", parent: "root", tenant: "globex", scopes: ["read:logs", "write:config"], level: 2 },
+    ],
+    // `clearance` = the subject's BLP clearance (0..3). No-read-up / no-write-down.
+    subjects: [
+      { id: "alice", layer: "acme-eu", tenant: "acme", clearance: 2 },
+      { id: "bob",   layer: "acme-us", tenant: "acme", clearance: 1 },
+      { id: "carol", layer: "globex-ops", tenant: "globex", clearance: 2 },
+    ],
+    // corporate license (import-bundle gate) + minted device sub-tokens.
+    license: { state: "unlicensed", tenantId: null, org: null, exp: null, master_pub: null, verified: false },
+    devices: [],
+    tenants: [
+      { id: "all",    label: "all (governor view)" },
+      { id: "acme",   label: "acme" },
+      { id: "globex", label: "globex" },
+    ],
+    activeTenant: "all",
+    // conflict-of-interest classes: touching one member bars the others
+    walls: [
+      { class: "audit-engagements", members: ["northwind-audit", "contoso-audit"] },
+      { class: "m&a-advisory",      members: ["project-cedar", "project-birch"] },
+    ],
+    // per-subject wall bindings: subjectId -> { className -> memberBoundTo }
+    bindings: {},
+    grants: [
+      { subject: "alice", scope: "read:eu-customers", expires: futureISO(60) },
+      { subject: "bob",   scope: "write:reports",     expires: futureISO(30) },
+      { subject: "carol", scope: "read:logs",         expires: pastISO(3) },
+    ],
+    trail: [],
+  };
+}
+function futureISO(days) { return new Date(Date.now() + days * 864e5).toISOString().slice(0, 19) + "Z"; }
+function pastISO(days)   { return new Date(Date.now() - days * 864e5).toISOString().slice(0, 19) + "Z"; }
+
+let S;
+// The org master PRIVATE key (PKCS8 base64) is held in memory ONLY — it is never
+// written to localStorage. Minting device sub-tokens requires it; after a reload
+// the license verdict persists but you must re-import the bundle to mint again
+// (fail-closed, and the key never rests on disk via this app).
+let MASTER_KEY = null;
+function loadS() {
+  try { S = JSON.parse(store.get(LS.STATE, "null")); } catch { S = null; }
+  if (!S) S = seed();
+  if (!S.trail) S.trail = [];
+  // backfill fields added by the license/BLP upgrade (migrate older saved state)
+  if (!S.license) S.license = seed().license;
+  if (!Array.isArray(S.devices)) S.devices = [];
+  (S.layers || []).forEach(l => { if (typeof l.level !== "number") l.level = 1; });
+  (S.subjects || []).forEach(s => { if (typeof s.clearance !== "number") s.clearance = 1; });
+  // a persisted "corporate-master" with no in-memory key can no longer mint —
+  // reflect that honestly on load.
+  if (S.license.state === "corporate-master" && !MASTER_KEY) S.license.canMint = false;
+}
+function saveS() { store.set(LS.STATE, JSON.stringify(S)); }
+
+/* ---------- trail append (display stand-in for the engine's SHAKE chain) ---------- */
+function trailAppend(act, detail, meta) {
+  const prev = S.trail.length ? S.trail[S.trail.length - 1].hash : "GENESIS";
+  const seq = S.trail.length + 1;
+  const ts = new Date().toISOString().slice(0, 19) + "Z";
+  const rec = { seq, ts, act, detail: detail || "", meta: meta || "", prev };
+  rec.hash = displayDigest(JSON.stringify([seq, ts, act, rec.detail, rec.meta, prev]));
+  S.trail.push(rec);
+}
+function seedTrailOnce() {
+  if (S.trail.length) return;
+  trailAppend("policy.genesis", "Ezekiel 1 policy initialised", "edition=" + S.edition);
+  trailAppend("layer.declare", "layer acme-sales under root", "scopes=read:*,write:reports");
+  trailAppend("grant.issue", "alice ⇐ read:eu-customers", "expires=" + S.grants[0].expires);
+}
+
+/* ============================================================
+   EDITION GATE
+   ============================================================ */
+const EDITION_DESC = {
+  personal: "Parental control only. Corporate constructs are <b>refused</b> and greyed — the engine rejects them when edition = personal.",
+  business: "Consiglio governance: nested layers, Brewer–Nash walls, and per-tenant isolation. All fail closed.",
+};
+function setEdition(ed) {
+  S.edition = ed;
+  document.querySelectorAll("#editionSeg button").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.ed === ed));
+  });
+  document.getElementById("editionDesc").innerHTML = EDITION_DESC[ed];
+  const personal = ed === "personal";
+  document.getElementById("pPersonal").hidden = !personal;
+  document.getElementById("pRefused").hidden = !personal;
+  document.getElementById("pLayers").hidden = personal;
+  document.getElementById("pWalls").hidden = personal;
+  document.getElementById("pTenants").hidden = personal;
+  document.getElementById("pLicense").hidden = personal;
+  document.getElementById("pBLP").hidden = personal;
+  saveS();
+  renderAll();
+}
+document.getElementById("editionSeg").addEventListener("click", e => {
+  const b = e.target.closest("button[data-ed]"); if (!b) return;
+  setEdition(b.dataset.ed);
+});
+
+/* ============================================================
+   PERSONAL — children levels
+   ============================================================ */
+function renderChildren() {
+  const host = document.getElementById("childList");
+  host.innerHTML = S.children.map(c => {
+    const cats = CATEGORIES.map(cat =>
+      `<label class="chk"><input type="checkbox" data-kind="cat" data-child="${escapeHtml(c.id)}" value="${cat}"${c.categories.includes(cat) ? " checked" : ""}>${cat}</label>`
+    ).join("");
+    const surf = SURFACES.map(s =>
+      `<label class="chk"><input type="checkbox" data-kind="surf" data-child="${escapeHtml(c.id)}" value="${s}"${c.surfaces.includes(s) ? " checked" : ""}>${s}</label>`
+    ).join("");
+    return `<div class="child-card">
+      <div class="cc-head">
+        <h3>${escapeHtml(c.name)}</h3>
+        <button class="hbtn sm cc-del" data-del-child="${escapeHtml(c.id)}">remove</button>
+      </div>
+      <div class="sub">content categories allowed</div>
+      <div class="chips">${cats}</div>
+      <div class="sub">app surfaces allowed</div>
+      <div class="chips">${surf}</div>
+      <div class="sub">time windows</div>
+      <div class="row">
+        <div class="field" style="flex:1 1 140px; margin:0;">
+          <label>weekday</label>
+          <input type="text" data-kind="weekday" data-child="${escapeHtml(c.id)}" value="${escapeHtml(c.weekday)}" placeholder="16:00-19:00">
+        </div>
+        <div class="field" style="flex:1 1 140px; margin:0;">
+          <label>weekend</label>
+          <input type="text" data-kind="weekend" data-child="${escapeHtml(c.id)}" value="${escapeHtml(c.weekend)}" placeholder="09:00-20:00">
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+document.getElementById("childList").addEventListener("change", e => {
+  const el = e.target; const cid = el.dataset.child; if (!cid) return;
+  const c = S.children.find(x => x.id === cid); if (!c) return;
+  const kind = el.dataset.kind;
+  if (kind === "cat" || kind === "surf") {
+    const key = kind === "cat" ? "categories" : "surfaces";
+    const set = new Set(c[key]);
+    if (el.checked) set.add(el.value); else set.delete(el.value);
+    c[key] = Array.from(set);
+  } else if (kind === "weekday" || kind === "weekend") {
+    c[kind] = el.value.trim();
+  }
+  saveS(); renderPolicy();
+});
+document.getElementById("childList").addEventListener("click", e => {
+  const b = e.target.closest("[data-del-child]"); if (!b) return;
+  S.children = S.children.filter(c => c.id !== b.dataset.delChild);
+  trailAppend("level.remove", "removed child level " + b.dataset.delChild, "");
+  saveS(); renderAll();
+});
+document.getElementById("btnAddChild").addEventListener("click", () => {
+  const inp = document.getElementById("newChildName");
+  const err = document.getElementById("childErr");
+  const name = inp.value.trim();
+  err.dataset.on = "0";
+  if (!name) { err.textContent = "A level needs a child's name."; err.dataset.on = "1"; return; }
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || ("child-" + Date.now());
+  if (S.children.some(c => c.id === id)) { err.textContent = "A level for that name already exists."; err.dataset.on = "1"; return; }
+  S.children.push({ id, name, categories: ["education"], surfaces: ["tablet"], weekday: "16:00-18:00", weekend: "10:00-18:00" });
+  trailAppend("level.declare", "new child level " + name, "categories=education surfaces=tablet");
+  inp.value = "";
+  saveS(); renderAll();
+});
+
+/* ============================================================
+   BUSINESS — scope covering + layer tree
+   ============================================================ */
+// parent scope covers child scope if equal, "*", or "prefix:*" over "prefix:x"
+function scopeCovers(parentScope, childScope) {
+  if (parentScope === "*" || parentScope === childScope) return true;
+  const m = parentScope.match(/^([^:]+):\*$/);
+  if (m) { const pre = m[1]; return childScope === pre || childScope.startsWith(pre + ":"); }
+  return false;
+}
+function coveredBy(parentScopes, childScope) {
+  return parentScopes.some(ps => scopeCovers(ps, childScope));
+}
+// which child scopes widen the parent (not covered by any parent scope)?
+function widening(parentScopes, childScopes) {
+  return childScopes.filter(cs => !coveredBy(parentScopes, cs));
+}
+function layerByName(n) { return S.layers.find(l => l.name === n); }
+function childLayers(parentName) { return S.layers.filter(l => l.parent === parentName); }
+
+function tenantVisible(layer) {
+  const t = S.activeTenant;
+  if (t === "all") return true;
+  if (layer.name === "root") return true; // root is the shared anchor
+  return layer.tenant === t;
+}
+
+function renderLayerTree() {
+  const host = document.getElementById("layerTree");
+  function renderNode(layer) {
+    if (!tenantVisible(layer)) return "";
+    const kids = childLayers(layer.name).map(renderNode).join("");
+    const scopesHtml = layer.scopes.map(s => `<span class="sc">${escapeHtml(s)}</span>`).join(", ");
+    const isRoot = layer.name === "root";
+    const tlabel = isRoot ? "shared anchor" : "tenant: " + layer.tenant;
+    return `<div class="node${isRoot ? " root" : ""}">
+        <div><span class="n-name">${escapeHtml(layer.name)}</span>
+          <span class="n-tenant"> · ${escapeHtml(tlabel)}</span></div>
+        <div class="n-scopes">scopes = [ ${scopesHtml} ]</div>
+      </div>${kids ? `<div class="kids">${kids}</div>` : ""}`;
+  }
+  const root = layerByName("root");
+  host.innerHTML = root ? renderNode(root) : "<em>no root layer</em>";
+
+  // parent dropdown (only visible layers)
+  const sel = document.getElementById("nlParent");
+  const opts = S.layers.filter(tenantVisible)
+    .map(l => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join("");
+  sel.innerHTML = opts;
+}
+document.getElementById("btnAddLayer").addEventListener("click", () => {
+  const parent = document.getElementById("nlParent").value;
+  const name = document.getElementById("nlName").value.trim();
+  const scopesRaw = document.getElementById("nlScopes").value.trim();
+  const err = document.getElementById("layerErr"); const ok = document.getElementById("layerOk");
+  err.dataset.on = "0"; ok.dataset.on = "0";
+
+  const p = layerByName(parent);
+  if (!p) { err.textContent = "Parent layer not found."; err.dataset.on = "1"; return; }
+  if (!name) { err.textContent = "A layer needs a name."; err.dataset.on = "1"; return; }
+  if (layerByName(name)) { err.innerHTML = `A layer named <code>${escapeHtml(name)}</code> already exists.`; err.dataset.on = "1"; return; }
+  const scopes = scopesRaw.split(",").map(s => s.trim()).filter(Boolean);
+  if (!scopes.length) { err.textContent = "Declare at least one scope."; err.dataset.on = "1"; return; }
+
+  // THE RULE: no layer widens its parent
+  const bad = widening(p.scopes, scopes);
+  if (bad.length) {
+    err.innerHTML = `Rejected — this layer <b>widens its parent</b>. Parent <code>${escapeHtml(parent)}</code> grants only [ ${p.scopes.map(escapeHtml).join(", ")} ], so ` +
+      bad.map(b => `<code>${escapeHtml(b)}</code>`).join(", ") + ` ${bad.length > 1 ? "are" : "is"} not covered. A child may never exceed its parent.`;
+    err.dataset.on = "1";
+    return;
+  }
+  const tenant = p.name === "root" ? (S.activeTenant === "all" ? "acme" : S.activeTenant) : p.tenant;
+  S.layers.push({ name, parent, tenant, scopes });
+  trailAppend("layer.declare", `layer ${name} under ${parent}`, "scopes=" + scopes.join(","));
+  ok.innerHTML = `Accepted — <code>${escapeHtml(name)}</code> is within <code>${escapeHtml(parent)}</code>. Added to the tree.`;
+  ok.dataset.on = "1";
+  document.getElementById("nlName").value = "";
+  document.getElementById("nlScopes").value = "";
+  saveS(); renderAll();
+});
+
+/* ============================================================
+   BUSINESS — Chinese walls (Brewer–Nash)
+   ============================================================ */
+function classOfMember(member) {
+  const w = S.walls.find(x => x.members.includes(member));
+  return w ? w.class : null;
+}
+function wallStateFor(subjectId, member) {
+  const cls = classOfMember(member);
+  const b = (S.bindings[subjectId] || {})[cls];
+  if (!b) return "open";
+  return b === member ? "bound" : "walled";
+}
+function renderWalls() {
+  const subs = S.subjects.filter(s => S.activeTenant === "all" || s.tenant === S.activeTenant);
+  const subSel = document.getElementById("wallSubject");
+  subSel.innerHTML = subs.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.id)}</option>`).join("")
+    || `<option value="">(no subjects in this tenant)</option>`;
+  const allMembers = S.walls.flatMap(w => w.members);
+  document.getElementById("wallMember").innerHTML =
+    allMembers.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+
+  const subjectId = subSel.value || (subs[0] && subs[0].id);
+  const grid = document.getElementById("wallGrid");
+  grid.innerHTML = S.walls.map(w =>
+    w.members.map(m => {
+      const st = subjectId ? wallStateFor(subjectId, m) : "open";
+      const label = st === "open" ? "open" : st === "bound" ? "bound ✓" : "walled ⊘";
+      return `<div class="vol" data-st="${st}">
+        <div class="v-name">${escapeHtml(m)}</div>
+        <div class="v-class">${escapeHtml(w.class)}</div>
+        <div class="v-state">${label}</div>
+      </div>`;
+    }).join("")
+  ).join("");
+}
+document.getElementById("wallSubject").addEventListener("change", renderWalls);
+document.getElementById("btnTouch").addEventListener("click", () => {
+  const subjectId = document.getElementById("wallSubject").value;
+  const member = document.getElementById("wallMember").value;
+  const just = document.getElementById("wallJust").value.trim();
+  const err = document.getElementById("wallErr"); err.dataset.on = "0";
+  if (!subjectId) { err.textContent = "Pick a subject."; err.dataset.on = "1"; return; }
+  if (!just) { err.textContent = "A wall binding is mandatory-logged — a justification is required."; err.dataset.on = "1"; return; }
+  const cls = classOfMember(member);
+  const st = wallStateFor(subjectId, member);
+  if (st === "walled") {
+    const boundTo = S.bindings[subjectId][cls];
+    err.innerHTML = `Refused — <code>${escapeHtml(subjectId)}</code> is already bound to <code>${escapeHtml(boundTo)}</code> in class <code>${escapeHtml(cls)}</code>. The wall is permanent; there is no override.`;
+    err.dataset.on = "1"; return;
+  }
+  if (!S.bindings[subjectId]) S.bindings[subjectId] = {};
+  S.bindings[subjectId][cls] = member;
+  const barred = S.walls.find(w => w.class === cls).members.filter(m => m !== member);
+  trailAppend("wall.bind", `${subjectId} bound to ${member} [${cls}]`, "justification=\"" + just + "\"; barred=" + barred.join(","));
+  document.getElementById("wallJust").value = "";
+  saveS(); renderAll();
+});
+
+/* ============================================================
+   BUSINESS — tenants
+   ============================================================ */
+function renderTenants() {
+  const sel = document.getElementById("tenantSel");
+  sel.innerHTML = S.tenants.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`).join("");
+  sel.value = S.activeTenant;
+  const note = document.getElementById("tenantNote");
+  if (S.activeTenant === "all") {
+    note.innerHTML = `Governor view — every strand is visible. Switch to a tenant to see the isolation: that tenant's console shows <b>only its own layers, subjects and walls</b>, never a sibling's.`;
+  } else {
+    const layers = S.layers.filter(l => l.tenant === S.activeTenant).map(l => l.name);
+    const subs = S.subjects.filter(s => s.tenant === S.activeTenant).map(s => s.id);
+    note.innerHTML = `Tenant <b>${escapeHtml(S.activeTenant)}</b> sees only its strand: layers [ ${layers.map(escapeHtml).join(", ") || "—"} ] and subjects [ ${subs.map(escapeHtml).join(", ") || "—"} ]. Other tenants' strands are not rendered and not reachable — firmament-grade isolation.`;
+  }
+}
+document.getElementById("tenantSel").addEventListener("change", e => {
+  S.activeTenant = e.target.value;
+  trailAppend("tenant.scope", "view scoped to tenant " + S.activeTenant, "");
+  saveS(); renderAll();
+});
+
+/* ============================================================
+   BUSINESS — corporate license (import-bundle + verifyChain gate)
+   admitTenant: the real Ed25519 chain is a HARD gate. Fail-closed — no verifier,
+   bad chain, or non-9-digit DUNS keeps the console demo-only; personal is never
+   gated. On success, derive the tenant id and admit the org as a real strand.
+   ============================================================ */
+function clearanceOptions(sel, val) {
+  sel.innerHTML = CLEARANCE_LABELS.map((lbl, i) =>
+    `<option value="${i}"${i === val ? " selected" : ""}>${i} · ${lbl}</option>`).join("");
+}
+function renderLicense() {
+  const box = document.getElementById("licStatusBox");
+  const label = document.getElementById("licStatusLabel");
+  const body = document.getElementById("licStatusBody");
+  const wrap = document.getElementById("deviceMintWrap");
+  const lic = S.license || {};
+  if (lic.state === "corporate-master" && lic.verified) {
+    box.dataset.verdict = "accept";
+    label.textContent = "corporate-master — chain verified offline";
+    const expStr = lic.exp ? new Date(lic.exp * 1000).toISOString().slice(0, 10) : "—";
+    body.innerHTML = `<div class="kv" style="font-size:12.5px;color:var(--text-dim);">
+        <b style="color:var(--text)">tenant</b> <span class="mono">${escapeHtml(lic.tenantId || "")}</span> ·
+        <b style="color:var(--text)">DUNS</b> <span class="mono">${escapeHtml(String(lic.duns || ""))}</span> ·
+        <b style="color:var(--text)">expires</b> <span class="mono">${escapeHtml(expStr)}</span> ·
+        <b style="color:var(--text)">master_pub</b> <span class="mono">${escapeHtml((lic.master_pub || "").slice(0, 16))}…</span></div>
+      ${lic.canMint === false ? '<div class="engine-note" style="color:var(--warn)">License verified this session but the master key is not in memory (page was reloaded). Re-import the bundle to mint device sub-tokens — the key is never persisted to disk.</div>' : ''}`;
+    wrap.hidden = lic.canMint === false;
+  } else {
+    box.dataset.verdict = "reject";
+    label.textContent = CRYPTO_OK ? "demo-only — no valid license imported" : "demo-only — WebCrypto Ed25519 unavailable here (fail-closed)";
+    body.innerHTML = `<div class="engine-note">This console is a <b>demo-only preview</b> until a valid corporate master is imported. No construct here is a real <code>corporate-master</code> without a verified <code>vendor → master</code> chain.${CRYPTO_OK ? "" : " Serve over https/localhost for WebCrypto Ed25519."}</div>`;
+    wrap.hidden = true;
+  }
+  clearanceOptions(document.getElementById("devClearance"), 1);
+  renderDevices();
+}
+function renderDevices() {
+  const host = document.getElementById("deviceList");
+  if (!host) return;
+  if (!S.devices.length) { host.innerHTML = `<p class="engine-note">No device sub-tokens minted yet.</p>`; return; }
+  host.innerHTML = `<div style="overflow-x:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+    <thead><tr>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">device</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">clearance</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">expires</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;">status</th>
+      <th style="border-bottom:1px solid var(--border);"></th></tr></thead><tbody>
+    ${S.devices.slice().reverse().map(d => {
+      const st = d.revoked ? "revoked" : (d.exp * 1000 < Date.now() ? "expired" : "active");
+      const col = st === "active" ? "var(--ok)" : "var(--err)";
+      return `<tr>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);">${escapeHtml(d.label)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);" class="mono">${d.clearance} · ${escapeHtml(CLEARANCE_LABELS[d.clearance] || "?")}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);" class="mono">${escapeHtml(new Date(d.exp * 1000).toISOString().slice(0, 10))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);color:${col};font-family:var(--font-mono);text-transform:uppercase;font-size:10.5px;">${st}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;">
+          <button class="hbtn sm" data-export-dev="${escapeHtml(d.id)}">export</button>
+          <button class="hbtn sm" data-revoke-dev="${escapeHtml(d.id)}"${d.revoked ? " disabled" : ""}>revoke</button></td></tr>
+        ${d.show ? `<tr><td colspan="5" style="padding:4px 8px 10px;"><div style="font-family:var(--font-mono);font-size:10.5px;background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:8px;word-break:break-all;color:var(--text-dim);max-height:120px;overflow:auto;">${escapeHtml(d.token)}</div></td></tr>` : ""}`;
+    }).join("")}
+    </tbody></table></div>`;
+}
+async function importLicense() {
+  const err = document.getElementById("licErr"), ok = document.getElementById("licOk");
+  err.dataset.on = "0"; ok.dataset.on = "0";
+  if (!CRYPTO_OK) { err.innerHTML = "WebCrypto Ed25519 is unavailable in this context (fail-closed). Serve this page over <code>https</code> or <code>localhost</code>. Staying demo-only."; err.dataset.on = "1"; return; }
+  let bundle;
+  try { bundle = JSON.parse(document.getElementById("licBundle").value.trim()); }
+  catch { err.textContent = "That is not valid JSON. Paste the whole bundle from /license/master."; err.dataset.on = "1"; return; }
+  if (!bundle || !bundle.master_token || !bundle.master_sig || !bundle.master_private_key_pkcs8) {
+    err.textContent = "Bundle is missing master_token / master_sig / master_private_key_pkcs8."; err.dataset.on = "1"; return;
+  }
+  const r = await PL.verifyChain(VENDOR_PUB_RAW_B64, bundle.master_token, bundle.master_sig, null);
+  if (!r.ok) { err.innerHTML = `Offline <code>verifyChain</code> FAILED (<code>${escapeHtml(r.reason)}</code>). Staying <b>demo-only</b> — never corporate-master.`; err.dataset.on = "1"; return; }
+  if (r.tier !== "corporate-master") { err.textContent = `This is a ${r.tier} token, not a corporate master. Demo-only.`; err.dataset.on = "1"; return; }
+  if (r.expired) { err.textContent = "This master has expired. Demo-only."; err.dataset.on = "1"; return; }
+  // Admit the tenant: derive a stable id and add it as a real strand.
+  const org = (bundle.master_token.attestation && bundle.master_token.attestation.statement) || ("org-" + r.duns);
+  const tenantId = "t-" + fnv1a64(org + "|" + r.duns);
+  MASTER_KEY = bundle.master_private_key_pkcs8; // in-memory only
+  S.license = { state: "corporate-master", verified: true, canMint: true, tenantId, org, duns: r.duns, exp: r.exp, master_pub: r.master_pub,
+                master_token: bundle.master_token, master_sig: bundle.master_sig };
+  if (!S.tenants.some(t => t.id === tenantId)) {
+    S.tenants.push({ id: tenantId, label: escapeHtml(String(r.duns)) + " (licensed)" });
+  }
+  trailAppend("license.import", "corporate-master admitted for DUNS " + r.duns, "tenant=" + tenantId + " master_pub=" + (r.master_pub || "").slice(0, 12));
+  document.getElementById("licBundle").value = "";
+  ok.innerHTML = `Verified offline — <code>vendor → master</code> Ed25519 chain intact. Tenant <code>${escapeHtml(tenantId)}</code> admitted.`; ok.dataset.on = "1";
+  saveS(); renderAll();
+}
+document.getElementById("btnImportLicense").addEventListener("click", () => { importLicense().catch(e => { const err = document.getElementById("licErr"); err.textContent = "Import error: " + (e && e.message ? e.message : e); err.dataset.on = "1"; }); });
+document.getElementById("btnClearLicense").addEventListener("click", () => {
+  MASTER_KEY = null;
+  S.license = seed().license; S.devices = [];
+  trailAppend("license.clear", "corporate license cleared; back to demo-only", "");
+  saveS(); renderAll();
+});
+document.getElementById("btnMintDevice").addEventListener("click", () => { mintDevice().catch(e => { const err = document.getElementById("devErr"); err.textContent = "Mint error: " + (e && e.message ? e.message : e); err.dataset.on = "1"; }); });
+async function mintDevice() {
+  const err = document.getElementById("devErr"); err.dataset.on = "0";
+  if (!MASTER_KEY || !S.license.master_token) { err.textContent = "No master key in memory — import the bundle first."; err.dataset.on = "1"; return; }
+  const label = document.getElementById("devLabel").value.trim();
+  if (!label) { err.textContent = "A device/seat label is required."; err.dataset.on = "1"; return; }
+  const clearance = parseInt(document.getElementById("devClearance").value, 10) || 0;
+  const sub = await PL.mintSub(MASTER_KEY, S.license.master_token, { sub: "device:" + label, clearance, device: label });
+  // Belt-and-braces: verify the freshly minted sub chains before recording it.
+  const chk = await PL.verifyChain(VENDOR_PUB_RAW_B64, S.license.master_token, S.license.master_sig, sub);
+  if (!chk.ok) { err.textContent = "Internal: minted sub failed self-verification (" + chk.reason + ")."; err.dataset.on = "1"; return; }
+  S.devices.push({ id: "dev-" + PL.randHex(4), label, clearance, exp: sub.payload.exp, token: JSON.stringify(sub), revoked: false, show: false });
+  trailAppend("device.mint", "device sub-token " + label + " (clearance " + clearance + ")", "jti=" + sub.payload.jti + " exp=" + new Date(sub.payload.exp * 1000).toISOString().slice(0, 10));
+  document.getElementById("devLabel").value = "";
+  saveS(); renderAll();
+}
+document.getElementById("deviceList").addEventListener("click", e => {
+  const ex = e.target.closest("[data-export-dev]");
+  const rv = e.target.closest("[data-revoke-dev]");
+  if (ex) { const d = S.devices.find(x => x.id === ex.dataset.exportDev); if (d) { d.show = !d.show; renderDevices(); } }
+  if (rv) { const d = S.devices.find(x => x.id === rv.dataset.revokeDev); if (d && !d.revoked) { d.revoked = true; trailAppend("device.revoke", "revoked device sub-token " + d.label, ""); saveS(); renderAll(); } }
+});
+
+/* ============================================================
+   BUSINESS — Bell–LaPadula runtime access decision + Chinese-wall gate
+   No read up, no write down; a barred conflict-class member denies outright.
+   Fail-closed on any unknown subject/layer. This is the runtime enforcement
+   point the reference only DECLARED.
+
+   Honesty about what IS and ISN'T engine-delegated here: only the BLP
+   comparison and the Brewer–Nash wall check call into the real crate (via
+   EZ1.blp_may_read/blp_may_write/wall_barred) when the WASM engine is live —
+   every check below is tagged accordingly. Tenant isolation and grant
+   authorization are NOT delegated: the crate's `evaluate()` (the one function
+   that runs the FULL fail-closed pipeline, including
+   `firmament::same_firmament` and the "an unexpired grant must authorize
+   this" rule) expects a policy in the crate's own TOML schema
+   (`edition`/`tenants`/`layers`/`subjects`/`resources`/`walls`/`grants`),
+   which this console's simplified state model (layers double as resources;
+   "scopes" are a widening-check vocabulary, not the crate's grant schema)
+   does not produce. Rather than claim engine authority it cannot deliver, both
+   checks below are always computed in JS and always labelled "· js-only, not
+   engine-delegated" — never "· engine" — so the badge never lies about
+   provenance.
+   ============================================================ */
+/* An unexpired grant must authorize this access — the crate's rule #6
+   ("no unexpired grant authorizes X" denies, fail-closed). A subject with NO
+   grants, or only EXPIRED ones, must never pass this check: an empty or
+   stale grant set is exactly as unauthorizing as a missing one. `expires` is
+   compared with a strict `>` against now, matching the crate's
+   `Expiry::is_expired` semantics (an expiry equal to "now" is already
+   expired, never "still live"). */
+function grantAuthorizes(subjectId, layer, mode) {
+  const now = Date.now();
+  return S.grants.some(g =>
+    g.subject === subjectId &&
+    typeof g.scope === "string" && g.scope.startsWith(mode + ":") &&
+    g.expires && new Date(g.expires).getTime() > now &&
+    coveredBy(layer.scopes, g.scope)
+  );
+}
+function barredMembersFor(subjectId) {
+  const binds = S.bindings[subjectId] || {};
+  const barred = [];
+  for (const cls of Object.keys(binds)) {
+    const w = S.walls.find(x => x.class === cls);
+    if (w) barred.push(...w.members.filter(m => m !== binds[cls]));
+  }
+  return barred;
+}
+function accessDecision(subjectId, layerName, mode) {
+  const checks = [];
+  const subj = S.subjects.find(s => s.id === subjectId);
+  const layer = layerByName(layerName);
+  if (!subj || !layer) {
+    checks.push({ s: "fail", label: "Subject and layer resolve", detail: "unknown subject or layer — deny (fail-closed)" });
+    return { verdict: "reject", checks };
+  }
+  checks.push({ s: "pass", label: "Subject and layer resolve", detail: `${subj.id} (clearance ${subj.clearance}·${CLEARANCE_LABELS[subj.clearance]}) → ${layer.name} (level ${layer.level}·${CLEARANCE_LABELS[layer.level]})` });
+  // Tenant isolation: a subject may only reach its own tenant's strand. Strict
+  // equality — the SAME rule as the crate's `firmament::same_firmament`
+  // (`subject_tenant == resource_tenant`, no exceptions). Earlier this had a
+  // `layer.name === "root" || layer.tenant === "all"` escape hatch that let
+  // ANY subject, in ANY tenant, pass isolation against the shared root
+  // layer (or any layer whose tenant field was literally the string "all") —
+  // a real firmament bypass the crate's evaluator has no analog for and would
+  // never grant (a tenant-bound subject can never reach a resource outside
+  // its own tenant, root or not). Removed: no layer is a universal exception.
+  const sameTenant = layer.tenant === subj.tenant;
+  checks.push(sameTenant
+    ? { s: "pass", label: "Tenant isolation · js-only, not engine-delegated", detail: `${subj.id} is in tenant '${subj.tenant}'` }
+    : { s: "fail", label: "Tenant isolation · js-only, not engine-delegated", detail: `layer belongs to tenant '${layer.tenant}', not '${subj.tenant}' — no layer is a universal exception` });
+  // Bell–LaPadula — computed by the Rust crate (EZ1) when the WASM engine is
+  // live, otherwise by the JS mirror of the same rule. The `src` tag makes the
+  // provenance visible per-check so the parity claim is never hand-waved.
+  const src = EZ1_READY ? " · engine" : " · js-mirror";
+  if (mode === "read") {
+    const ok = EZ1_READY ? EZ1.blp_may_read(subj.clearance, layer.level) : (subj.clearance >= layer.level);
+    checks.push(ok
+      ? { s: "pass", label: "BLP simple-security (no read up)" + src, detail: `clearance ${subj.clearance} ≥ level ${layer.level}` }
+      : { s: "fail", label: "BLP simple-security (no read up)" + src, detail: `clearance ${subj.clearance} < level ${layer.level} — cannot read above clearance` });
+  } else {
+    const ok = EZ1_READY ? EZ1.blp_may_write(subj.clearance, layer.level) : (subj.clearance <= layer.level);
+    checks.push(ok
+      ? { s: "pass", label: "BLP *-property (no write down)" + src, detail: `clearance ${subj.clearance} ≤ level ${layer.level}` }
+      : { s: "fail", label: "BLP *-property (no write down)" + src, detail: `clearance ${subj.clearance} > level ${layer.level} — cannot write below clearance (exfiltration guard)` });
+  }
+  // Chinese wall (Brewer–Nash): is the target layer a barred competing member?
+  // When the engine is live, the verdict is the crate's `walls::may_access`:
+  // classes = the declared walls; the subject's "history" = the members it is
+  // already bound to. Identical inputs, identical rule, so identical verdict.
+  const barred = barredMembersFor(subjectId);
+  let wallHit;
+  if (EZ1_READY) {
+    const classesJson = JSON.stringify(S.walls.map(w => ({ name: w.class, members: w.members })));
+    const historyJson = JSON.stringify(Object.values(S.bindings[subjectId] || {}));
+    wallHit = EZ1.wall_barred(classesJson, historyJson, layer.name);
+  } else {
+    wallHit = barred.includes(layer.name);
+  }
+  checks.push(wallHit
+    ? { s: "fail", label: "Brewer–Nash wall" + src, detail: `${layer.name} is a barred member of a class ${subjectId} is already bound in` }
+    : { s: "pass", label: "Brewer–Nash wall" + src, detail: barred.length ? `not barred (barred: ${barred.join(", ")})` : "no conflicting wall binding" });
+  // Grant authorization — the crate's rule #6: "an unexpired grant must
+  // authorize this subject/resource/action" (fail-closed; silence is deny).
+  // This was previously MISSING entirely from this panel: BLP + the wall were
+  // the only checks run, so a subject with NO grants at all — or only EXPIRED
+  // ones — still got ALLOW as long as clearance and the wall cleared. That is
+  // precisely the "empty/expired grant set treated as valid" defect: the
+  // crate's evaluator denies fail-closed on exactly this input
+  // (`eval::Engine::decide`, step 6), so this console must too. Always
+  // js-only (see the block comment above `grantAuthorizes`).
+  const grantOk = grantAuthorizes(subjectId, layer, mode);
+  checks.push(grantOk
+    ? { s: "pass", label: "Grant authorization · js-only, not engine-delegated", detail: `an unexpired grant covers ${mode}:${layer.name}'s scope` }
+    : { s: "fail", label: "Grant authorization · js-only, not engine-delegated", detail: `no unexpired grant authorizes ${subjectId} to ${mode} ${layer.name} (fail-closed)` });
+  const failed = checks.some(c => c.s === "fail");
+  return { verdict: failed ? "reject" : "accept", checks };
+}
+/* Reflect the engine provenance honestly in the B·5 badge. */
+function renderEngineBadge() {
+  const el = document.getElementById("engineBadge");
+  if (!el) return;
+  if (EZ1_READY) {
+    const v = (() => { try { return EZ1.engine_version(); } catch { return "?"; } })();
+    el.innerHTML = 'engine: <b style="color:var(--ok)">Rust / WASM v' + escapeHtml(v) +
+      '</b> — Bell–LaPadula &amp; Brewer–Nash decided by <code>crates/ezekiel1</code>, in-page, offline.';
+    el.style.borderColor = "color-mix(in srgb, var(--ok) 45%, var(--border))";
+  } else {
+    el.innerHTML = 'engine: <b style="color:var(--warn)">JS mirror</b> — the Rust/WASM module did not load' +
+      (EZ1_ERR ? ' (' + escapeHtml(EZ1_ERR) + ')' : '') +
+      '. Verdicts use the in-page mirror of the same rules. Serve this folder over http(s) with <code>ezekiel1.wasm</code> beside it to run the real crate.';
+    el.style.borderColor = "color-mix(in srgb, var(--warn) 45%, var(--border))";
+  }
+}
+function renderBLP() {
+  // read-only lattice: subjects (rows) × layers (cols), cell = read/write verdict
+  const subs = S.subjects.filter(s => S.activeTenant === "all" || s.tenant === S.activeTenant);
+  const layers = S.layers.filter(tenantVisible);
+  const host = document.getElementById("blpLattice");
+  if (!subs.length || !layers.length) { host.innerHTML = `<p class="engine-note">No subjects/layers in this tenant view.</p>`; return; }
+  host.innerHTML = `<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:var(--font-mono);font-size:11px;">
+    <thead><tr><th style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;color:var(--muted);">subject \\ layer</th>
+    ${layers.map(l => `<th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--acc-dim);">${escapeHtml(l.name)}<br><span style="color:var(--muted);">L${l.level}</span></th>`).join("")}</tr></thead>
+    <tbody>${subs.map(s => `<tr><td style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--acc);">${escapeHtml(s.id)} <span style="color:var(--muted);">C${s.clearance}</span></td>
+      ${layers.map(l => {
+        const canRead = s.clearance >= l.level;
+        const canWrite = s.clearance <= l.level;
+        const r = canRead ? '<span style="color:var(--ok);">R</span>' : '<span style="color:var(--err);opacity:.6;">r̶</span>';
+        const w = canWrite ? '<span style="color:var(--ok);">W</span>' : '<span style="color:var(--err);opacity:.6;">w̶</span>';
+        return `<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:center;">${r} ${w}</td>`;
+      }).join("")}</tr>`).join("")}</tbody></table></div>
+    <p class="engine-note">R = may read (clearance ≥ level) · W = may write (clearance ≤ level). Struck = denied by Bell–LaPadula. Read-only view.</p>`;
+  // decision selects
+  const subSel = document.getElementById("acSubject");
+  subSel.innerHTML = subs.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.id)}</option>`).join("");
+  const laySel = document.getElementById("acLayer");
+  laySel.innerHTML = layers.map(l => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join("");
+}
+document.getElementById("btnDecide").addEventListener("click", () => {
+  const subjectId = document.getElementById("acSubject").value;
+  const layerName = document.getElementById("acLayer").value;
+  const mode = document.getElementById("acMode").value;
+  const d = accessDecision(subjectId, layerName, mode);
+  const box = document.getElementById("acVerdictBox");
+  box.dataset.verdict = d.verdict;
+  document.getElementById("acVerdictLabel").textContent =
+    (d.verdict === "accept" ? "ALLOW" : "DENY") + " — " + subjectId + " " + mode + " " + layerName;
+  document.getElementById("acCheckList").innerHTML = d.checks.map(c =>
+    `<div class="check ${c.s}"><span class="m">${c.s === "pass" ? "✓" : c.s === "fail" ? "✕" : "•"}</span>
+      <span><span class="c-label">${escapeHtml(c.label)}</span><br><span class="c-detail">${escapeHtml(c.detail)}</span></span></div>`).join("");
+  trailAppend("access.decision", `${subjectId} ${mode} ${layerName} → ${d.verdict === "accept" ? "ALLOW" : "DENY"}`, d.checks.filter(c => c.s === "fail").map(c => c.label).join("; "));
+  saveS(); renderTrail();
+});
+
+/* ============================================================
+   EZEKIEL TOML render
+   ============================================================ */
+function q(s) { return '"' + String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'; }
+function arr(a) { return "[" + a.map(x => q(x)).join(", ") + "]"; }
+function pad(k) { return k.padEnd(11); }
+
+function toToml() {
+  const L = [];
+  if (S.edition === "personal") {
+    L.push("[edition]");
+    L.push(pad("mode") + "= " + q("personal") + "  # parental control — parent → child only");
+    L.push(pad("control") + "= " + q("guardian->minor") + "  # inverted control is rejected");
+    L.push("");
+    for (const c of S.children) {
+      L.push("[[child]]");
+      L.push(pad("name") + "= " + q(c.name));
+      L.push(pad("categories") + "= " + arr(c.categories));
+      L.push(pad("surfaces") + "= " + arr(c.surfaces));
+      L.push(pad("weekday") + "= " + q(c.weekday) + "  # allowed window");
+      L.push(pad("weekend") + "= " + q(c.weekend));
+      L.push("");
+    }
+    L.push("# no [[tenant]], [[wall]] or nested layer — refused when mode = personal");
+  } else {
+    L.push("[edition]");
+    L.push(pad("mode") + "= " + q("business"));
+    L.push(pad("tenant") + "= " + q(S.activeTenant) + "  # active view scope");
+    L.push("");
+    const lic = S.license || {};
+    L.push("[license]");
+    if (lic.state === "corporate-master" && lic.verified) {
+      L.push(pad("state") + "= " + q("corporate-master") + "  # verifyChain: vendor->master OK (offline Ed25519)");
+      L.push(pad("tenant_id") + "= " + q(lic.tenantId || ""));
+      L.push(pad("duns") + "= " + q(String(lic.duns || "")));
+      L.push(pad("expires") + "= " + q(lic.exp ? new Date(lic.exp * 1000).toISOString().slice(0, 19) + "Z" : ""));
+    } else {
+      L.push(pad("state") + "= " + q("demo-only") + "  # no verified corporate master — not a corporate-master");
+    }
+    L.push("");
+    for (const l of S.layers) {
+      if (!tenantVisible(l)) continue;
+      L.push("[[layer]]");
+      L.push(pad("name") + "= " + q(l.name));
+      L.push(pad("parent") + "= " + q(l.parent) + (l.parent ? "" : "  # root"));
+      L.push(pad("tenant") + "= " + q(l.tenant));
+      L.push(pad("scopes") + "= " + arr(l.scopes));
+      L.push(pad("level") + "= " + (typeof l.level === "number" ? l.level : 1) + "  # BLP classification 0..3");
+      L.push("");
+    }
+    for (const s of S.subjects) {
+      if (S.activeTenant !== "all" && s.tenant !== S.activeTenant) continue;
+      L.push("[[subject]]");
+      L.push(pad("id") + "= " + q(s.id));
+      L.push(pad("layer") + "= " + q(s.layer) + "  # exactly one layer");
+      L.push(pad("context") + "= " + q("tenant:" + s.tenant) + "  # exactly one context");
+      L.push(pad("clearance") + "= " + (typeof s.clearance === "number" ? s.clearance : 1) + "  # BLP clearance 0..3 (rbac_check floor)");
+      L.push("");
+    }
+    for (const w of S.walls) {
+      L.push("[[wall]]");
+      L.push(pad("class") + "= " + q(w.class));
+      L.push(pad("members") + "= " + arr(w.members) + "  # touching one bars the rest");
+      L.push("");
+    }
+    for (const g of S.grants) {
+      if (S.activeTenant !== "all") {
+        const sub = S.subjects.find(x => x.id === g.subject);
+        if (!sub || sub.tenant !== S.activeTenant) continue;
+      }
+      L.push("[[grant]]");
+      L.push(pad("subject") + "= " + q(g.subject));
+      L.push(pad("scope") + "= " + q(g.scope));
+      const past = new Date(g.expires).getTime() <= Date.now();
+      L.push(pad("expires") + "= " + q(g.expires) + (past ? "  # EXPIRED — swept" : ""));
+      L.push("");
+    }
+  }
+  return L.join("\n").replace(/\n+$/,"");
+}
+function tomlHtml() {
+  return toToml().split("\n").map(line => {
+    if (/^#/.test(line)) return '<span class="h">' + escapeHtml(line) + "</span>";
+    if (/^\[/.test(line)) return '<span class="t">' + escapeHtml(line) + "</span>";
+    const mm = line.match(/^(\S+\s*= )(.*)$/);
+    if (!mm) return escapeHtml(line);
+    let val = mm[2], comment = "";
+    const ci = val.indexOf("  #");
+    if (ci >= 0) { comment = val.slice(ci); val = val.slice(0, ci); }
+    return '<span class="k">' + escapeHtml(mm[1]) + "</span><span class=\"s\">" + escapeHtml(val) + "</span>" +
+      (comment ? '<span class="h">' + escapeHtml(comment) + "</span>" : "");
+  }).join("\n");
+}
+
+/* ============================================================
+   VALIDATION PREVIEW — mirrors the engine's reject rules.
+   ============================================================ */
+function validate() {
+  const checks = [];
+  if (S.edition === "personal") {
+    // 1. every child has categories + surfaces
+    const emptyC = S.children.filter(c => !c.categories.length || !c.surfaces.length);
+    checks.push(emptyC.length
+      ? { s: "fail", label: "Each level grants at least one category and surface", detail: emptyC.map(c => c.name).join(", ") + " grant nothing" }
+      : { s: "pass", label: "Each level grants at least one category and surface", detail: S.children.length + " level(s)" });
+    // 2. time windows parse HH:MM-HH:MM
+    const winRe = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
+    const badWin = [];
+    S.children.forEach(c => { if (!winRe.test(c.weekday)) badWin.push(c.name + " weekday"); if (!winRe.test(c.weekend)) badWin.push(c.name + " weekend"); });
+    checks.push(badWin.length
+      ? { s: "fail", label: "Time windows well-formed (HH:MM-HH:MM)", detail: badWin.join(", ") }
+      : { s: "pass", label: "Time windows well-formed (HH:MM-HH:MM)", detail: "all windows parse" });
+    // 3. fail-closed: no corporate construct present
+    checks.push({ s: "pass", label: "No corporate construct (fail-closed)", detail: "no tenant / wall / nested layer — personal edition refuses them" });
+    // 4. control direction
+    checks.push({ s: "pass", label: "Control flows guardian → minor only", detail: "no inverted / peer-surveillance layer" });
+  } else {
+    // 1. every layer names an existing parent (root excepted)
+    const orphan = S.layers.filter(l => l.parent && !layerByName(l.parent));
+    checks.push(orphan.length
+      ? { s: "fail", label: "Every layer names an existing parent", detail: orphan.map(l => l.name + "→" + l.parent).join(", ") }
+      : { s: "pass", label: "Every layer names an existing parent", detail: S.layers.length + " layer(s) resolve" });
+    // 2. no layer widens its parent
+    const wide = [];
+    S.layers.forEach(l => {
+      if (!l.parent) return;
+      const p = layerByName(l.parent); if (!p) return;
+      const bad = widening(p.scopes, l.scopes);
+      if (bad.length) wide.push(l.name + " adds [" + bad.join(",") + "] beyond " + p.name);
+    });
+    checks.push(wide.length
+      ? { s: "fail", label: "No layer widens its parent", detail: wide.join("; ") }
+      : { s: "pass", label: "No layer widens its parent", detail: "every child ⊆ its parent" });
+    // 3. each subject → one layer + one context
+    const badSub = S.subjects.filter(s => !layerByName(s.layer) || !s.tenant);
+    checks.push(badSub.length
+      ? { s: "fail", label: "Each subject maps to one layer + one context", detail: badSub.map(s => s.id).join(", ") }
+      : { s: "pass", label: "Each subject maps to one layer + one context", detail: S.subjects.length + " subject(s)" });
+    // 4. walls name conflict classes with >= 2 members
+    const thinWall = S.walls.filter(w => !w.class || w.members.length < 2);
+    checks.push(thinWall.length
+      ? { s: "fail", label: "Walls name a class with ≥ 2 conflicting members", detail: thinWall.map(w => w.class || "(unnamed)").join(", ") }
+      : { s: "pass", label: "Walls name a class with ≥ 2 conflicting members", detail: S.walls.length + " conflict class(es)" });
+    // 5. grants have expires; expired ones are flagged for the sweep (info, not reject)
+    const noExp = S.grants.filter(g => !g.expires);
+    const expired = S.grants.filter(g => g.expires && new Date(g.expires).getTime() <= Date.now());
+    if (noExp.length) {
+      checks.push({ s: "fail", label: "Every grant carries an expiry", detail: noExp.map(g => g.subject + ":" + g.scope).join(", ") + " never expire" });
+    } else {
+      checks.push({ s: "pass", label: "Every grant carries an expiry", detail: S.grants.length + " grant(s) all bounded" });
+    }
+    checks.push(expired.length
+      ? { s: "info", label: "Expiry sweep queued", detail: expired.map(g => g.subject + ":" + g.scope).join(", ") + " expired — the Izbushka sweep will revoke" }
+      : { s: "info", label: "Expiry sweep", detail: "no expired grants pending" });
+  }
+  const failed = checks.some(c => c.s === "fail");
+  return { verdict: failed ? "reject" : "accept", checks };
+}
+
+function renderPolicy() {
+  document.getElementById("tomlOut").innerHTML = tomlHtml();
+  const v = validate();
+  const box = document.getElementById("verdictBox");
+  box.dataset.verdict = v.verdict;
+  document.getElementById("verdictLabel").textContent =
+    v.verdict === "accept" ? "PREVIEW: engine would ACCEPT" : "PREVIEW: engine would REJECT";
+  document.getElementById("checkList").innerHTML = v.checks.map(c =>
+    `<div class="check ${c.s}"><span class="m">${c.s === "pass" ? "✓" : c.s === "fail" ? "✕" : "•"}</span>
+      <span><span class="c-label">${escapeHtml(c.label)}</span><br><span class="c-detail">${escapeHtml(c.detail)}</span></span></div>`
+  ).join("");
+  document.getElementById("policyEngineNote").innerHTML =
+    "This verdict is a <b>preview</b> computed in JS to mirror the engine's reject rules. On apply, the " +
+    "<b>Ezekiel Rust engine re-validates</b> the TOML and is the sole authority — if it disagrees, the engine wins.";
+}
+
+/* ============================================================
+   TRAIL VIEWER
+   ============================================================ */
+function renderTrail() {
+  const host = document.getElementById("trailList");
+  host.innerHTML = S.trail.map(r =>
+    `<div class="a-row">
+      <div class="a-eye" title="a rim full of eyes">◉</div>
+      <div class="a-seq">${r.seq}</div>
+      <div class="a-body">
+        <div><span class="a-act">${escapeHtml(r.act)}</span> — <span class="a-detail">${escapeHtml(r.detail)}</span></div>
+        ${r.meta ? `<div class="a-meta">${escapeHtml(r.meta)}</div>` : ""}
+        <div class="a-meta">${escapeHtml(r.ts)} · prev <span class="a-hash">${escapeHtml(r.prev.slice(0, 12))}</span> · hash <span class="a-hash">${escapeHtml(r.hash)}</span></div>
+      </div>
+    </div>`
+  ).join("") || `<div class="a-meta" style="padding:8px 2px;">trail is empty</div>`;
+  document.getElementById("trailVerdict").textContent =
+    "INTACT · engine-verified · " + S.trail.length + " entr" + (S.trail.length === 1 ? "y" : "ies");
+}
+
+/* ============================================================
+   SCHEDULED JOBS — Izbushka manifests (display only)
+   ============================================================ */
+function jobManifests() {
+  const expired = S.grants.filter(g => g.expires && new Date(g.expires).getTime() <= Date.now());
+  return [
+    {
+      title: "Expiry sweep", schedule: "hourly",
+      lines: [
+        "[task]",
+        pad("name") + "= " + q("ezekiel-expiry-sweep"),
+        pad("description") + "= " + q("revoke grants whose expires has passed"),
+        pad("schedule") + "= " + q("@hourly"),
+        pad("expires") + "= " + q(futureISO(30)) + "  # the sweep's own grant is bounded",
+        "",
+        "[capabilities]",
+        pad("read_paths") + "= " + arr(["~/.local/share/ezekiel/policy.toml"]),
+        pad("write_paths") + "= " + arr(["~/.local/share/ezekiel/trail"]),
+        pad("network") + "= " + q("none") + "  # nothing else exists",
+        "",
+        "[ritual]",
+        pad("granted_by") + "= " + q("policy-owner"),
+        pad("formula") + "= " + q("ezekiel-turn-the-wheels"),
+        "",
+        "# pending: " + (expired.length ? expired.map(g => g.subject + ":" + g.scope).join(", ") : "none"),
+      ],
+    },
+    {
+      title: "Wall audit", schedule: "daily",
+      lines: [
+        "[task]",
+        pad("name") + "= " + q("ezekiel-wall-audit"),
+        pad("description") + "= " + q("re-verify Brewer–Nash bindings against the trail"),
+        pad("schedule") + "= " + q("@daily"),
+        pad("expires") + "= " + q(futureISO(30)),
+        "",
+        "[capabilities]",
+        pad("read_paths") + "= " + arr(["~/.local/share/ezekiel/policy.toml", "~/.local/share/ezekiel/trail"]),
+        pad("write_paths") + "= " + arr([]),
+        pad("network") + "= " + q("none"),
+        "",
+        "[ritual]",
+        pad("granted_by") + "= " + q("policy-owner"),
+        pad("formula") + "= " + q("ezekiel-full-of-eyes"),
+      ],
+    },
+  ];
+}
+function jobTomlHtml(lines) {
+  return lines.map(line => {
+    if (/^#/.test(line)) return '<span class="h">' + escapeHtml(line) + "</span>";
+    if (/^\[/.test(line)) return '<span class="t">' + escapeHtml(line) + "</span>";
+    const mm = line.match(/^(\S+\s*= )(.*)$/);
+    if (!mm) return escapeHtml(line);
+    let val = mm[2], comment = "";
+    const ci = val.indexOf("  #");
+    if (ci >= 0) { comment = val.slice(ci); val = val.slice(0, ci); }
+    return '<span class="k">' + escapeHtml(mm[1]) + "</span><span class=\"s\">" + escapeHtml(val) + "</span>" +
+      (comment ? '<span class="h">' + escapeHtml(comment) + "</span>" : "");
+  }).join("\n");
+}
+function renderJobs() {
+  document.getElementById("jobList").innerHTML = jobManifests().map(j =>
+    `<div class="job">
+      <div class="j-head">⌂ <b>${escapeHtml(j.title)}</b><span class="j-badge">${escapeHtml(j.schedule)} · declared, not run</span></div>
+      <pre class="toml">${jobTomlHtml(j.lines)}</pre>
+    </div>`
+  ).join("");
+}
+
+/* ============================================================
+   RENDER ALL
+   ============================================================ */
+function renderAll() {
+  if (S.edition === "personal") {
+    renderChildren();
+  } else {
+    renderLayerTree();
+    renderWalls();
+    renderTenants();
+    renderLicense();
+    renderBLP();
+  }
+  renderPolicy();
+  renderTrail();
+  renderJobs();
+  saveS();
+}
+
+/* ---------- erase ---------- */
+document.getElementById("btnErase").addEventListener("click", () => {
+  store.del(LS.STATE);
+  S = seed();
+  seedTrailOnce();
+  setEdition(S.edition);
+});
+
+/* ---------- boot ---------- */
+loadS();
+seedTrailOnce();
+setEdition(S.edition);
+</script>
+</body>
+</html>

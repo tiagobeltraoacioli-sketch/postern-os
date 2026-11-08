@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://posternlabs.com/schema/consent-spine.v1.json",
+  "title": "Postern Consent Spine — the shared cross-tier consent state file (v1)",
+  "description": "ONE contract spanning three tiers (Porog / NoporIS / Waydroid). Every tier's state file at /var/lib/postern/<product>-gate/state.json (0600, root-owned) shares an IDENTICAL spine (schema, version, tier, consent, killSwitch, lang) and differs ONLY in its capability object and one pinned tier rail. A reader MUST treat a missing/unparseable file, a foreign `schema`, an unknown `version`, or any missing field as full-deny + not-consented. EVERY capability defaults to DENY. Nothing here is telemetry; the file never leaves the device. Reference-prototype, UNAUDITED — certifies nothing. The coin is not a security; personal use is free; not legal advice.",
+  "oneOf": [
+    { "$ref": "#/definitions/slobodaState" },
+    { "$ref": "#/definitions/noporisState" },
+    { "$ref": "#/definitions/porogState" }
+  ],
+  "definitions": {
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "scope"],
+      "description": "First-entry consent. Default DENY: not entered unless accepted on purpose after reading the honest disclosure.",
+      "properties": {
+        "accepted": { "type": "boolean", "default": false, "description": "True only after the operator read the honest disclosure and accepted. Default DENY." },
+        "scope": { "type": "string", "enum": ["session", "persistent"], "default": "session", "description": "'session' = valid this boot only (re-ask next boot); 'persistent' = remembered until revoked. Safer default = session." },
+        "acceptedAtIso": { "type": ["string", "null"], "default": null, "description": "ISO-8601 timestamp of acceptance, or null. Local record only." }
+      }
+    },
+    "killSwitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engaged"],
+      "description": "Operator kill-switch. Engaging is always allowed, drops the span, and NEVER destroys the sealed wallet/keys. Default not-engaged so a fresh file does not wedge a legitimately-enabled container; entry still requires consent.accepted.",
+      "properties": {
+        "engaged": { "type": "boolean", "default": false, "description": "True = span down, reader must refuse entry until disengaged. Default DENY-of-entry via consent, not via kill." },
+        "engagedAtIso": { "type": ["string", "null"], "default": null, "description": "ISO-8601 timestamp last engaged, or null." }
+      }
+    },
+    "lang": { "type": "string", "enum": ["pt-BR", "en"], "default": "en", "description": "Last UI language. Cosmetic; the reader may ignore it." },
+    "crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["open"],
+      "description": "One per-capability crossing (NoporIS shape). DENY by default; open only by an explicit, disclosed, individually-revocable toggle. Any value that is not exactly true is never-given. `direction` pins the single authorised lane (its own vocabulary, distinct from Porog's).",
+      "properties": {
+        "open": { "type": "boolean", "default": false, "description": "True = lent across right now. Default DENY." },
+        "scope": { "type": "string", "enum": ["session", "persistent"], "default": "session", "description": "'session' | 'persistent'. Safer default = session." },
+        "direction": { "type": "string", "enum": ["near-to-far", "far-to-near"], "default": "near-to-far", "description": "The single authorised lane: 'near-to-far' (clean side hands to the Google-Play side, the safer default) or 'far-to-near' (the more dangerous ingest lane, chosen on purpose). Never 'both'; missing/unknown collapses to 'near-to-far'." },
+        "openedAtIso": { "type": ["string", "null"], "default": null, "description": "ISO-8601 timestamp opened, or null when closed." }
+      }
+    },
+    "crossingDirectional": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["open"],
+      "description": "One per-capability cross-profile crossing (Porog shape). DENY by default. `direction` is first-class: a crossing open without a real direction installs NO grant (fail-closed). `package` (calendar/connectedApp only) names the single allowlisted package.",
+      "properties": {
+        "open": { "type": "boolean", "default": false, "description": "True = crossing lent. Default DENY." },
+        "direction": { "type": "string", "enum": ["none", "p2w", "w2p", "both"], "default": "none", "description": "'p2w' personal->Google, 'w2p' Google->personal, 'both', or 'none' (closed). Not one of these => 'none'." },
+        "scope": { "type": "string", "enum": ["session", "persistent"], "default": "session" },
+        "openedAtIso": { "type": ["string", "null"], "default": null },
+        "package": { "type": ["string", "null"], "default": null, "description": "Exactly one allowlisted package (standing/ambient crossings only), or null." }
+      }
+    },
+    "egress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["torOnly", "torBootstrapped"],
+      "description": "Waydroid tier rail: egress is ALWAYS Tor-only. torOnly is fixed true (never from input) so no file can downgrade to a clearnet path; torBootstrapped is the live 'is Tor up' signal — until true, egress is DENIED (fail-closed). Tor here is CLIENT-ONLY metadata reduction, NOT anonymity.",
+      "properties": {
+        "torOnly": { "const": true, "description": "Fixed true. No supported clearnet path for the container." },
+        "torBootstrapped": { "type": "boolean", "default": false, "description": "True ONLY while postern-tor reports a usable circuit. Default false = no egress." }
+      }
+    },
+    "sealedWallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved"],
+      "description": "NoporIS/Porog tier rail: cutting the bridge must never destroy the sealed wallet/keys on the near side. 'preserved' is fixed true (never from input, never cleared by the kill-switch).",
+      "properties": {
+        "preserved": { "const": true, "description": "Fixed true. The sealed wallet is never destroyed by the bridge, its crossings, or the kill-switch." }
+      }
+    },
+
+    "slobodaState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "version", "tier", "consent", "bridges", "egress", "killSwitch"],
+      "description": "Waydroid tier — 'Postern for postmarketOS, community edition'. NON-ATTESTABLE (not covered by the Postern Seal). Capability object is the flat-bool `bridges`; tier rail is `egress` (Tor-only).",
+      "properties": {
+        "schema": { "const": "postern.sloboda-gate.state", "description": "Discriminator; a reader refuses a foreign file outright." },
+        "version": { "const": 1, "description": "Full-deny on an unknown version." },
+        "tier": { "const": "non-attestable", "description": "PINNED. Never relabelled as attested; not covered by os_roothash / the Seal." },
+        "lang": { "$ref": "#/definitions/lang" },
+        "consent": { "$ref": "#/definitions/consent" },
+        "bridges": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["clipboard", "files", "mic", "camera", "location"],
+          "description": "Per-capability host<->container bridges (flat bool). Each defaults to DENY; only ever true by an explicit, disclosed toggle.",
+          "properties": {
+            "clipboard": { "type": "boolean", "default": false },
+            "files": { "type": "boolean", "default": false },
+            "mic": { "type": "boolean", "default": false },
+            "camera": { "type": "boolean", "default": false },
+            "location": { "type": "boolean", "default": false }
+          }
+        },
+        "egress": { "$ref": "#/definitions/egress" },
+        "killSwitch": { "$ref": "#/definitions/killSwitch" }
+      }
+    },
+
+    "noporisState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "version", "tier", "consent", "crossings", "killSwitch", "sealedWallet"],
+      "description": "NoporIS tier — guarded bridge to a far Google-Play persona. NON-ATTESTABLE (the far side is the LESS-PRIVATE side; phones home to Google; no Tor rail). Capability object is `crossings` ({open,scope,openedAtIso}); tier rail is `sealedWallet`.",
+      "properties": {
+        "schema": { "const": "postern.noporis-gate.state" },
+        "version": { "const": 1 },
+        "tier": { "const": "non-attestable", "description": "PINNED. The far side is never attested; no Seal, no measured boot." },
+        "lang": { "$ref": "#/definitions/lang" },
+        "consent": { "$ref": "#/definitions/consent" },
+        "crossings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["clipboard", "files", "mic", "camera", "location"],
+          "properties": {
+            "clipboard": { "$ref": "#/definitions/crossing" },
+            "files": { "$ref": "#/definitions/crossing" },
+            "mic": { "$ref": "#/definitions/crossing" },
+            "camera": { "$ref": "#/definitions/crossing" },
+            "location": { "$ref": "#/definitions/crossing" }
+          }
+        },
+        "killSwitch": { "$ref": "#/definitions/killSwitch" },
+        "sealedWallet": { "$ref": "#/definitions/sealedWallet" }
+      }
+    },
+
+    "porogState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "version", "tier", "consent", "crossings", "killSwitch", "sealedWallet"],
+      "description": "Porog tier — stock-Android managed-profile cross-profile door. KEY-ATTESTED-DEVICE: attests the PHONE, NOT the workspace (never measured-boot). Capability object is directional `crossings`; tier rail is `sealedWallet`.",
+      "properties": {
+        "schema": { "const": "postern.porog-gate.state" },
+        "version": { "const": 1 },
+        "tier": { "const": "key-attested-device", "description": "PINNED. Key-attested DEVICE only; never 'attested workspace' / 'measured-boot'." },
+        "lang": { "$ref": "#/definitions/lang" },
+        "consent": { "$ref": "#/definitions/consent" },
+        "crossings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["intents", "clipboard", "files", "contacts", "calendar", "connectedApp"],
+          "description": "user-mediated (intents/clipboard/files) + standing/ambient (contacts/calendar/connectedApp — hard-deny, separate stronger consent). Each defaults DENY.",
+          "properties": {
+            "intents": { "$ref": "#/definitions/crossingDirectional" },
+            "clipboard": { "$ref": "#/definitions/crossingDirectional" },
+            "files": { "$ref": "#/definitions/crossingDirectional" },
+            "contacts": { "$ref": "#/definitions/crossingDirectional" },
+            "calendar": { "$ref": "#/definitions/crossingDirectional" },
+            "connectedApp": { "$ref": "#/definitions/crossingDirectional" }
+          }
+        },
+        "killSwitch": { "$ref": "#/definitions/killSwitch" },
+        "sealedWallet": { "$ref": "#/definitions/sealedWallet" }
+      }
+    }
+  }
+}

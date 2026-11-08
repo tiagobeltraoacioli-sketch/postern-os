@@ -1,0 +1,47 @@
+# bloch-l2-prover — SP1-guest RSP-pattern SKELETON for the Bloch EVM L2
+# proving pipeline (docs/specs/BLOCH-L2-EVM-DESIGN.md §3).
+#
+# HONESTY (non-negotiable, mirrored in the crate docs and README):
+#   * SCAFFOLD, UNAUDITED, not a working L2, NOT a zk prover.
+#   * The MockProver in this crate proves NOTHING cryptographically — it is
+#     plumbing so the batch pipeline can be exercised end-to-end in tests.
+#   * The state-transition function here is a deliberately SIMPLIFIED
+#     account-map placeholder: NOT revm, NOT an MPT, NOT Ethereum semantics.
+#   * The real SP1 program/script/service triple (see crates/coherence-prover
+#     in the node repo for the pattern), riscv32im guest builds, MPT witness
+#     verification, revm-in-guest re-execution, FRI proof handling, and vkey
+#     pinning are all honestly stubbed behind `// SCAFFOLD:` markers.
+#
+# Standalone-workspace pattern (same as crates/bloch-tokens): its own empty
+# [workspace] table so it builds and tests outside the frozen root workspace
+# and can later carry heavy SP1 deps independently.
+[package]
+name = "bloch-l2-prover"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "SCAFFOLD — unaudited, not a working L2, NOT a zk prover. SP1-guest RSP-pattern skeleton for the Bloch EVM L2: BatchPublicValues + ExecutionWitness types with canonical encodings, a simplified placeholder STF, and a MockProver that proves nothing cryptographically."
+
+# Deliberately empty: this crate is its own workspace root, excluded from the
+# product root workspace (crates/bloch-tokens pattern).
+[workspace]
+
+[features]
+default = ["std"]
+# std: enables std::error::Error impls. Without it the crate is
+# #![no_std] + alloc, the shape an SP1 riscv32im guest needs.
+std = []
+# SCAFFOLD: the real SP1 guest/host integration would live behind a feature
+# like `sp1` pulling sp1-zkvm / sp1-sdk. Deliberately ABSENT from default
+# features (and from this manifest entirely) — nothing here talks to SP1 yet.
+
+[dependencies]
+# SHAKE-256 / Keccak-256 for the domain-separated commitments the design
+# specifies. no_std-capable; the only dependency.
+sha3 = { version = "0.10", default-features = false }
+
+[lints.clippy]
+# Determinism contract from BLOCH-L2-EVM-DESIGN: integer-only arithmetic in
+# any state-affecting path; no f32/f64 anywhere in the execution path.
+float_arithmetic = "deny"

@@ -1,0 +1,330 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  NoporIS Gate — the guarded crossing (reference-prototype UI, UNAUDITED).
+  Self-contained: no network, no telemetry, no external resources, no cookies.
+  The gate logic below is a condensed, behavior-equivalent port of gate-store.mjs
+  (the canonical, node-tested reference; it omits parse/loadState/serialize/
+  revokeAllCrossings and the sloboda-bridge file helpers, which this demo does
+  not need) — kept in sync by hand, not generated. This
+  page only surfaces the state the on-device bridge wrapper would read; the wrapper
+  does not exist yet (UNTESTED). Never "Postern OS".
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoporIS Gate — the guarded crossing</title>
+<style>
+  :root {
+    --bg: #0f1216; --panel: #171c22; --panel2: #1e242c; --line: #2b333d;
+    --ink: #e7edf3; --dim: #9aa7b4; --warn-bg: #2a2013; --warn-line: #6b5220; --warn-ink: #f2d79a;
+    --deny: #7d8894; --allow: #3fb27f; --far: #c9772e; --kill: #d0524a; --kill-bg: #2a1614;
+    --focus: #5aa9e6;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6f9; --panel: #ffffff; --panel2: #eef2f6; --line: #d5dde5;
+      --ink: #14202b; --dim: #5a6674; --warn-bg: #fdf5e2; --warn-line: #e2c073; --warn-ink: #6b4e12;
+      --deny: #6b7682; --allow: #1d8a5c; --far: #a9611f; --kill: #b23b34; --kill-bg: #fdecea;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 64px; }
+  h1 { font-size: 22px; margin: 8px 0 2px; }
+  .sub { color: var(--dim); margin: 0 0 18px; }
+  .honesty { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink);
+    border-radius: 10px; padding: 12px 14px; margin: 0 0 18px; font-size: 13.5px; }
+  .honesty b { color: var(--warn-ink); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin: 0 0 14px; }
+  .panel h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: .02em; }
+  .panel p.note { color: var(--dim); font-size: 13px; margin: 2px 0 10px; }
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px;
+    border-radius: 999px; border: 1px solid var(--line); vertical-align: middle; }
+  .badge.far { color: var(--far); border-color: var(--far); }
+  .badge.tier { color: var(--dim); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .row .label { font-weight: 600; }
+  .row .desc { color: var(--dim); font-size: 12.5px; }
+  .state { font-size: 12px; font-weight: 700; letter-spacing: .04em; padding: 3px 9px;
+    border-radius: 6px; border: 1px solid var(--line); color: var(--deny); white-space: nowrap; }
+  .state.on { color: var(--allow); border-color: var(--allow); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel2); color: var(--ink); padding: 7px 12px; }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button.primary { background: var(--allow); border-color: var(--allow); color: #06130d; font-weight: 600; }
+  button.ghost { background: transparent; }
+  button.kill { background: var(--kill-bg); border-color: var(--kill); color: var(--kill); font-weight: 700; }
+  button[disabled] { opacity: .45; cursor: not-allowed; }
+  .cross-btns { display: flex; gap: 8px; }
+  .assert { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); }
+  .assert .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--allow); flex: 0 0 auto; }
+  details { margin-top: 6px; } summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+  pre { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; overflow-x: auto; font-size: 12px; margin: 8px 0 0; }
+  .foot { color: var(--dim); font-size: 12px; margin-top: 18px; line-height: 1.6; }
+  .span-anim { height: 4px; margin: 10px 0 2px; border-radius: 2px; background: var(--line);
+    position: relative; overflow: hidden; }
+  .span-anim > i { position: absolute; inset: 0; width: 0; background:
+    linear-gradient(90deg, var(--allow), var(--far)); transition: width .5s ease; }
+  .span-anim.up > i { width: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NoporIS — the guarded crossing <span class="badge far">Google-Play side · less private</span></h1>
+  <p class="sub">A controlled span between two personas on one phone. Nothing crosses that you didn't hand across.</p>
+
+  <div class="honesty" role="note">
+    <b>The Google-Play side is the less-private side, by construction.</b> NoporIS sells
+    <b>separation and convenience — not privacy on that side</b>. That persona runs Google Play Services and
+    <b>phones home to Google</b>; NoporIS cannot change that. This is an app on <b>stock Android — not an
+    operating system, never “Postern OS”, and not a “Seal”</b>. A <b>rooted or compromised phone defeats the
+    separation</b>. <b>Reference-prototype, UNAUDITED.</b> The coin is worthless and is not a security. Personal
+    use is free. This is not legal advice.
+  </div>
+
+  <div class="panel">
+    <h2>Stand on the bridge <span class="badge tier" id="tierBadge"></span></h2>
+    <p class="note">First-entry consent. The far side is non-attestable and phones home to Google.
+      Accept for this session (re-asked next boot) or persistently.</p>
+    <div class="span-anim" id="spanAnim"><i></i></div>
+    <div class="row">
+      <div><div class="label">Bridge</div><div class="desc" id="bridgeDesc"></div></div>
+      <div class="cross-btns" id="consentBtns"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="crossPanel">
+    <h2>Per-capability crossings</h2>
+    <p class="note">Each is a lever you throw — a deliberate hand-over, off by default, individually revocable.
+      NoporIS never opens a crossing you didn't open.</p>
+    <div id="crossings"></div>
+    <p class="note" id="projOut" style="margin-top:12px"></p>
+  </div>
+
+  <div class="panel">
+    <h2>Kill-switch — drop the span</h2>
+    <p class="note">Stops the far side entirely. The near side — the door, the wallet, the keys — is untouched.</p>
+    <div class="row">
+      <div class="assert"><span class="dot"></span><span id="walletAssert"></span></div>
+      <div class="cross-btns" id="killBtns"></div>
+    </div>
+  </div>
+
+  <details>
+    <summary>Inspect the state the wrapper would read (this file never leaves the device)</summary>
+    <pre id="stateDump"></pre>
+  </details>
+
+  <p class="foot">
+    NoporIS is the guarded <b>bridge</b> (the Kalinov crossing); <b>Porog</b> is the guarded <b>door</b> — different
+    products, one shared signer. The isolation here is Android's work-profile mechanism, configured by an
+    unprivileged app: <b>sandboxed, not secure, private, or attested</b>. “Nopor” is a coined mark, not folklore.
+    UNTESTED: the on-device wrapper does not exist yet. Do not treat this page as a security control.
+  </p>
+</div>
+
+<script type="module">
+/* ===== condensed, behavior-equivalent port of gate-store.mjs (omits parse/loadState/serialize/revokeAllCrossings and the sloboda-bridge file helpers; kept in sync manually — the .mjs is canonical) ===== */
+const SCHEMA_ID = "postern.noporis-gate.state";
+const SCHEMA_VERSION = 1;
+const TIER = "non-attestable";
+const CROSSING_KEYS = ["clipboard", "files", "mic", "camera", "location"];
+const CONSENT_SCOPES = ["session", "persistent"];
+const CROSSING_DIRECTIONS = ["near-to-far", "far-to-near"];
+const DEFAULT_DIRECTION = "near-to-far";
+const LANGS = ["pt-BR", "en"];
+const LESS_PRIVATE_FAR_SIDE = true;
+const WALLET_PRESERVED = true;
+const STATE_PATH = "/var/lib/postern/noporis-gate/state.json";
+const closedCrossing = () => ({ open: false, scope: "session", direction: DEFAULT_DIRECTION, openedAtIso: null });
+function defaultState() {
+  return {
+    schema: SCHEMA_ID, version: SCHEMA_VERSION, tier: TIER, lang: "en",
+    consent: { accepted: false, scope: "session", acceptedAtIso: null },
+    crossings: { clipboard: closedCrossing(), files: closedCrossing(), mic: closedCrossing(),
+      camera: closedCrossing(), location: closedCrossing() },
+    killSwitch: { engaged: false, engagedAtIso: null },
+    sealedWallet: { preserved: WALLET_PRESERVED },
+  };
+}
+const asBool = (v) => v === true;
+const oneOf = (v, allowed, fb) => (allowed.includes(v) ? v : fb);
+const asIso = (v) => (typeof v === "string" && v.length > 0 ? v : null);
+function normalize(input) {
+  const out = defaultState();
+  if (!input || typeof input !== "object") return out;
+  const c = input.consent && typeof input.consent === "object" ? input.consent : {};
+  out.consent.accepted = asBool(c.accepted);
+  out.consent.scope = oneOf(c.scope, CONSENT_SCOPES, "session");
+  out.consent.acceptedAtIso = out.consent.accepted ? asIso(c.acceptedAtIso) : null;
+  const cr = input.crossings && typeof input.crossings === "object" ? input.crossings : {};
+  for (const k of CROSSING_KEYS) {
+    const x = cr[k] && typeof cr[k] === "object" ? cr[k] : {};
+    const open = asBool(x.open);
+    out.crossings[k] = { open, scope: oneOf(x.scope, CONSENT_SCOPES, "session"),
+      direction: oneOf(x.direction, CROSSING_DIRECTIONS, DEFAULT_DIRECTION),
+      openedAtIso: open ? asIso(x.openedAtIso) : null };
+  }
+  const ks = input.killSwitch && typeof input.killSwitch === "object" ? input.killSwitch : {};
+  out.killSwitch.engaged = asBool(ks.engaged);
+  out.killSwitch.engagedAtIso = out.killSwitch.engaged ? asIso(ks.engagedAtIso) : null;
+  out.lang = oneOf(input.lang, LANGS, "en");
+  return out;
+}
+function bridgeStanding(state, { requireConsent = true } = {}) {
+  const s = normalize(state);
+  if (s.killSwitch.engaged) return false;
+  if (requireConsent && !s.consent.accepted) return false;
+  return true;
+}
+function activeCrossings(state, opts) {
+  const s = normalize(state);
+  if (!bridgeStanding(s, opts)) return [];
+  return CROSSING_KEYS.filter((k) => s.crossings[k].open === true);
+}
+function walletPreserved(state) { return normalize(state).sealedWallet.preserved === true; }
+const BRIDGE_STATE_ENABLED = "enabled";
+const BRIDGE_STATE_DISABLED = "disabled";
+/* PURE runtime bridge-state projection — the single "enabled"|"disabled" string
+   the on-device orchestrator persists (default-closed: anything not exactly
+   "enabled" is off). "enabled" IFF consent.accepted && !killSwitch.engaged &&
+   any crossing open. Equal to activeCrossings(...).length > 0. */
+function projectNoporisBridgeState(state) {
+  return activeCrossings(state).length > 0 ? BRIDGE_STATE_ENABLED : BRIDGE_STATE_DISABLED;
+}
+function acceptConsent(state, { scope = "session", atIso = null } = {}) {
+  const s = normalize(state);
+  s.consent = { accepted: true, scope: oneOf(scope, CONSENT_SCOPES, "session"), acceptedAtIso: asIso(atIso) };
+  return s;
+}
+function withdrawConsent(state) {
+  const s = normalize(state);
+  s.consent = { accepted: false, scope: "session", acceptedAtIso: null };
+  for (const k of CROSSING_KEYS) s.crossings[k] = closedCrossing();
+  return s;
+}
+function openCrossing(state, key, { scope = "session", direction = DEFAULT_DIRECTION, atIso = null } = {}) {
+  const s = normalize(state);
+  if (!CROSSING_KEYS.includes(key)) return s;
+  if (!bridgeStanding(s)) return s;
+  s.crossings[key] = { open: true, scope: oneOf(scope, CONSENT_SCOPES, "session"),
+    direction: oneOf(direction, CROSSING_DIRECTIONS, DEFAULT_DIRECTION), openedAtIso: asIso(atIso) };
+  return s;
+}
+function revokeCrossing(state, key) {
+  const s = normalize(state);
+  if (!CROSSING_KEYS.includes(key)) return s;
+  s.crossings[key] = closedCrossing();
+  return s;
+}
+function engageKillSwitch(state, { atIso = null } = {}) {
+  const s = normalize(state);
+  s.killSwitch = { engaged: true, engagedAtIso: asIso(atIso) };
+  s.sealedWallet = { preserved: WALLET_PRESERVED };
+  return s;
+}
+function disengageKillSwitch(state) {
+  const s = normalize(state);
+  s.killSwitch = { engaged: false, engagedAtIso: null };
+  return s;
+}
+
+/* ===== UI (demo only; in-memory, nothing persisted) ===== */
+const CAP_DESC = {
+  clipboard: "Clipboard hand-over across the two personas.",
+  files: "Shared files/folder hand-over.",
+  mic: "Microphone hand-over.",
+  camera: "Camera hand-over.",
+  location: "Location / GPS hand-over.",
+};
+let state = defaultState();
+const now = () => new Date().toISOString();
+const $ = (id) => document.getElementById(id);
+
+function render() {
+  const standing = bridgeStanding(state);
+  const active = activeCrossings(state);
+  $("tierBadge").textContent = "tier: " + state.tier;
+
+  $("spanAnim").classList.toggle("up", standing);
+
+  $("bridgeDesc").textContent = state.killSwitch.engaged
+    ? "Span dropped by the kill-switch. Nothing crosses."
+    : state.consent.accepted
+      ? `Standing (${state.consent.scope}). ${active.length} of ${CROSSING_KEYS.length} crossings lent across.`
+      : "Not entered. No crossing can open until you consent.";
+
+  // consent buttons
+  const cb = $("consentBtns"); cb.innerHTML = "";
+  if (!state.consent.accepted) {
+    for (const scope of CONSENT_SCOPES) {
+      const b = document.createElement("button");
+      b.className = "primary"; b.textContent = scope === "session" ? "Accept (this session)" : "Accept (persist)";
+      b.disabled = state.killSwitch.engaged;
+      b.onclick = () => { state = acceptConsent(state, { scope, atIso: now() }); render(); };
+      cb.appendChild(b);
+    }
+  } else {
+    const b = document.createElement("button");
+    b.className = "ghost"; b.textContent = "Leave the bridge";
+    b.onclick = () => { state = withdrawConsent(state); render(); };
+    cb.appendChild(b);
+  }
+
+  // crossings
+  const host = $("crossings"); host.innerHTML = "";
+  for (const k of CROSSING_KEYS) {
+    const cr = state.crossings[k];
+    const on = active.includes(k);
+    const row = document.createElement("div"); row.className = "row";
+    const left = document.createElement("div");
+    left.innerHTML = `<div class="label">${k}</div><div class="desc">${CAP_DESC[k]}</div>`;
+    const right = document.createElement("div"); right.className = "cross-btns";
+    const st = document.createElement("span");
+    st.className = "state" + (on ? " on" : "");
+    st.textContent = on ? "CROSSING" : (cr.open && !standing ? "MASKED" : "DENIED");
+    const btn = document.createElement("button");
+    if (cr.open) { btn.textContent = "Revoke"; btn.onclick = () => { state = revokeCrossing(state, k); render(); }; }
+    else {
+      btn.textContent = "Hand across"; btn.disabled = !standing;
+      btn.onclick = () => { state = openCrossing(state, k, { atIso: now() }); render(); };
+    }
+    right.appendChild(st); right.appendChild(btn);
+    row.appendChild(left); row.appendChild(right); host.appendChild(row);
+  }
+
+  // wallet assertion + kill-switch
+  $("walletAssert").textContent = walletPreserved(state)
+    ? "Sealed wallet preserved — the kill-switch never destroys it."
+    : "INVARIANT VIOLATED"; // unreachable by construction
+  const kb = $("killBtns"); kb.innerHTML = "";
+  const k = document.createElement("button");
+  if (state.killSwitch.engaged) { k.className = "ghost"; k.textContent = "Restore the span";
+    k.onclick = () => { state = disengageKillSwitch(state); render(); }; }
+  else { k.className = "kill"; k.textContent = "Drop the span";
+    k.onclick = () => { state = engageKillSwitch(state, { atIso: now() }); render(); }; }
+  kb.appendChild(k);
+
+  // the single string the on-device orchestrator would persist to the
+  // bridge-state file the enforcement side reads (default-closed: anything but
+  // "enabled" is off). Mirrors gate-store.projectNoporisBridgeState.
+  const proj = projectNoporisBridgeState(state);
+  $("projOut").innerHTML = `Runtime bridge-state the orchestrator would write: ` +
+    `<b class="state${proj === "enabled" ? " on" : ""}">${proj}</b> — ` +
+    (proj === "enabled"
+      ? `a crossing is open on the less-private, non-attestable side (separation, not privacy).`
+      : `default-closed. Nothing crosses; anything but the literal <code>enabled</code> is off.`);
+
+  $("stateDump").textContent = JSON.stringify(state, null, 2);
+}
+render();
+</script>
+</body>
+</html>

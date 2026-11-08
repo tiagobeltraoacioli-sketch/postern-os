@@ -1,0 +1,50 @@
+# SCAFFOLD — not a secure or deployed system.
+#
+# Standalone, self-contained design-scaffold crate for the Postern FFG
+# permissioned-notary module. By default it now depends on the RustCrypto
+# `ml-dsa` crate and wires a REAL (still UNAUDITED, pre-1.0) FIPS-204 ML-DSA-65
+# verify/sign into the `MlDsa65Verifier` seam (see `src/signature.rs`);
+# `--no-default-features` restores the fully offline, zero-dependency stub
+# scaffold. It is NOT wired into any workspace and MUST
+# NOT be treated as production, audited, secure, or deployed software.
+# Detach from any ancestor workspace so this crate stays fully standalone
+# (it is intentionally NOT a member of /Users/tiagoacioli/dev/bloch-protocol).
+[workspace]
+
+[package]
+name = "postern-ffg"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — conceptual, unaudited design types for Postern's permissioned, Postern-operated FFG notary-checkpoint layer that anchors to the ownerless Bloch-SIS-PoW base. Not secure, not deployed, not an offering."
+publish = false
+
+[lib]
+name = "postern_ffg"
+path = "src/lib.rs"
+
+[dependencies]
+# The real ML-DSA-65 (FIPS 204) verify/sign primitive is now wired in BY
+# DEFAULT: a plain `cargo test`/`cargo build` (no `--features`) pulls in the
+# RustCrypto `ml-dsa` crate and exercises the `MlDsa65Verifier` seam with a
+# genuine FIPS-204 verify instead of the accept-nothing stub. It is the
+# RustCrypto `ml-dsa` crate (Apache-2.0 OR MIT): a real FIPS-204 ML-DSA
+# implementation, but it is **pre-1.0 (0.1.1) and UNAUDITED**. Wiring it in as
+# the default does NOT make this crate secure, audited, operational, or
+# deployed — see `RustCryptoMlDsa65Verifier` in `src/signature.rs` for the
+# full caveat.
+#
+# It stays `optional` only so `--no-default-features` still yields the fully
+# offline, zero-dependency stub scaffold (`NonVerifyingStubVerifier`, which
+# verifies nothing). The default build is NOT zero-dep.
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc"], optional = true }
+
+[features]
+# ON by default now. A default `cargo test`/`cargo build` (no `--features`)
+# runs the real (still UNAUDITED, pre-1.0) FIPS-204 ML-DSA-65 verify/sign pair
+# (`RustCryptoMlDsa65Verifier` / `RustCryptoMlDsa65Signer`). Build with
+# `--no-default-features` to fall back to the offline zero-dependency stub
+# scaffold (`NonVerifyingStubVerifier`, which asserts nothing).
+default = ["real-mldsa65"]
+real-mldsa65 = ["dep:ml-dsa"]

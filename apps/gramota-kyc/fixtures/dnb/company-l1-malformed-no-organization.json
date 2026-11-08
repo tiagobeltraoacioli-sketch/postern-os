@@ -1,0 +1,5 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs; NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "Malformed-but-200 edge case (no documented real cause; defensive fixture) — HTTP 200 with no `organization` key at all. Must fail CLOSED to not-found/dnb-no-organization, never be treated as unavailable/retry-later.",
+  "transactionDetail": { "transactionID": "SYNTHETIC-TXN-0002" }
+}

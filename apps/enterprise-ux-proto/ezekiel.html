@@ -1,0 +1,402 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT OR Apache-2.0
+  SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+  Ezekiel 1 — access-layer clearance + Chinese-wall barriers. UX PROTOTYPE.
+  It surfaces, honestly, WHAT A USER CAN AND CANNOT SEE:
+    - Bell-LaPadula clearance floor: no-read-up / no-write-down, fail-closed.
+    - Brewer-Nash Chinese walls: first touch binds; competitors then barred.
+  The Ezekiel Rust engine's rbac_check re-applies the same clearance floor and
+  wall at enforcement; this page DECLARES and DISPLAYS. Key-withholding is hard
+  denial for data at rest; in-session containment needs OS-level MAC (Postern OS
+  machine profiles) — a client-side page is ADVISORY.
+
+  HONESTY: UNAUDITED. Not compliance, not legal advice. No network (connect-src
+  'none'). No software stops a human photographing a screen.
+-->
+<html lang="en" data-surface="ezekiel">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Ezekiel 1 — clearance &amp; Chinese walls · UX prototype · Postern Labs</title>
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#0b0f0e;--bg-glow:#0e1614;--surface:#13181a;--surface-2:#192023;--surface-3:#20292c;
+  --border:#283334;--border-hi:#38474a;--text:#e6ebea;--text-dim:#a4b0ad;--muted:#77857f;
+  --acc:#57c2b2;--acc-hi:#77d6c7;--acc-dim:#3a8478;--acc-ink:#08130f;
+  --ok:#63ab7c;--warn:#d08c2e;--err:#d96a63;--radius:14px;--shadow:0 18px 50px rgba(0,0,0,.45);
+}
+:root[data-theme="light"]{
+  --bg:#e9f0ee;--bg-glow:#f0f6f4;--surface:#fbfcfb;--surface-2:#e8efec;--surface-3:#dde7e3;
+  --border:#cdd9d5;--border-hi:#b1c1bc;--text:#1e2422;--text-dim:#48524e;--muted:#71807b;
+  --acc:#2f8175;--acc-hi:#236258;--acc-dim:#69a89d;--acc-ink:#f2f9f6;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(40,54,50,.14);
+}
+@media (prefers-color-scheme: light){:root:not([data-theme]){
+  --bg:#e9f0ee;--bg-glow:#f0f6f4;--surface:#fbfcfb;--surface-2:#e8efec;--surface-3:#dde7e3;
+  --border:#cdd9d5;--border-hi:#b1c1bc;--text:#1e2422;--text-dim:#48524e;--muted:#71807b;
+  --acc:#2f8175;--acc-hi:#236258;--acc-dim:#69a89d;--acc-ink:#f2f9f6;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(40,54,50,.14);
+}}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:var(--font-ui);background:radial-gradient(1100px 520px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--text);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+a{color:var(--acc-hi);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+.mono{font-family:var(--font-mono)}
+header.site{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
+.site-inner{display:flex;align-items:center;gap:12px;padding:12px 0}
+.wordmark{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:.2em;color:var(--text)}
+.wordmark .tick{color:var(--acc)}
+.byline{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);padding-left:12px}
+.site-actions{margin-left:auto;display:flex;gap:8px}
+.hbtn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim)}
+.hbtn:hover{border-color:var(--border-hi);color:var(--text)}
+.notice{border-bottom:1px solid color-mix(in srgb,var(--acc) 45%,var(--border));background:color-mix(in srgb,var(--acc) 10%,var(--surface));font-size:12.5px;color:var(--text-dim)}
+.notice .wrap{padding:8px 20px}.notice strong{color:var(--acc)}
+main.wrap{padding:20px 20px 48px}
+h1{font-size:23px;margin:.1em 0 .3em}h2{font-size:16px;margin:.1em 0 .5em}
+.lead{color:var(--text-dim);font-size:13.5px;max-width:70ch}
+.lead code,.mini code{color:var(--acc-hi);font-family:var(--font-mono);font-size:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin:14px 0;box-shadow:var(--shadow)}
+.field{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.field label{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.04em;text-transform:uppercase}
+.field input,.field select{background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.row>.field{flex:1 1 160px}
+.btn-acc{background:var(--acc);color:var(--acc-ink);border:1px solid var(--acc);border-radius:10px;padding:9px 16px;font-weight:600}
+.btn-acc:hover{background:var(--acc-hi)}
+.btn-ghost{background:transparent;border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text-dim)}
+.btn-ghost:hover{border-color:var(--border-hi);color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.mini{font-size:11.8px;color:var(--muted)}
+.err{color:var(--err);font-size:12.5px;min-height:1.1em;margin:6px 0}
+
+/* clearance lattice legend */
+.lattice{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.lv{font-family:var(--font-mono);font-size:11px;border:1px solid var(--border-hi);border-radius:7px;padding:4px 10px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+.lv .n{color:var(--acc-hi);font-weight:700}
+.lv[data-l="0"]{border-color:color-mix(in srgb,var(--ok) 40%,var(--border))}
+.lv[data-l="3"]{border-color:color-mix(in srgb,var(--err) 50%,var(--border))}
+
+/* subject chips */
+.subjects{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.subj{border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:150px}
+.subj[aria-pressed="true"]{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc-dim) inset}
+.subj .s-n{font-weight:640;font-size:13.5px}
+.subj .s-m{font-family:var(--font-mono);font-size:10.5px;color:var(--muted)}
+.subj .s-c{font-family:var(--font-mono);font-size:10.5px;color:var(--acc-hi)}
+
+/* visibility matrix */
+.vis{display:grid;gap:8px;margin-top:6px}
+.vrow{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:10px 13px;background:var(--surface-2)}
+@media(max-width:620px){.vrow{grid-template-columns:1fr;gap:6px}}
+.vrow .v-name{font-weight:600;font-size:13.5px}
+.vrow .v-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--muted)}
+.badge{font-family:var(--font-mono);font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--border-hi);text-align:center;white-space:nowrap}
+.badge.allow{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,var(--border));background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.badge.clr{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--border));background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.badge.wall{color:var(--err);border-color:color-mix(in srgb,var(--err) 50%,var(--border));background:color-mix(in srgb,var(--err) 10%,transparent)}
+.badge.bound{color:var(--acc-hi);border-color:var(--acc-dim);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.opseg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.opseg button{background:var(--surface-2);border:0;padding:6px 13px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);border-right:1px solid var(--border)}
+.opseg button:last-child{border-right:0}
+.opseg button[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink);font-weight:700}
+
+/* wall touch */
+.classgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:8px}
+.classcard{border:1px solid var(--border);border-radius:11px;padding:12px;background:var(--surface-2)}
+.classcard h4{margin:0 0 6px;font-size:13px;font-family:var(--font-mono);color:var(--acc-hi);letter-spacing:.04em}
+.member{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:4px 0}
+.member .m-badge{margin-left:auto}
+.decisionbox{font-family:var(--font-mono);font-size:11.8px;background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:11px;margin-top:8px;white-space:pre-wrap;color:var(--text-dim)}
+.decisionbox b{color:var(--acc-hi)}
+.log{font-family:var(--font-mono);font-size:11.5px;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:8px}
+.log-row{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.log-row:last-child{border-bottom:0}
+.log-row .lt{color:var(--muted)}.log-row .lx{color:var(--text-dim);word-break:break-word}
+.honest{border-left:3px solid var(--acc);padding:8px 0 8px 12px;font-size:12.5px;color:var(--text-dim);background:color-mix(in srgb,var(--acc) 6%,transparent);margin:10px 0}
+.honest b{color:var(--acc-hi)}
+footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:11px;padding:16px 20px;text-align:center;font-family:var(--font-mono);letter-spacing:.05em}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap site-inner">
+  <div class="wordmark">EZEKIEL<span class="tick">·</span>1</div>
+  <div class="byline">clearance · Chinese walls · UX prototype</div>
+  <div class="site-actions"><a class="hbtn" href="index.html">← hub</a><button class="hbtn" id="themeBtn">theme</button></div>
+</div></header>
+
+<div class="notice"><div class="wrap">
+  <strong>UX prototype — UNAUDITED.</strong> Shows what a user can and cannot see. The Ezekiel engine re-applies the same clearance floor and wall at enforcement; this page declares and displays. Client-side enforcement is <strong>advisory</strong>. Not compliance, not legal advice.
+</div></div>
+
+<main class="wrap">
+  <h1>What can this user see — honestly</h1>
+  <p class="lead">Two mandatory controls decide it. <b>Bell–LaPadula</b> sets a clearance floor: <em>no read up</em> (you can't read data above your clearance) and <em>no write down</em> (you can't write below it, which would leak). <b>Brewer–Nash</b> raises Chinese walls between competitors: the first one you touch binds you, and its rivals go permanently barred. Everything fails closed.</p>
+
+  <!-- ===== SUBJECT + LATTICE ===== -->
+  <div class="card">
+    <h2>1 · Pick a subject &amp; the operation</h2>
+    <div class="lattice" aria-label="Clearance lattice">
+      <span class="lv" data-l="0"><span class="n">0</span> public</span>
+      <span class="lv" data-l="1"><span class="n">1</span> internal</span>
+      <span class="lv" data-l="2"><span class="n">2</span> confidential</span>
+      <span class="lv" data-l="3"><span class="n">3</span> secret</span>
+    </div>
+    <div class="subjects" id="subjects"></div>
+    <div class="row" style="margin-top:6px">
+      <div class="field" style="flex:0 0 auto"><label>Operation</label>
+        <div class="opseg" id="opSeg" role="group" aria-label="Operation">
+          <button type="button" data-op="read" aria-pressed="true">read</button>
+          <button type="button" data-op="write" aria-pressed="false">write</button>
+        </div>
+      </div>
+      <span class="mini">Read tests <b>no-read-up</b>; write tests <b>no-write-down</b>. Both then consult the Chinese walls.</span>
+    </div>
+  </div>
+
+  <!-- ===== VISIBILITY MATRIX ===== -->
+  <div class="card">
+    <h2>2 · Visibility — every volume, one verdict</h2>
+    <p class="lead">For the selected subject and operation, each volume resolves to exactly one honest verdict.</p>
+    <div class="lattice" style="margin-bottom:4px">
+      <span class="badge allow">allowed</span>
+      <span class="badge clr">blocked · clearance</span>
+      <span class="badge wall">walled · conflict</span>
+      <span class="badge bound">bound (yours)</span>
+    </div>
+    <div class="vis" id="vis"></div>
+  </div>
+
+  <!-- ===== BREWER-NASH ===== -->
+  <div class="card">
+    <h2>3 · Chinese walls — touch binds, rivals bar</h2>
+    <p class="lead">Open a volume in a conflict class and it <b>binds</b> the subject to that member; every competitor in the class then goes cryptographically unavailable — the key is simply never released. <b>There is no override button;</b> each binding is logged with a justification.</p>
+    <div class="row">
+      <div class="field"><label for="touchVol">Volume to open</label><select id="touchVol"></select></div>
+      <div class="field" style="flex:2 1 240px"><label for="touchJust">Justification (required, logged)</label><input type="text" id="touchJust" placeholder="engagement #4417, signed conflict check" autocomplete="off"></div>
+      <button class="btn-acc" id="btnTouch">Open / bind (logged)</button>
+    </div>
+    <p class="err" id="touchErr"></p>
+    <div class="classgrid" id="classGrid"></div>
+    <div class="btnrow"><button class="btn-ghost" id="btnResetWalls">Reset bindings</button></div>
+  </div>
+
+  <!-- ===== DECISION + AUDIT ===== -->
+  <div class="card">
+    <h2>4 · Last access decision &amp; audit</h2>
+    <div class="decisionbox" id="decision">Pick a subject and open a volume to see the decision trace.</div>
+    <div class="log" id="log"></div>
+    <div class="honest"><b>Enforcement limits, stated.</b> Cryptographic key-withholding is hard denial for data at <em>rest</em>. In-session containment needs OS-level MAC (SELinux/AppArmor domains per volume) — Postern OS machine profiles provide that; this client-side page is <b>advisory</b>: it demonstrates and audits the model. The engine's <code>rbac_check</code> re-applies the same clearance floor and wall on enforcement. And no software stops a human photographing a screen — a wall is a technical <b>plus</b> contractual <b>plus</b> supervisory control. UNAUDITED; not legal advice.</div>
+  </div>
+</main>
+
+<footer class="site">Ezekiel 1 · Bell–LaPadula + Brewer–Nash · fail-closed · UX prototype · advisory · no network · UNAUDITED · not legal advice</footer>
+
+<script>
+"use strict";
+/* ============================================================================
+   Access-decision + Chinese-wall visibility. Mirrors the Ezekiel model:
+   Bell-LaPadula (no-read-up / no-write-down) + Brewer-Nash (history-based
+   binding). The Rust engine's rbac_check re-applies the same rules at
+   enforcement; this page declares and displays (advisory).
+   ============================================================================ */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+var LEVELS = ["public","internal","confidential","secret"];
+
+/* subjects: clearance 0..3 */
+var SUBJECTS = [
+  { id:"alice", name:"Alice — EU analyst",  clearance:2 },
+  { id:"bob",   name:"Bob — US intern",     clearance:1 },
+  { id:"carol", name:"Carol — partner",     clearance:3 }
+];
+/* conflict classes group competitors (Brewer-Nash) */
+var CLASSES = [
+  { name:"Banking",  members:["banco-norte","banco-sul"] },
+  { name:"Telecom",  members:["tel-atlas","tel-beacon"] }
+];
+/* volumes: level = data classification; klass = conflict class member id (optional) */
+var VOLUMES = [
+  { id:"hr-handbook",  name:"HR handbook",              level:0, klass:null },
+  { id:"eu-customers", name:"EU customer records",      level:1, klass:null },
+  { id:"ma-secret",    name:"M&A war-room",             level:3, klass:null },
+  { id:"banco-norte",  name:"Banco Norte — deal room",  level:2, klass:"banco-norte" },
+  { id:"banco-sul",    name:"Banco Sul — deal room",    level:2, klass:"banco-sul" },
+  { id:"tel-atlas",    name:"Tel Atlas — audit",        level:2, klass:"tel-atlas" },
+  { id:"tel-beacon",   name:"Tel Beacon — audit",       level:2, klass:"tel-beacon" }
+];
+
+/* state: current subject, op, and per-subject wall bindings { subjectId: { className: boundMemberId } } */
+var S = { subject:"alice", op:"read", bindings:{}, log:[] };
+SUBJECTS.forEach(function(s){ S.bindings[s.id] = {}; });
+
+function subj(){ return SUBJECTS.filter(function(x){ return x.id===S.subject; })[0]; }
+function classOf(memberId){ return CLASSES.filter(function(c){ return c.members.indexOf(memberId)>=0; })[0]; }
+function ts(){ return new Date().toISOString().slice(11,19); }
+function logLine(text){ S.log.unshift({ t:ts(), x:text }); renderLog(); }
+
+/* Brewer-Nash wall state for the current subject touching `memberId`. */
+function wallState(subjectId, memberId){
+  var c = classOf(memberId);
+  if (!c) return "none";
+  var bound = S.bindings[subjectId][c.name];
+  if (!bound) return "free";               // nothing touched in this class yet
+  return bound === memberId ? "bound" : "walled"; // rival = walled
+}
+
+/* Access decision — Bell-LaPadula floor then Brewer-Nash wall. Fail-closed. */
+function decide(subjectId, vol, op){
+  var s = SUBJECTS.filter(function(x){ return x.id===subjectId; })[0];
+  // Bell-LaPadula
+  if (op==="read" && s.clearance < vol.level){
+    return { verdict:"clr", why:"no-read-up: clearance "+s.clearance+" ("+LEVELS[s.clearance]+") < data "+vol.level+" ("+LEVELS[vol.level]+")" };
+  }
+  if (op==="write" && s.clearance > vol.level){
+    return { verdict:"clr", why:"no-write-down: clearance "+s.clearance+" ("+LEVELS[s.clearance]+") > data "+vol.level+" ("+LEVELS[vol.level]+") — would leak downward" };
+  }
+  // Brewer-Nash
+  if (vol.klass){
+    var w = wallState(subjectId, vol.klass);
+    if (w==="walled"){
+      var c = classOf(vol.klass);
+      var bound = S.bindings[subjectId][c.name];
+      return { verdict:"wall", why:"Brewer–Nash: already bound to '"+bound+"' in class '"+c.name+"' — '"+vol.klass+"' is a barred competitor (key never released)" };
+    }
+    if (w==="bound"){
+      return { verdict:"bound", why:"allowed — this subject is bound to this member of class '"+classOf(vol.klass).name+"'" };
+    }
+    return { verdict:"allow", why:"allowed — opening this would BIND the subject to class '"+classOf(vol.klass).name+"' (first touch)" };
+  }
+  return { verdict:"allow", why:"allowed — clearance floor satisfied; no conflict class" };
+}
+
+/* ---- render subjects ---- */
+function renderSubjects(){
+  var host = $("subjects"); host.innerHTML="";
+  SUBJECTS.forEach(function(s){
+    var b = document.createElement("button");
+    b.className = "subj"; b.setAttribute("aria-pressed", String(s.id===S.subject));
+    b.dataset.subj = s.id;
+    b.innerHTML = '<span class="s-n">'+esc(s.name)+'</span><span class="s-c">clearance '+s.clearance+' · '+LEVELS[s.clearance]+'</span><span class="s-m">no-read-up / no-write-down</span>';
+    host.appendChild(b);
+  });
+}
+$("subjects").addEventListener("click", function(e){
+  var b = e.target.closest("[data-subj]"); if(!b) return;
+  S.subject = b.dataset.subj;
+  renderSubjects(); renderVis(); renderClasses();
+});
+$("opSeg").addEventListener("click", function(e){
+  var b = e.target.closest("[data-op]"); if(!b) return;
+  S.op = b.dataset.op;
+  Array.prototype.forEach.call($("opSeg").children, function(x){ x.setAttribute("aria-pressed", String(x.dataset.op===S.op)); });
+  renderVis();
+});
+
+/* ---- render visibility matrix ---- */
+function renderVis(){
+  var host = $("vis"); host.innerHTML="";
+  VOLUMES.forEach(function(v){
+    var d = decide(S.subject, v, S.op);
+    var label = { allow:"allowed", clr:"blocked · clearance", wall:"walled · conflict", bound:"allowed · bound" }[d.verdict];
+    var row = document.createElement("div");
+    row.className = "vrow";
+    var cls = v.klass ? (" · class "+classOf(v.klass).name) : "";
+    row.innerHTML =
+      '<div><div class="v-name">'+esc(v.name)+'</div><div class="v-meta">'+LEVELS[v.level]+' ('+v.level+')'+esc(cls)+'</div></div>'+
+      '<div class="badge '+d.verdict+'">'+label+'</div>'+
+      '<div class="v-meta" style="max-width:280px">'+esc(d.why)+'</div>';
+    host.appendChild(row);
+  });
+}
+
+/* ---- Brewer-Nash touch ---- */
+function fillTouchSelect(){
+  var sel = $("touchVol");
+  sel.innerHTML = VOLUMES.filter(function(v){ return v.klass; }).map(function(v){
+    return '<option value="'+v.id+'">'+esc(v.name)+' — class '+esc(classOf(v.klass).name)+'</option>';
+  }).join("");
+}
+$("btnTouch").addEventListener("click", function(){
+  $("touchErr").textContent="";
+  var volId = $("touchVol").value;
+  var just = $("touchJust").value.trim();
+  var vol = VOLUMES.filter(function(v){ return v.id===volId; })[0];
+  if (!just){ $("touchErr").textContent="A justification is required and is logged."; return; }
+  var d = decide(S.subject, vol, "read");
+  var s = subj();
+  if (d.verdict==="wall"){
+    $("decision").innerHTML = '<b>DENY</b> · '+esc(s.name)+' → '+esc(vol.name)+'\n'+esc(d.why);
+    logLine("WALLED: "+s.name+" refused "+vol.klass+" — "+d.why);
+    renderClasses(); return;
+  }
+  if (d.verdict==="clr"){
+    $("decision").innerHTML = '<b>DENY</b> · '+esc(s.name)+' → '+esc(vol.name)+'\n'+esc(d.why);
+    logLine("CLEARANCE-DENY: "+s.name+" → "+vol.name+" — "+d.why);
+    renderClasses(); return;
+  }
+  // allowed: bind the subject to this member of its class
+  var c = classOf(vol.klass);
+  S.bindings[S.subject][c.name] = vol.klass;
+  $("decision").innerHTML = '<b>BIND</b> · '+esc(s.name)+' touched '+esc(vol.name)+'\nbound to class '+esc(c.name)+' → competitors now walled\njustification: '+esc(just);
+  logLine("BIND: "+s.name+" → "+vol.klass+" (class "+c.name+"); rivals barred. Justification: "+just);
+  renderVis(); renderClasses();
+});
+$("btnResetWalls").addEventListener("click", function(){
+  SUBJECTS.forEach(function(s){ S.bindings[s.id] = {}; });
+  logLine("bindings reset (a logged act in production, not a silent click)");
+  renderVis(); renderClasses();
+});
+
+/* ---- render conflict classes ---- */
+function renderClasses(){
+  var host = $("classGrid"); host.innerHTML="";
+  CLASSES.forEach(function(c){
+    var card = document.createElement("div");
+    card.className = "classcard";
+    var rows = c.members.map(function(mId){
+      var vol = VOLUMES.filter(function(v){ return v.klass===mId; })[0];
+      var w = wallState(S.subject, mId);
+      var badge = w==="bound" ? '<span class="badge bound m-badge">bound</span>'
+        : w==="walled" ? '<span class="badge wall m-badge">walled</span>'
+        : '<span class="badge allow m-badge">free</span>';
+      return '<div class="member">'+esc(vol?vol.name:mId)+badge+'</div>';
+    }).join("");
+    card.innerHTML = '<h4>'+esc(c.name)+' · conflict class</h4>'+rows;
+    host.appendChild(card);
+  });
+}
+
+/* ---- log ---- */
+function renderLog(){
+  var host = $("log"); host.innerHTML="";
+  if (!S.log.length){ host.innerHTML = '<div class="log-row"><span class="lt">—</span><span class="lx">no access events yet</span></div>'; return; }
+  S.log.forEach(function(e){
+    var row = document.createElement("div"); row.className="log-row";
+    row.innerHTML = '<span class="lt">'+esc(e.t)+'</span><span class="lx">'+esc(e.x)+'</span>';
+    host.appendChild(row);
+  });
+}
+
+/* theme */
+$("themeBtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", cur==="light"?"dark":"light");
+});
+
+/* init */
+renderSubjects();
+fillTouchSelect();
+renderVis();
+renderClasses();
+renderLog();
+</script>
+</body>
+</html>

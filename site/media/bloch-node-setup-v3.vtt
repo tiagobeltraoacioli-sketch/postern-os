@@ -1,0 +1,166 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.048
+How to run a Bloch-SIS-PoW node with snapshot sync at k=8.
+
+2
+00:00:04.048 --> 00:00:08.585
+Bloch is an ownerless, post-quantum proof-of-work research chain.
+
+3
+00:00:08.585 --> 00:00:11.865
+It is unaudited, and the coin carries no value.
+
+4
+00:00:12.315 --> 00:00:17.167
+Why start from a snapshot? The Module-SIS gate is now active at k=8,
+
+5
+00:00:17.167 --> 00:00:20.877
+which makes valid candidates about 4096 times rarer.
+
+6
+00:00:20.877 --> 00:00:25.443
+That is a stronger structural filter — not a security guarantee.
+
+7
+00:00:25.443 --> 00:00:32.007
+The old k=4 history is invalid under k=8 and pruned, so syncing from genesis is impractical.
+
+8
+00:00:32.007 --> 00:00:35.717
+Instead, restore a signed snapshot and mine forward.
+
+9
+00:00:35.717 --> 00:00:38.214
+Expect slow blocks at low hashrate.
+
+10
+00:00:38.214 --> 00:00:40.783
+That is the gate working, not a bug.
+
+11
+00:00:41.248 --> 00:00:43.203
+Step 1 — build from source.
+
+12
+00:00:43.203 --> 00:00:47.548
+Clone the project from GitLab and run cargo build --release.
+
+13
+00:00:47.548 --> 00:00:51.603
+You need stable Rust, plus clang, cmake, and pkg-config.
+
+14
+00:00:51.603 --> 00:00:53.920
+The build produces two binaries:
+
+15
+00:00:53.920 --> 00:00:58.988
+bloch — the node itself — and bloch-cli, for RPC calls and the wallet.
+
+16
+00:00:59.448 --> 00:01:01.551
+Step 2 — create a miner address.
+
+17
+00:01:01.551 --> 00:01:05.230
+Run bloch-cli newwallet with a path for the wallet file.
+
+18
+00:01:05.230 --> 00:01:08.646
+It prompts for a password of at least 12 characters,
+
+19
+00:01:08.646 --> 00:01:11.734
+and prints your address, starting with bloch1q…
+
+20
+00:01:11.734 --> 00:01:13.311
+Back up the wallet file.
+
+21
+00:01:13.311 --> 00:01:16.004
+Mining only ever uses the public address.
+
+22
+00:01:16.454 --> 00:01:22.307
+Step 3 — download the snapshot into your data directory, and fetch the archive with curl.
+
+23
+00:01:22.307 --> 00:01:26.450
+Always verify the SHA-256 checksum before trusting the archive.
+
+24
+00:01:26.450 --> 00:01:28.686
+Once the check passes, extract it.
+
+25
+00:01:28.686 --> 00:01:33.289
+The archive holds a db/ folder, which lands inside the data directory.
+
+26
+00:01:33.754 --> 00:01:35.255
+Step 4 — run and mine.
+
+27
+00:01:35.255 --> 00:01:39.281
+Point bloch at your data directory, add the bootstrap peer,
+
+28
+00:01:39.281 --> 00:01:42.010
+and pass --mine with your miner address.
+
+29
+00:01:42.010 --> 00:01:47.127
+The node loads the snapshot at around height 393,000 and mines k=8 forward.
+
+30
+00:01:47.127 --> 00:01:51.562
+The bootstrap peer is only a convenience, not a privileged seed —
+
+31
+00:01:51.562 --> 00:01:53.677
+the default seed list is empty.
+
+32
+00:01:54.127 --> 00:01:56.217
+Step 5 — verify it is working.
+
+33
+00:01:56.217 --> 00:02:00.397
+bloch-cli height should show roughly 393,000 — and climbing.
+
+34
+00:02:00.397 --> 00:02:06.248
+bloch-cli peers should list at least one peer, and bloch-cli info gives an overview.
+
+35
+00:02:06.248 --> 00:02:11.333
+To keep the node alive, wrap it in a systemd service with Restart=always.
+
+36
+00:02:11.794 --> 00:02:13.450
+A final word of honesty:
+
+37
+00:02:13.450 --> 00:02:17.453
+the k=8 gate is a structural filter, not a security claim.
+
+38
+00:02:17.453 --> 00:02:22.215
+The chain is unaudited and 51%-attackable, and the coin has no value.
+
+39
+00:02:22.215 --> 00:02:26.493
+The protocol is ownerless — Postern is one builder among many.
+
+40
+00:02:26.493 --> 00:02:30.151
+If you need help, ask Vestnik on the Run-a-node page.
+
+41
+00:02:30.151 --> 00:02:31.531
+Thanks for watching.
+

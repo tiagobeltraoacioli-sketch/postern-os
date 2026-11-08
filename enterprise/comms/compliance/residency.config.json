@@ -1,0 +1,35 @@
+{
+  "//": "SPDX-License-Identifier: MIT OR Apache-2.0 — Postern Comms (Enterprise) data-residency options. NOT LEGAL ADVICE. Residency choice has legal consequences (adequacy, transfer mechanisms) that require legal review — this file only declares the DEPLOYMENT options honestly.",
+  "schema": "postern.comms.residency/1",
+  "options": [
+    {
+      "id": "eu",
+      "label": "European Union",
+      "regulation": "GDPR (Regulation (EU) 2016/679)",
+      "storesInRegion": ["message-store", "metadata-store", "directory-store", "audit-store"],
+      "crossBorderTransfer": "None by default. Any transfer outside the EEA requires an Art. 44-49 mechanism (adequacy decision / SCCs) — legal review required.",
+      "notes": "Recommended default for EU-employed data subjects."
+    },
+    {
+      "id": "br",
+      "label": "Brazil",
+      "regulation": "LGPD (Lei nº 13.709/2018)",
+      "storesInRegion": ["message-store", "metadata-store", "directory-store", "audit-store"],
+      "crossBorderTransfer": "International transfer governed by LGPD Arts. 33-36 (adequacy, SCCs, specific consent) — legal review required.",
+      "notes": "Recommended for BR-employed data subjects. ANPD is the supervisory authority."
+    },
+    {
+      "id": "self-hosted",
+      "label": "Self-hosted / on-premises (customer-controlled)",
+      "regulation": "Determined by the customer's own jurisdiction & deployment",
+      "storesInRegion": ["message-store", "metadata-store", "directory-store", "audit-store"],
+      "crossBorderTransfer": "Entirely under the customer's control; the customer is the controller and sets residency.",
+      "notes": "Postern Labs operates no server in this mode. The customer holds all stores. This is the strongest residency guarantee and the E2EE story is unchanged."
+    }
+  ],
+  "rails": [
+    "Residency is a DEPLOYMENT config, not a legal opinion. Choosing 'eu' does not by itself make a deployment GDPR-compliant.",
+    "E2EE means message CONTENT is unreadable by the operator in every residency mode; residency affects where CIPHERTEXT and METADATA physically live.",
+    "Cross-border transfer of personal data is a legally gated act — the transfer mechanism must be reviewed by counsel before enabling."
+  ]
+}

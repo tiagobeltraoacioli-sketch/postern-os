@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Postern OS — x86_64 NixOS live-ISO boot markers (DESKTOP ISO / GNOME + GDM).
+#
+# Sibling of success-markers-x86.txt: same kernel -> stage-1 -> systemd base,
+# but the final REQUIRED rung is the graphical login (GDM greeter reached),
+# because `.#desktop-iso` (os/desktop.nix: services.displayManager.gdm +
+# services.desktopManager.gnome) boots to a GDM login, not a text getty.
+#
+# Graded by os/boot-harness/check-boot-log.sh (Dev O4's SHARED grader, READ-ONLY
+# from this harness). Same format, same meaning of "booted".
+#
+# HONESTY: WRITTEN, NOT RUN. macOS dev host has no Nix/QEMU/KVM. A green run
+# proves only the x86_64 SOFTWARE boot chain to a GDM greeter under TCG:
+#   built != booted . QEMU != hardware . reproducible-by-design != reproduced.
+# The site's "boot-validated on QEMU x86_64" claim stays UNSUBSTANTIATED until
+# this runs on the Nix+QEMU box.
+#
+# NOTE: graphical output is on the GPU framebuffer, NOT the serial line. The
+# harness captures the GDM/GNOME evidence from the SYSTEMD JOURNAL on the serial
+# console (unit start lines), which is what these markers key on — we do not
+# scrape pixels. To eyeball the greeter, run without -nographic (see README).
+#
+# FORMAT: '+ required' / '- failure' / '~ informational' — see the node file.
+
+# -- Required success ladder (kernel -> stage-1 -> systemd -> GDM greeter) ------
++ Linux version [0-9]
++ (<<< NixOS Stage 1 >>>|Reached target .*Initrd|systemd\[1\]: Startup finished, in the initrd)
++ systemd\[1\]:
++ Reached target
+# Graphical login is up: the display-manager unit and/or the graphical target.
++ (Started .*(GNOME Display Manager|Display Manager)|Reached target Graphical Interface|gdm-session-worker|GdmDisplay|Starting GNOME Display Manager)
+
+# -- Hard failures (any one means the boot did NOT pass) -----------------------
+- Kernel panic
+- Entering emergency mode
+- Unable to mount root fs
+- Failed to start .*Stage 1
+- No filesystem could mount root
+- Failed to start .*(GNOME Display Manager|Display Manager)
+- -- stage-1 --.*(emergency|shell)
+
+# -- Informational (nice to see; never gate the desktop rung) ------------------
+# The desktop MOTD banner from os/desktop.nix.
+~ ◆ Postern OS — Desktop
+# Wayland session / GNOME shell coming up.
+~ (gnome-shell|Wayland|gdm)
+# Tor client the hardened desktop brings up.
+~ (tor|Tor)

@@ -1,0 +1,18 @@
+{
+  "name": "@postern/cloud-services",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Postern CLOUD hosted services (reference prototype): hosted license verification, hosted admin console backend, and a metadata-minimizing E2EE comms relay. Framework-free, zero runtime dependencies. Hosted = less private, and disclosed as such.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=18.17" },
+  "scripts": {
+    "self-check": "node self-check.mjs",
+    "check": "node --check src/common.mjs && node --check src/license-service.mjs && node --check src/console-service.mjs && node --check src/relay-service.mjs && node --check self-check.mjs",
+    "start:license": "node src/license-service.mjs",
+    "start:console": "node src/console-service.mjs",
+    "start:relay": "node src/relay-service.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

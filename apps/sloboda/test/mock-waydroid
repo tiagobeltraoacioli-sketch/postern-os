@@ -1,0 +1,112 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────
+#  MOCK waydroid — test double for sloboda (NOT a real Android runtime)
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  HONESTY: this fakes the `waydroid` CLI so the wrapper can be exercised
+#     WITHOUT a real container. It boots NOTHING. It proves the wrapper's
+#     control flow (status parsing, wait-for-ready, .desktop generation,
+#     pruning, kill) — it proves NOTHING about on-device Waydroid behaviour,
+#     which remains UNTESTED. Real Android = data leaves the sealed base;
+#     STRONG integrity fails; not Sealed; personal-free; not legal advice.
+#
+#  TEST SURFACE: this mock + ./dry-run.sh are the ENTIRE sloboda test suite
+#  (shell-only). There is intentionally NO node/JS suite — no *.mjs files
+#  under apps/sloboda — so node test sweeps correctly find nothing here.
+# ─────────────────────────────────────────────────────────────────────────────
+set -eu
+
+# Session state persists across invocations in this file so `status` reflects
+# prior `session start/stop`. Isolated per test run via PAW_MOCK_STATE.
+_ST="${PAW_MOCK_STATE:-/tmp/mock-waydroid.state}"
+_state() { [ -f "$_ST" ] && cat "$_ST" || echo STOPPED; }
+_set()   { printf '%s\n' "$1" > "$_ST"; }
+_say()   { printf '[mock-waydroid] %s\n' "$*" >&2; }
+
+# Integrity-gated packages that, on a REAL device, would detect the uncertified
+# Waydroid environment (unlocked bootloader, no hardware keymaster) and REFUSE to
+# run — Play Integrity STRONG fails for banking / Google Wallet / DRM. Here we
+# SIMULATE that refusal (exit 3) so the wrapper's honest error path is exercised.
+# This is a TEST DOUBLE: it proves the control flow, NOTHING about real Play
+# Integrity (matrix item 12 stays T2, device-only). Override with
+# PAW_MOCK_REFUSE_PKGS (space-separated) to widen/narrow the simulated set.
+_REFUSE="${PAW_MOCK_REFUSE_PKGS:-com.google.android.apps.walletnfcrel com.google.android.apps.nbu.paisa.user com.chase.sig.android com.netflix.mediaclient}"
+_is_refused() {
+    [ -n "${1:-}" ] || return 1
+    for _r in $_REFUSE; do
+        [ "$1" = "$_r" ] && return 0
+    done
+    return 1
+}
+
+_sub="${1:-}"; [ "$#" -ge 1 ] && shift || true
+case "$_sub" in
+    init)
+        _say "init $* — pretending to pull a system image (nothing downloaded)."
+        ;;
+    session)
+        case "${1:-}" in
+            start) _set RUNNING; _say "session start — state now RUNNING." ;;
+            stop)  _set STOPPED; _say "session stop — state now STOPPED." ;;
+            *)     _say "session ${1:-?} — ok." ;;
+        esac
+        ;;
+    container)
+        _say "container ${1:-?} — ok (root op, faked)."
+        ;;
+    status)
+        # Match the real `waydroid status` shape closely enough for the parser.
+        _s="$(_state)"
+        printf 'Session:\t%s\n' "$_s"
+        if [ "$_s" = "RUNNING" ]; then
+            printf 'Container:\tRUNNING\n'
+            printf 'Vendor type:\tMAINLINE\n'
+            printf 'IP address:\t192.168.240.112\n'
+        else
+            printf 'Container:\tSTOPPED\n'
+        fi
+        ;;
+    show-full-ui)
+        _say "show-full-ui — would display the full Android UI (no Wayland here)."
+        ;;
+    app)
+        case "${1:-}" in
+            launch)
+                if _is_refused "${2:-}"; then
+                    _say "app launch ${2:-?} — Play Integrity STRONG check FAILED."
+                    _say "  This app detects the uncertified Waydroid environment and REFUSES"
+                    _say "  to run (SIMULATED refusal — no real integrity API here; mirrors the"
+                    _say "  on-device reality of matrix item 12). Returning non-zero."
+                    exit 3
+                fi
+                _say "app launch ${2:-?} — would foreground that package." ;;
+            install) _say "app install ${2:-?} — would sideload that APK." ;;
+            list)
+                # Two fake installed apps in the real Name:/packageName: format.
+                printf 'Name: Aurora Store\n'
+                printf 'packageName: com.aurora.store\n'
+                printf '\n'
+                printf 'Name: Organic Maps\n'
+                printf 'packageName: app.organicmaps\n'
+                ;;
+            *) _say "app ${1:-?} — ok." ;;
+        esac
+        ;;
+    prop)
+        _say "prop $* — ok."
+        ;;
+    __postern_mock_ident__)
+        # Self-identification hook (anti-fake-green). The VM smoke and dry-run
+        # real mode probe for this token and REFUSE to run a "real" boot if the
+        # on-PATH waydroid answers it — a real Waydroid has no such subcommand,
+        # so it errors here instead of printing the token. Keeps an accidentally
+        # on-PATH mock from ever reporting a green it did not earn.
+        printf 'POSTERN-MOCK-WAYDROID\n'
+        _say "ident — this is the TEST MOCK, not a real Waydroid runtime."
+        ;;
+    "")
+        _say "no subcommand"; exit 2
+        ;;
+    *)
+        _say "unhandled subcommand: $_sub $*"; exit 2
+        ;;
+esac

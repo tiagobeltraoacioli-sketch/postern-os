@@ -1,0 +1,56 @@
+[package]
+name = "postern-quarantine"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs inbound-document safety — neutralise untrusted files by rebuilding them from pixels / a PDF render. The image path is Landlock-sandboxed on Linux; the office->PDF converter adapter runs out-of-process (wall-clock kill + output cap, NO Landlock/seccomp around the subprocess yet); the optional pure-Rust PDF renderer (feature `render-hayro`, default OFF) runs in-process, same attack-surface register as the image path. macOS/Windows run unsandboxed. Unaudited. The mirror of postern-hygiene (protects what you receive)."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_quarantine"
+
+[features]
+# `render-hayro` (DEFAULT OFF): ships a ready page-raster renderer for
+# `pdf::quarantine_pdf` / `office::quarantine_office`, built on `hayro`
+# (https://github.com/LaurenzV/hayro) — a pure-Rust PDF rasterizer,
+# `Apache-2.0 OR MIT`. License RE-VERIFIED on crates.io at adoption
+# (2026-07-16): hayro 0.7.1 and its 0.5.0+ line are `Apache-2.0 OR MIT`
+# (0.2.0–0.4.0 were Apache-2.0-only — still permissive). Maturity at
+# adoption: 8 releases since 2025-07, actively maintained (0.7.1 released
+# 2026-06-05), >1.1M downloads, upstream regression-tests against 1000+
+# PDFs from the pdf.js/PDFBOX suites, and `#![forbid(unsafe_code)]` at the
+# crate level — but upstream itself calls the feature set incomplete, and
+# the render runs IN-PROCESS (see src/render_hayro.rs for the honest
+# attack-surface register). Default OFF so the base crate stays lean and
+# adopting the renderer is an explicit, informed choice.
+render-hayro = ["dep:hayro"]
+
+[dependencies]
+# `image` (MIT OR Apache-2.0) decodes an untrusted image to raw pixels and
+# re-encodes a clean one — the file structure, metadata, and any parser-exploit
+# payload never survive the pixel round-trip. Lean feature set.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+thiserror = "2"
+
+# `hayro` (Apache-2.0 OR MIT; license re-verified on crates.io 2026-07-16 —
+# see the `render-hayro` feature comment above for the full re-verification
+# note) — optional, pulled ONLY by the default-OFF `render-hayro` feature: a
+# pure-Rust PDF rasterizer used as the renderer adapter for the PDF/office
+# quarantine paths. Default features kept ON deliberately (`embed-fonts`,
+# `embed-cmaps`): without them, PDFs that rely on the 14 standard fonts or
+# predefined CMaps would silently rasterize with missing text, and a
+# quarantine that silently drops visible content is worse than a bigger
+# binary. NOT poppler/mutool (GPL/AGPL — off-limits per repo policy).
+hayro = { version = "0.7.1", optional = true }
+
+# `landlock` (rust-landlock, MIT OR Apache-2.0) confines the decode path with
+# the Linux Landlock LSM. Target-gated: only pulled in on Linux builds, so
+# macOS/Windows builds carry no landlock dependency (and no unsandboxed-decode
+# illusion of protection — see sandbox.rs for the honest, non-Linux fallback).
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = "0.4"
+
+[dev-dependencies]
+# `lopdf` (MIT, same version postern-hygiene uses) — TEST-ONLY: parses the
+# rebuilt flat PDF to assert page count, trailer contents, and pixel-stream
+# round-trip. The library code emits its PDF by hand and does not depend on it.
+lopdf = "0.43"

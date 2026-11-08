@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  Porog (Postern Container) — window base theme for the DPC app shell.
+
+  Porog is a COMPOSE-ONLY surface: the actual Material3 look is drawn by
+  PorogTheme (provision/ui/PorogTheme.kt) via androidx.compose.material3, and the
+  app deliberately does NOT depend on the com.google.android.material XML library
+  (see app/build.gradle.kts — only the Compose bundle is pulled in). So the
+  activity window theme must resolve WITHOUT that library: an earlier scaffold
+  referenced @style/Theme.Material3.DayNight.NoActionBar, which lives only in
+  com.google.android.material and therefore fails resource linking here.
+
+  This local theme parents the platform DayNight theme (API 29+, always present;
+  minSdk is 30) and simply strips the action bar / title so Compose owns the whole
+  window. Day/night still follows the system setting, matching PorogTheme's
+  isSystemInDarkTheme() default.
+
+  SCAFFOLD · DESIGN ONLY · UNAUDITED · never provisioned on hardware.
+-->
+<resources>
+    <style name="Theme.PosternContainer" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

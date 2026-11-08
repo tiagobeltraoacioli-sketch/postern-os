@@ -1,0 +1,19 @@
+{
+  "payload": {
+    "v": 1,
+    "typ": "depot-crl",
+    "repo_id": "com.example.journalist-kit",
+    "kid": "f4fc0998d2d20473",
+    "version": 1,
+    "issued_at": 1783968827,
+    "next_update": 1784055227,
+    "max_stale_secs": 1209600,
+    "revoked_ids": [
+      "courier-mirror"
+    ],
+    "revoked_versions": [
+      "vault-mirror@13"
+    ]
+  },
+  "sig": "cDYdJEhcHLONyy45LuQVSOQccPdwJb3cC441kJuDLmkA0UunnD6PyJD26U3G9AN+jZ7j+n5XMeQTliSlsoD5Ag=="
+}

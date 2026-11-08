@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# Bloch device verification — thin Rust reference. Standalone crate (own
+# workspace) so it `cargo check`s on its own. It REFERENCES the Postern Messenger
+# E2EE core by path (crates/postern-messenger) to bind trust to its SecurityTier
+# wall; it does NOT reimplement the real Matrix key-verification protocol.
+
+[package]
+name = "bloch-comms-verification"
+version = "0.1.0"
+edition = "2021"
+description = "Bloch org messenger — fail-closed device (identity-key) verification state machine + reference SAS (Business edition only). UNAUDITED reference prototype."
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Standalone: do not get absorbed into the repo root workspace.
+[workspace]
+
+[dependencies]
+# The E2EE core, referenced (not forked). Default features only (the SecurityTier
+# wall); NOT the heavy `matrix` feature.
+postern-messenger = { path = "../../../../../crates/postern-messenger" }
+sha2 = "0.10"
+thiserror = "2"

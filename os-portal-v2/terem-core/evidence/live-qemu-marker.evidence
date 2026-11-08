@@ -1,0 +1,79 @@
+# Terem (terem-core) — live QEMU marker-boot evidence — FIRST LIVE EXECUTION, PASSED
+# UNAUDITED. The success claim is EXACTLY this and nothing more: "SeaBIOS
+# executed the 512-byte in-repo fixture sector to the TEREM-LIVE-QEMU-MARKER-V1
+# serial marker under an operator-supplied QEMU". It is NOT "an OS booted", it
+# is NOT an isolation/TEE/security claim, and it says nothing about any real
+# guest workload — no real guest image exists in this repo and none was run.
+# Both tests stay #[ignore] + env-double-gated and MUST NOT become CI gates;
+# "no VM boots in CI" remains true after this run (this was a manual,
+# operator-driven act on a dev workstation, not CI).
+timestamp   : 2026-07-16T04:36:30Z (live_qemu_boot_marker) / 2026-07-16T04:37:16Z (real_spawn)
+host        : Darwin 23.6.0 x86_64 (macOS 14.8.7, MacBook Pro — operator dev workstation, not CI)
+git_rev     : 880d415f6112bc5e68fba8b96c3a1a4c59a8feef (base of branch fleet/rm-live-proofs-courier-onion-terem-qemu; terem-core src/tests UNMODIFIED for this run — zero source changes were needed)
+toolchain   : rustc 1.94.1 (e408947bf 2026-03-25) / cargo 1.94.1
+qemu        : QEMU emulator version 11.0.2 (Homebrew) — OPERATOR-INSTALLED, external process; /usr/local/bin/qemu-system-x86_64 -> ../Cellar/qemu/11.0.2/bin/qemu-system-x86_64 (symlink collapsed by the crate's canonicalizing resolver; pinned file name re-checked). qemu-img 11.0.2 at /usr/local/bin/qemu-img. NEVER fetched, bundled, linked, or vendored by this repo — LICENSE-DECISION.md §2's bring-your-own doctrine held: both license gates (plan-time + spawn-time full_vm_qemu refusal) and the program-name pin are unchanged.
+accel       : TCG (the plan's argv sets no -accel/KVM/HVF; SeaBIOS + a 512-byte real-mode sector need none)
+
+# ── RUN 1: the marker-boot test (hermetic in-repo El Torito fixture ISO) ──
+command_1   : TEREM_LIVE_QEMU=1 cargo test --test live_qemu_boot_marker -- --ignored --nocapture
+              (cwd os-portal-v2/terem-core — its own workspace; targeted command, no workspace build)
+environment : TEREM_LIVE_QEMU=1 only; TEREM_QEMU_BIN/TEREM_QEMU_IMG_BIN unset, so the
+              pinned names qemu-system-x86_64 / qemu-img were probed on $PATH through
+              resolve_qemu_binary / resolve_qemu_img_binary
+fixture     : built by the test itself in scratch (tests/live_qemu_boot_marker.rs
+              build_marker_iso() — pure std, zero downloads); 16M scratch qcow2 via qemu-img create
+output_1    : |  (verbatim; compile lines elided, test output complete)
+                  Finished `test` profile [unoptimized + debuginfo] target(s) in 4.01s
+                       Running tests/live_qemu_boot_marker.rs (target/debug/deps/live_qemu_boot_marker-04a7dddcf532754d)
+
+                  running 1 test
+                  live QMP query-status: running=true status=running
+                  live marker test passed. Honest scope of this success: SeaBIOS executed our 512-byte fixture sector to a serial marker under an operator-supplied QEMU. It is NOT 'an OS booted', NOT an isolation/TEE claim, and this test has never run in CI.
+                  test live_qemu_boots_fixture_sector_to_serial_marker ... ok
+
+                  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.33s
+result_1    : PASS — the serial log came to contain TEREM-LIVE-QEMU-MARKER-V1 while the
+              QEMU process stayed alive; the optional QMP handshake + query-status also
+              succeeded (running=true status=running); kill_and_wait reaped the process.
+
+# ── RUN 2: the operator-supplied-image spawn test (companion, weaker bar) ──
+command_2   : TEREM_QEMU_BIN=/usr/local/bin/qemu-system-x86_64 \
+              TEREM_BOOT_IMAGE=<scratch>/marker-boot.iso \
+              TEREM_GUEST_DISK=<scratch>/guest0.qcow2 \
+              cargo test --test real_spawn -- --ignored --nocapture
+boot_image  : the SAME in-repo fixture, dumped to disk by compiling the test's builder
+              functions verbatim (rustc, pure std) — sha256 8da0194f8dfd96a94b9b87e38ccc5660d2d7a492f1665269e03a8e08caf9032d (43008 bytes, 21×2048 sectors); no image downloaded
+guest_disk  : /usr/local/bin/qemu-img create -f qcow2 guest0.qcow2 16M (scratch, deleted after)
+output_2    : |  (verbatim; compile lines elided, test output complete)
+                  Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+                       Running tests/real_spawn.rs (target/debug/deps/real_spawn-378ccdc4b1c156e7)
+
+                  running 1 test
+                  test real_qemu_spawns_stays_alive_and_writes_serial_log ... ok
+
+                  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+result_2    : PASS — resolve → plan → spawn → serial log file appeared → kill + reap.
+              This test's bar is deliberately weaker ("the emulator came up"), and it
+              claims nothing about booting.
+
+hermetic    : the full offline suite was run first the same session (cargo test, no env
+              vars): 6 fixture/layout tests + all lib/dry-run tests passed; both live
+              tests correctly stayed ignored. Gates verified intact: without
+              TEREM_LIVE_QEMU=1 the marker test SKIPs even under -- --ignored, and
+              real_spawn panics-with-instructions without its three env vars.
+cleanup     : QEMU processes kill_and_wait-reaped by the tests themselves (pgrep -fl qemu
+              → empty afterwards); scratch ISO + qcow2 deleted; nothing was added to the
+              repo except this evidence file.
+
+# ── Interpretation (honest scope — do not widen) ──
+# What this proves: terem-core's resolve → license-gate → launch-plan → spawn →
+# serial/QMP plumbing works against a REAL operator-installed QEMU on this host,
+# and the hand-assembled in-repo 512-byte boot sector is genuinely bootable:
+# SeaBIOS loaded the El Torito no-emulation image at 0x7C00 and executed it to
+# the TEREM-LIVE-QEMU-MARKER-V1 serial marker under an operator-supplied QEMU.
+# What this does NOT prove: no OS booted (the fixture is 512 bytes of real-mode
+# polling code, not a guest); no isolation, TEE, attestation, or security
+# property of any kind is claimed or tested; QEMU's own correctness/safety is
+# out of scope (it is the operator's external GPL-2.0 process, never ours);
+# everything remains UNAUDITED. A real guest-OS boot is a different, later
+# proof requiring a real guest image — deliberately unclaimed here.

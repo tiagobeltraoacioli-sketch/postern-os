@@ -1,0 +1,25 @@
+
+  Postern for postmarketOS -- community edition
+
+  You are running the LOWER-TRUST, NON-ATTESTABLE tier.
+
+  This is Postern SOFTWARE on postmarketOS. It is NOT "Postern OS".
+  - No reproducible build. No attestation. No verity-sealed image.
+  - NOT covered by the Postern Seal. The Seal and the attestable images
+    are "Postern OS" (Mobile NixOS) only, on a shorter list of devices.
+  - Packages are cryptographically signed (you can verify WHO published
+    them) but not reproducible (you cannot rebuild a bit-identical file).
+  - Wallet keys are stored in SOFTWARE, encrypted at rest. There is NO
+    hardware-backed keystore (no TEE/StrongBox) on this platform.
+
+  No covert telemetry. Nothing here phones home. Any analytics would be
+  opt-in and disclosed first. All privacy routing (Tor via Arti) and the
+  firewall are transparent and configured under /etc/postern.
+
+  The Postern coin has no monetary value and no value is claimed for it;
+  revenue never touches the coin. Personal use is free.
+
+  This is not legal or financial advice.
+
+  Full first-run notice: /usr/share/postern/first-run/about-tier.txt
+

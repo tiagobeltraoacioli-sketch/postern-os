@@ -1,0 +1,2009 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Content-Security-Policy — defense-in-depth, not "security" on its own.
+
+  script-src's hash pins the ONE executable inline <script> (below) by
+  sha256 hash, so 'unsafe-inline' is dropped. The command anchors on the script's
+  "use strict" prologue so it never matches this comment's own <script> text.
+  RECOMPUTE after ANY edit to the executable script (this file is served
+  verbatim — no build step — so the served bytes == these bytes):
+
+    node -e 'const f=require("fs").readFileSync("apps/sotto/index.html","utf8");const s=f.indexOf("<script>\n\"use strict")+8;const e=f.indexOf("</script>",s);console.log("sha256-"+require("crypto").createHash("sha256").update(f.slice(s,e),"utf8").digest("base64"))'
+
+  style-src keeps 'unsafe-inline' on purpose: there is a hand-maintained
+  <style> block and no build step hashes it, so a hash-only style policy
+  would be brittle in this hand-maintained, no-build-step file.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-e2KuuF6H72gz8srqxzADS/ZhhX1RNcwRu2vN5fhIQSo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src data:; connect-src https://api.anthropic.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sotto — a quiet voice assistant · Postern Labs</title>
+<style>
+/* ============================================================
+   SOTTO · Postern Labs
+   "sotto voce" — a voice assistant that keeps its voice down.
+   Graphite/ink instrument panel + one warm brass accent.
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — the shared Postern graphite/ink neutral base
+     (matches _design-system/tokens.css + vedetta) with sotto's brass accent */
+  --bg:        #0d1014;
+  --bg-glow:   #10141b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e8ec;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --brass:     #c9a648;
+  --brass-hi:  #e4c465;
+  --brass-dim: #8f7630;
+  --brass-ink: #16130a;
+
+  --live:      #e4574f;   /* mic hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow:    0 18px 50px rgba(0,0,0,.45);
+  --shadow-sm: 0 6px 18px rgba(0,0,0,.35);
+  --radius: 14px;
+  --radius-card: 12px;
+}
+
+/* light — forced by the header toggle (data-theme wins over the OS) */
+:root[data-theme="light"] {
+  --bg:        #f0eff3;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #eceae2;
+  --surface-3: #e3e0d5;
+  --border:    #d5d0c4;
+  --border-hi: #bdb7a8;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --brass:     #96781f;
+  --brass-hi:  #7c6316;
+  --brass-dim: #b1963f;
+  --brass-ink: #fffdf5;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow:    0 14px 40px rgba(40,50,64,.14);
+  --shadow-sm: 0 4px 14px rgba(40,50,64,.10);
+}
+
+/* light — followed from the OS when the toggle hasn't forced a theme */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0eff3; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#eceae2;
+    --surface-3:#e3e0d5; --border:#d5d0c4; --border-hi:#bdb7a8;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --brass:#96781f; --brass-hi:#7c6316; --brass-dim:#b1963f; --brass-ink:#fffdf5;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(40,50,64,.14);
+    --shadow-sm: 0 4px 14px rgba(40,50,64,.10);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--brass); color: var(--brass-ink); }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wrap { max-width: 780px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+}
+/* seal + wordmark — the brass tick is sotto's seal, same rhythm as vedetta */
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 17px; font-weight: 700;
+  letter-spacing: .34em; text-indent: .34em;
+  color: var(--text);
+  user-select: none;
+  white-space: nowrap;
+}
+.wordmark .tick { color: var(--brass); }
+.byline {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+  margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn[data-attn="1"] { border-color: var(--brass); color: var(--brass); }
+
+/* ---------- hero / orb ---------- */
+.hero { text-align: center; padding: 40px 0 10px; }
+
+.orb-stage { position: relative; width: 210px; height: 210px; margin: 0 auto; }
+
+.orb {
+  position: absolute; inset: 25px;
+  border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  background:
+    radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--brass) 26%, transparent), transparent 58%),
+    radial-gradient(circle at 68% 78%, color-mix(in srgb, var(--brass-dim) 20%, transparent), transparent 55%),
+    linear-gradient(160deg, var(--surface-3), var(--surface));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 0 0 1px color-mix(in srgb, var(--brass) 10%, transparent),
+    0 0 46px color-mix(in srgb, var(--brass) 13%, transparent),
+    var(--shadow);
+  display: grid; place-items: center;
+  -webkit-user-select: none; user-select: none;
+  touch-action: none;
+  transition: box-shadow .25s, transform .15s;
+  padding: 0;
+}
+.orb:active { transform: scale(.985); }
+
+.orb-glyph { width: 54px; height: 54px; color: var(--brass); pointer-events: none; }
+.orb-glyph .bar { transform-origin: center 50%; }
+
+.orb-ring {
+  position: absolute; inset: 12px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--brass) 30%, transparent);
+  pointer-events: none;
+  transition: border-color .25s, inset .25s;
+}
+.orb-ring.outer {
+  inset: 0;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--border-hi) 70%, transparent);
+  opacity: .7;
+}
+
+@keyframes breathe   { 0%,100% { transform: scale(1); opacity:.75 } 50% { transform: scale(1.035); opacity: 1 } }
+@keyframes spin      { to { transform: rotate(360deg); } }
+@keyframes livepulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent), var(--shadow); }
+                       55%     { box-shadow: 0 0 0 16px transparent, var(--shadow); } }
+@keyframes barTalk   { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
+@keyframes barListen { 0%,100% { transform: scaleY(.3) } 50% { transform: scaleY(1.15) } }
+
+body[data-state="idle"] .orb-ring:not(.outer) { animation: breathe 4.5s ease-in-out infinite; }
+
+body[data-state="listening"] .orb {
+  border-color: var(--live);
+  animation: livepulse 1.3s ease-out infinite;
+}
+body[data-state="listening"] .orb-ring:not(.outer) { border-color: color-mix(in srgb, var(--live) 65%, transparent); }
+body[data-state="listening"] .orb-glyph { color: var(--live); }
+body[data-state="listening"] .orb-glyph .bar { animation: barListen 0.9s ease-in-out infinite; }
+body[data-state="listening"] .orb-glyph .bar:nth-child(2) { animation-delay: .12s }
+body[data-state="listening"] .orb-glyph .bar:nth-child(3) { animation-delay: .24s }
+body[data-state="listening"] .orb-glyph .bar:nth-child(4) { animation-delay: .36s }
+body[data-state="listening"] .orb-glyph .bar:nth-child(5) { animation-delay: .48s }
+
+body[data-state="thinking"] .orb-ring.outer {
+  border-color: color-mix(in srgb, var(--brass) 55%, transparent);
+  animation: spin 2.6s linear infinite;
+}
+
+body[data-state="speaking"] .orb-glyph .bar { animation: barTalk 0.7s ease-in-out infinite; }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(2) { animation-delay: .1s }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(3) { animation-delay: .2s }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(4) { animation-delay: .3s }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(5) { animation-delay: .4s }
+body[data-state="speaking"] .orb-ring:not(.outer) { border-color: color-mix(in srgb, var(--brass) 60%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  body[data-state="listening"] .orb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 45%, transparent), var(--shadow); }
+}
+
+/* mic-live badge — prominent + unambiguous */
+.mic-live {
+  display: none;
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  align-items: center; gap: 7px;
+  background: var(--live); color: #fff;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em;
+  padding: 4px 12px; border-radius: 999px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--live) 50%, transparent);
+  z-index: 5; white-space: nowrap;
+}
+.mic-live .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: breathe 1s infinite; }
+body[data-state="listening"] .mic-live { display: inline-flex; }
+
+.status-line {
+  min-height: 1.6em;
+  margin: 20px auto 2px;
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 560px;
+}
+.status-line .hint-key {
+  font-family: var(--font-mono); font-size: 11px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 7px; margin: 0 2px;
+  color: var(--muted); background: var(--surface-2);
+}
+.status-line[data-tone="err"]  { color: var(--err); }
+.status-line[data-tone="live"] { color: var(--live); font-weight: 500; }
+
+/* ---------- example chips ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 14px 0 6px; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: 6px 14px;
+  font-size: 13px; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.chip:hover { border-color: var(--brass); color: var(--text); background: var(--surface-2); }
+
+/* ---------- timers ---------- */
+.timers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 8px 0 0; }
+.timer-chip {
+  display: inline-flex; align-items: center; gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--brass) 45%, var(--border));
+  background: color-mix(in srgb, var(--brass) 8%, var(--surface));
+  border-radius: 10px; padding: 6px 8px 6px 13px;
+  font-family: var(--font-mono); font-size: 13px;
+}
+.timer-chip .t-count { color: var(--brass); font-weight: 700; min-width: 5ch; }
+.timer-chip .t-label { color: var(--text-dim); font-family: var(--font-ui); font-size: 12.5px; }
+.timer-chip.done { border-color: var(--ok); }
+.timer-chip.done .t-count { color: var(--ok); }
+.timer-chip .t-x {
+  background: none; border: 0; color: var(--muted); font-size: 15px;
+  line-height: 1; padding: 3px 6px; border-radius: 6px;
+}
+.timer-chip .t-x:hover { color: var(--err); background: var(--surface-2); }
+
+/* ---------- transcript ---------- */
+.transcript { list-style: none; margin: 26px 0 0; padding: 0 0 20px; display: flex; flex-direction: column; gap: 14px; }
+.turn { display: flex; flex-direction: column; max-width: 86%; }
+.turn.user { align-self: flex-end; align-items: flex-end; }
+.turn.assistant { align-self: flex-start; }
+.turn .who {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); margin: 0 6px 4px;
+}
+.turn .bubble {
+  padding: 11px 15px; border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: 15px;
+}
+.turn.user .bubble {
+  background: color-mix(in srgb, var(--brass) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--brass) 38%, var(--border));
+  border-bottom-right-radius: 5px;
+}
+.turn.assistant .bubble { border-bottom-left-radius: 5px; }
+.turn.assistant .bubble.streaming::after {
+  content: "▍"; color: var(--brass);
+  animation: breathe 1s infinite;
+}
+.turn .note {
+  font-size: 12px; color: var(--err); margin: 5px 6px 0;
+}
+.turn .sys {
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  border: 1px dashed var(--border); border-radius: 10px; padding: 7px 12px;
+}
+.empty-hint { text-align: center; color: var(--muted); font-size: 13.5px; padding: 26px 0 8px; }
+
+/* ---------- composer ---------- */
+.composer-dock {
+  position: sticky; bottom: 0; z-index: 15;
+  padding: 12px 0 18px;
+  background: linear-gradient(transparent, var(--bg) 34%);
+}
+.composer {
+  display: flex; gap: 8px; align-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--brass) 60%, var(--border)); }
+.composer input[type="text"] {
+  flex: 1; background: none; border: 0; outline: none;
+  padding: 8px 10px; font-size: 15px; color: var(--text); min-width: 0;
+}
+.composer input::placeholder { color: var(--muted); }
+.cbtn {
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 11px; width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  color: var(--text-dim);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.cbtn:hover { color: var(--text); border-color: var(--border-hi); }
+.cbtn svg { width: 18px; height: 18px; }
+.cbtn.primary { background: var(--brass); border-color: var(--brass); color: var(--brass-ink); }
+.cbtn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+.cbtn[aria-pressed="true"] { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+.cbtn:disabled { opacity: .45; cursor: not-allowed; }
+.composer-foot {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 11.5px; color: var(--muted); padding: 8px 6px 0;
+  font-family: var(--font-mono); letter-spacing: .02em;
+}
+.composer-foot .lock { color: var(--brass); }
+.composer-foot button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+  font: inherit;
+}
+.composer-foot button.linkish:hover { color: var(--text-dim); }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  width: min(600px, calc(100vw - 36px));
+  max-height: min(84vh, 760px);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(6,8,10,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--brass);
+  font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+
+.field { margin-bottom: 18px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field input[type="password"], .field input[type="text"], .field select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+}
+.field input:focus, .field select:focus { border-color: var(--brass); outline: none; }
+.keyrow { display: flex; gap: 8px; }
+.keyrow input { flex: 1; font-family: var(--font-mono); font-size: 13px; }
+.keyrow .hbtn { flex: none; }
+.field input[type="range"] { width: 100%; accent-color: var(--brass); }
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 6%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--brass); }
+.radio-card .rc-t { font-size: 14px; }
+.radio-card .rc-d { font-size: 12px; color: var(--muted); }
+.radio-card input:disabled ~ div { opacity: .55; }
+
+.danger-zone { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 16px; }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.btn-brass {
+  background: var(--brass); border: 1px solid var(--brass); color: var(--brass-ink);
+  border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 600;
+}
+.btn-brass:hover { background: var(--brass-hi); border-color: var(--brass-hi); }
+
+/* privacy ledger — spec .card spacing: 12px radius, 16px padding, sm shadow */
+.ledger {
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: var(--shadow-sm);
+  overflow: hidden; margin: 10px 0 16px;
+}
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; line-height: 1.4; }
+.ledger-row.local .mark { color: var(--ok); }
+.ledger-row.leaves .mark { color: var(--warn); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--brass); }
+.pv-note { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+
+/* footer */
+footer.site {
+  padding: 8px 0 26px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .byline { display: none; }
+  .turn { max-width: 94%; }
+  .composer-foot { flex-direction: column; gap: 4px; }
+}
+
+/* ---------- Izbushka intent hand-off card ---------- */
+.izb-card {
+  border: 1px solid color-mix(in srgb, var(--brass) 42%, var(--border));
+  background: color-mix(in srgb, var(--brass) 7%, var(--surface));
+  border-radius: var(--radius-card); box-shadow: var(--shadow-sm);
+  padding: 14px 16px; font-size: 13.5px;
+}
+.izb-card h4 {
+  margin: 0 0 9px; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--brass); font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.izb-card dl { margin: 0 0 10px; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
+.izb-card dt {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .1em; align-self: baseline;
+}
+.izb-card dd { margin: 0; color: var(--text-dim); overflow-wrap: anywhere; }
+.izb-card dd.izb-code, .izb-code { font-family: var(--font-mono); font-size: 12px; color: var(--brass); }
+.izb-card .izb-consent {
+  display: flex; gap: 7px; align-items: flex-start;
+  font-size: 12px; color: var(--warn); margin: 0 0 11px; line-height: 1.5;
+}
+.izb-card .izb-consent.granted { color: var(--ok); }
+.izb-card .izb-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.izb-card .izb-actions a.hbtn { text-decoration: none; display: inline-flex; align-items: center; }
+.izb-card .izb-hint { font-size: 11.5px; color: var(--muted); margin: 9px 0 0; line-height: 1.5; }
+
+/* voice-consent notice highlight inside the STT setting */
+.voice-consent-state { font-size: 12.5px; color: var(--muted); margin: 0 0 8px; line-height: 1.55; }
+.voice-consent-state.on { color: var(--warn); }
+</style>
+</head>
+<body data-state="idle">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Sotto">S<span class="tick">·</span>OTTO</div>
+    <div class="byline">Postern Labs · sotto voce</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnPrivacy">Privacy</button>
+      <button class="hbtn" id="btnSettings">Settings</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" aria-label="Voice control">
+    <div class="orb-stage">
+      <span class="mic-live" role="status"><span class="dot"></span>MIC LIVE</span>
+      <div class="orb-ring outer" aria-hidden="true"></div>
+      <div class="orb-ring" aria-hidden="true"></div>
+      <button class="orb" id="orb" aria-label="Hold to talk. Push-to-talk only: the microphone is on only while you hold this button or the space bar.">
+        <svg class="orb-glyph" viewBox="0 0 54 54" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round">
+          <line class="bar" x1="11" y1="21" x2="11" y2="33"/>
+          <line class="bar" x1="19" y1="15" x2="19" y2="39"/>
+          <line class="bar" x1="27" y1="9"  x2="27" y2="45"/>
+          <line class="bar" x1="35" y1="15" x2="35" y2="39"/>
+          <line class="bar" x1="43" y1="21" x2="43" y2="33"/>
+        </svg>
+      </button>
+    </div>
+    <p class="status-line" id="statusLine" aria-live="polite"></p>
+  </section>
+
+  <section class="chips" id="chips" aria-label="Example requests">
+    <button class="chip">Set a timer for 5 minutes</button>
+    <button class="chip">What time is it?</button>
+    <button class="chip">Explain how yeast makes bread rise</button>
+    <button class="chip">Draft a short message to my landlord about a leaky faucet</button>
+    <button class="chip">Izbushka, declare a task to index my notes every night</button>
+  </section>
+
+  <section class="timers" id="timers" aria-label="Active timers" aria-live="polite"></section>
+
+  <ol class="transcript" id="transcript" aria-label="Conversation transcript"></ol>
+  <p class="empty-hint" id="emptyHint">Nothing here yet. Hold the orb (or the space bar) and speak — or just type below.<br>Everything stays in this tab until you send a message to your own Claude.</p>
+
+  <div class="composer-dock">
+    <form class="composer" id="composer">
+      <button type="button" class="cbtn" id="btnMute" aria-pressed="false" aria-label="Mute spoken replies" title="Mute spoken replies">
+        <svg id="icoSpeaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="spkWaves" d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/><line id="spkSlash" x1="22" y1="3" x2="14" y2="21" style="display:none"/></svg>
+      </button>
+      <input type="text" id="textInput" autocomplete="off"
+             placeholder="Type instead of speaking — the fully local input path"
+             aria-label="Message Sotto by text">
+      <button type="button" class="cbtn" id="btnStop" disabled aria-label="Stop responding and speaking" title="Stop">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      </button>
+      <button type="submit" class="cbtn primary" id="btnSend" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </form>
+    <div class="composer-foot">
+      <span><span class="lock">●</span> no server · no account · key stays in this browser</span>
+      <span>model: <button class="linkish" id="modelHint" type="button">—</button></span>
+    </div>
+  </div>
+</main>
+
+<footer class="site wrap">Sotto · a Postern Labs instrument · your key, your words, your machine</footer>
+
+<!-- ================= SETTINGS ================= -->
+<dialog id="dlgSettings" aria-labelledby="settingsTitle">
+  <div class="dlg-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <button class="x" data-close aria-label="Close settings">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="field">
+      <label for="apiKey">Your Anthropic API key</label>
+      <div class="keyrow">
+        <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button type="button" class="hbtn" id="btnShowKey">show</button>
+      </div>
+      <p class="fhelp">Stored only in this browser’s localStorage and sent only to <code>api.anthropic.com</code> — Sotto has no server that could ever see it. Get a key at console.anthropic.com.</p>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Key at rest (optional lock)</span>
+      <p class="fhelp" id="keyLockState" aria-live="polite"></p>
+      <div class="keyrow">
+        <input type="password" id="keyPass" placeholder="passphrase (min 6 characters)" autocomplete="off" spellcheck="false" aria-label="Passphrase to seal the API key">
+        <button type="button" class="hbtn" id="btnKeyLock">lock key</button>
+      </div>
+      <p class="fhelp" id="keyLockHelp">Locking seals the key with <b>AES-256-GCM</b> under a key derived from your passphrase
+      (<b>PBKDF2-SHA-256, 310,000 it.</b> — a WebCrypto stand-in for the product's <b>Argon2id</b>, the same construction as Chiave, our sign-in reference).
+      localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means
+      re-entering the key. <b>Without a lock, the key sits readable in this browser’s localStorage</b> — any
+      code or person with access to this browser profile can read it.</p>
+    </div>
+
+    <div class="field">
+      <label for="modelSel">Claude model</label>
+      <select id="modelSel">
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest, best for voice (default)</option>
+        <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable, slower</option>
+      </select>
+      <p class="fhelp">Billed to your own Anthropic account at your account’s rates.</p>
+    </div>
+
+    <div class="field">
+      <span class="flabel" id="sttLabel">Speech-to-text engine</span>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="webspeech" id="sttWeb">
+        <div>
+          <div class="rc-t">Browser speech recognition (Web Speech API)</div>
+          <div class="rc-d">Works now in Chrome/Edge. Honest caveat: the browser may send your audio to its vendor’s servers for transcription — see the Privacy panel.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="ondevice" id="sttLocal">
+        <div>
+          <div class="rc-t">On-device Whisper (planned)</div>
+          <div class="rc-d">A whisper.cpp-WASM engine that never lets audio leave this machine. The engine slot is wired; the model isn’t bundled in this prototype. Until then, typing is the fully local path.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Voice input (opt-in)</span>
+      <p class="voice-consent-state" id="voiceConsentState" aria-live="polite"></p>
+      <p class="fhelp" style="margin:0 0 10px">Browser speech recognition <b>streams your microphone audio to Google’s servers</b> for transcription — it is <b>not</b> on-device. Text/manual entry stays local to this tab. Voice is off until you turn it on, and is strictly push-to-talk.</p>
+      <button type="button" class="hbtn" id="btnVoiceConsent">—</button>
+    </div>
+
+    <div class="field">
+      <label for="voiceSel">Voice for spoken replies (on-device)</label>
+      <select id="voiceSel"></select>
+    </div>
+
+    <div class="field">
+      <label for="rate">Speaking rate <span id="rateVal" style="color:var(--muted)"></span></label>
+      <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
+    </div>
+
+    <div class="danger-zone">
+      <span class="flabel">Erase everything</span>
+      <p class="fhelp" style="margin:0 0 10px">Wipes your API key, all settings, and this session’s conversation from the browser. Nothing else exists to erase — there is no server copy.</p>
+      <button type="button" class="btn-danger" id="btnErase">Erase key, settings &amp; conversation</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= PRIVACY ================= -->
+<dialog id="dlgPrivacy" aria-labelledby="privacyTitle">
+  <div class="dlg-head">
+    <h2 id="privacyTitle">Privacy — who sees what</h2>
+    <button class="x" data-close aria-label="Close privacy panel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">
+      Sotto is a static page. <strong>There is no Postern server, no account, no telemetry, and no analytics.</strong>
+      Your API key and settings live in this browser’s localStorage; the conversation lives in this tab’s memory
+      and is gone when you close it. The honest ledger:
+    </p>
+
+    <div class="ledger">
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your words → Anthropic (when you send a message)</h3>
+          <p>Each turn, the conversation text is sent from your browser directly to
+          <code>api.anthropic.com</code>, authenticated with <em>your</em> key — no middleman relays or logs it.
+          Anthropic processes it under <em>your</em> agreement with them (their usage and data-retention terms apply).
+          If you never send a message, nothing is ever transmitted.</p>
+        </div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your voice → your browser’s vendor (only while you hold to talk)</h3>
+          <p>Voice input uses the browser’s Web Speech API. In Chrome and most browsers this
+          <strong>sends your audio to the browser vendor’s servers</strong> for transcription — so speech input is
+          <em>not</em> fully private. It is strictly push-to-talk: the microphone is captured only while you hold
+          the orb or the space bar, never in the background. Want zero audio leaving the machine?
+          <strong>Type instead</strong> — the text path is fully local until you hit send. The real product ships an
+          on-device Whisper (whisper.cpp/WASM) engine in the same slot.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Spoken replies — on-device</h3>
+          <p>Text-to-speech uses your operating system’s voices via <code>speechSynthesis</code>. Audio is generated
+          locally and does not leave the device.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Key, settings, conversation — this browser only</h3>
+          <p>API key + preferences: localStorage. With the optional lock set in Settings, the key is stored only
+          as AES-256-GCM ciphertext sealed under your passphrase; without it, it is readable in localStorage —
+          Settings says so plainly. Conversation + timers: tab memory only, never persisted.
+          “Erase everything” in Settings wipes all of it instantly.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="pv-note">
+      <strong>What we won’t claim:</strong> Sotto is not “100% private.” Anything you send to a model necessarily
+      reaches Anthropic, and spoken input may reach your browser vendor. What Sotto guarantees is <em>no extra
+      parties</em>: no Postern servers, no resellers, no analytics — the only network destination in this page’s
+      code is <code>api.anthropic.com</code>. The source is one readable HTML file; verify it yourself.
+    </p>
+    <p style="text-align:right; margin: 14px 0 0">
+      <button class="btn-brass" data-close>Understood</button>
+    </p>
+  </div>
+</dialog>
+
+<!-- ============ VOICE-INPUT CONSENT (opt-in, shown before first mic capture) ============ -->
+<dialog id="dlgVoice" aria-labelledby="voiceTitle">
+  <div class="dlg-head">
+    <h2 id="voiceTitle">Turn on voice input?</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0" id="voiceDisclosure">
+      <strong>Speech recognition sends your microphone audio to Google’s servers for transcription — this is not on-device.</strong>
+      Text and manual entry stay local to this tab and are never uploaded for transcription. Voice stays off until you turn it on
+      here, and it is strictly push-to-talk: the microphone is live only while you hold the orb or the space bar, shown by the red
+      <em>MIC&nbsp;LIVE</em> badge. Sotto keeps no recordings and adds no telemetry — but once audio reaches Google it is handled
+      under Google’s terms, outside Sotto’s control.
+    </p>
+    <div class="ledger" style="margin-top:14px">
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Voice → Google’s servers (only while you hold to talk)</h3>
+          <p>Chrome’s Web Speech API streams your audio to Google and returns text. Off by default; opt-in only; never in the background.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Typing → stays in this tab</h3>
+          <p>The composer is the fully local path — nothing leaves until you send a message to your own Claude.</p>
+        </div>
+      </div>
+    </div>
+    <p style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin: 16px 0 0">
+      <button class="hbtn" data-close>Keep typing (stay local)</button>
+      <button class="btn-brass" id="btnVoiceEnable">Enable voice — audio goes to Google</button>
+    </p>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ============================================================
+   SOTTO — application logic
+   Zero dependencies. Only network destination: api.anthropic.com
+   ============================================================ */
+
+/* ---------- tiny helpers ---------- */
+const $ = (sel) => document.querySelector(sel);
+const LS = {
+  KEY:    "sotto.apiKey",
+  SEALED: "sotto.apiKey.sealed",
+  MODEL: "sotto.model",
+  VOICE: "sotto.voiceURI",
+  RATE:  "sotto.rate",
+  MUTE:  "sotto.muted",
+  STT:   "sotto.stt",
+  THEME: "sotto.theme",
+  VOICE_CONSENT: "sotto.voiceConsent",   // opt-in gate before any mic capture
+};
+/* Shared, cross-app hand-off contract (NOT sotto-namespaced): Izbushka reads this
+   same-origin key and turns it into a task manifest awaiting the user's explicit,
+   scoped, expiring confirmation. Sotto only ever PROPOSES — it never executes or grants. */
+const IZBUSHKA_INTENT_KEY = "izbushka.intent";
+const IZBUSHKA_RITUAL = "izbushka-turn-your-face-to-me";
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+/* ---------- sealed key at rest (optional lock) ----------
+   Adopts the ONE postern-sdk wiring seam (globalThis.PosternSDK): when a Postern
+   host shell (Tauri / mobile WebView / relaxed-CSP build) has installed the wasm
+   core, the key is sealed with the REAL Argon2id(64 MiB, t=3) + XChaCha20-Poly1305
+   from postern-core — killing stand-in S2. In a plain browser tab (this page's
+   strict CSP forbids fetching wasm) the seam is absent and we keep the honest
+   classical stand-in: PBKDF2-SHA-256 (310,000 it.) → AES-256-GCM. Never silently
+   weaker — a blob sealed by the real core refuses to open without it (fail-closed),
+   and the on-disk record is tagged with the KDF that produced it so open() can't
+   be tricked into a downgrade. When locked, localStorage holds ONLY ciphertext;
+   the readable key lives in this tab's memory, unlocked once per session. */
+const KeySeal = (() => {
+  const te = new TextEncoder(), td = new TextDecoder();
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  const KDF_ITER = 310000;      // classical stand-in iterations (PBKDF2-SHA-256)
+  const KDF_REAL = "Argon2id-postern-sdk";  // on-disk tag for real-core seals
+  const AAD = "sotto.apikey.v1";
+  let plain = null;             // unlocked key — this tab's memory only, never persisted
+  let aesKey = null;            // PBKDF2-derived AES key (stand-in path); kept so edits re-seal without re-running the KDF
+  let realKey = null;           // opaque postern-sdk VaultKey handle (real path); kept for re-seals, lives in wasm memory
+  let realLabel = "";           // the core's honest KDF label, stored alongside the blob
+  let saltB64 = null;
+  let writing = Promise.resolve(); // serialize re-seals (last write wins)
+
+  const sdk = () => (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null;
+  const kdfReal = () => { const s = sdk(); return !!(s && s.kdf && s.kdf.available); };
+
+  const record = () => { try { return JSON.parse(store.get(LS.SEALED, "null")); } catch { return null; } };
+  const derive = async (pass, salt, iter) => {
+    const base = await crypto.subtle.importKey("raw", te.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iter },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  };
+  async function persist() {
+    if (realKey) {                                     // REAL postern-sdk core path
+      const blob = sdk().kdf.seal(realKey, te.encode(AAD), te.encode(JSON.stringify({ key: plain })));
+      store.set(LS.SEALED, JSON.stringify({
+        v: 1,
+        kdf: { algo: KDF_REAL, label: realLabel, salt: saltB64 },
+        cipher: { algo: "XChaCha20-Poly1305", blob: b64(blob) },
+      }));
+      return;
+    }
+    const iv = crypto.getRandomValues(new Uint8Array(12)); // fresh IV per write, always
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: te.encode(AAD) },
+      aesKey, te.encode(JSON.stringify({ key: plain })));
+    store.set(LS.SEALED, JSON.stringify({
+      v: 1,
+      kdf: { algo: "PBKDF2-SHA-256", iter: KDF_ITER, salt: saltB64 },
+      cipher: { algo: "AES-256-GCM", iv: b64(iv), ct: b64(ct) },
+    }));
+  }
+  return {
+    isSealed: () => !!record(),
+    isLocked: () => !!record() && plain === null,
+    key: () => plain,
+    real: () => kdfReal(),                             // is the real core installed right now?
+    cipherLabel: () => {                               // what actually sealed the current blob
+      const r = record();
+      if (r && r.kdf && r.kdf.algo === KDF_REAL) return "XChaCha20-Poly1305 (real Argon2id, via postern-sdk)";
+      return "AES-256-GCM (PBKDF2-SHA-256 stand-in)";
+    },
+    async lock(pass, currentKey) {          // seal, then drop the plaintext copy from disk
+      plain = currentKey;
+      const s = sdk();
+      if (kdfReal()) {
+        const salt = s.kdf.generateSalt();
+        realKey = s.kdf.deriveKey(te.encode(pass), salt);
+        realLabel = s.kdf.label || "Argon2id"; saltB64 = b64(salt); aesKey = null;
+      } else {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        aesKey = await derive(pass, salt, KDF_ITER);
+        saltB64 = b64(salt); realKey = null;
+      }
+      await persist();
+      store.del(LS.KEY);
+    },
+    async unlock(pass) {                    // per-session; a wrong passphrase fails the AEAD tag
+      const r = record(); if (!r) return false;
+      if (r.kdf && r.kdf.algo === KDF_REAL) {   // sealed by the real core — never downgrade
+        const s = sdk();
+        if (!kdfReal()) return false;           // honest fail-closed: the core isn't loaded here
+        try {
+          const key = s.kdf.deriveKey(te.encode(pass), unb64(r.kdf.salt));
+          const pt = s.kdf.open(key, te.encode(AAD), unb64(r.cipher.blob));
+          plain = JSON.parse(td.decode(pt)).key;
+          realKey = key; realLabel = r.kdf.label || (s.kdf.label || "Argon2id"); saltB64 = r.kdf.salt; aesKey = null;
+          return true;
+        } catch { return false; }
+      }
+      try {
+        const k = await derive(pass, unb64(r.kdf.salt), r.kdf.iter);
+        const pt = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: unb64(r.cipher.iv), additionalData: te.encode(AAD) },
+          k, unb64(r.cipher.ct));
+        plain = JSON.parse(td.decode(pt)).key;
+        aesKey = k; saltB64 = r.kdf.salt; realKey = null;
+        return true;
+      } catch { return false; }             // all-or-nothing: nothing decrypted, nothing leaked
+    },
+    update(newKey) {                        // edits while unlocked re-seal automatically
+      if (!aesKey && !realKey) return;
+      plain = newKey;
+      writing = writing.then(persist).catch(() => {});
+    },
+    removeLock() {                          // back to plaintext-at-rest, by explicit choice only
+      if (plain === null) return false;
+      store.set(LS.KEY, plain);
+      store.del(LS.SEALED);
+      if (realKey) { try { realKey.free(); } catch {} }
+      aesKey = null; realKey = null; saltB64 = null;
+      return true;
+    },
+    forget() { plain = null; aesKey = null; if (realKey) { try { realKey.free(); } catch {} } realKey = null; saltB64 = null; },
+  };
+})();
+
+/* ---------- constants ---------- */
+const API_URL = "https://api.anthropic.com/v1/messages";
+const MODELS = {
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+  "claude-sonnet-5": "Sonnet 5",
+  "claude-opus-4-8": "Opus 4.8",
+};
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const MAX_TOKENS = 1024;
+const MAX_TOOL_ROUNDS = 4;
+
+const SYSTEM_PROMPT = [
+  "You are Sotto, a private voice assistant made by Postern Labs. Your replies are read aloud by a speech synthesizer, so speak like a considerate person, not a document:",
+  "- Keep it brief. One to three short sentences for most requests; go longer only when the substance truly needs it.",
+  "- Plain prose only. Never use markdown, bullet points, headers, code fences, or emoji.",
+  "- Read numbers, dates, and units the way you would say them out loud.",
+  "You have exactly two tools: set_timer and get_current_time. Use them when asked about timers or the current time.",
+  "You run entirely inside the user's browser with no server behind you. You cannot browse the web or fetch live data, control smart-home devices, play music, access calendars, contacts, email, or files, send messages, or remember anything after this session ends. If asked for any of that, say plainly that you can't do it here, and offer what you can do instead — for example, you can draft a message for the user to copy and send themselves.",
+  "If asked about privacy: the user's words go only to Anthropic under their own API key; there is no middleman server; voice input via the browser may reach the browser vendor; your spoken voice is generated on-device.",
+].join("\n");
+
+const TOOLS = [
+  {
+    name: "set_timer",
+    description: "Set a countdown timer that will chime and announce itself in the user's browser when it finishes. Use whenever the user asks for a timer, an alarm in relative time, or a reminder after a duration.",
+    input_schema: {
+      type: "object",
+      properties: {
+        seconds: { type: "integer", description: "Duration of the timer in seconds. Must be at least 1." },
+        label:   { type: "string",  description: "Short human label for the timer, e.g. 'tea' or 'pasta'." },
+      },
+      required: ["seconds"],
+    },
+  },
+  {
+    name: "get_current_time",
+    description: "Get the user's current local date and time. Use whenever the user asks the time, the date, or the day of the week.",
+    input_schema: { type: "object", properties: {} },
+  },
+];
+
+/* ---------- state ---------- */
+let history = [];            // Anthropic messages array (session memory)
+let busy = false;            // a request is in flight
+let abortCtl = null;
+let timers = [];             // {id, label, endsAt, fired}
+let timerTick = null;
+let ttsQueue = [];           // sentences waiting to be spoken
+let ttsSpeaking = false;
+
+/* ---------- elements ---------- */
+const el = {
+  body: document.body,
+  orb: $("#orb"),
+  status: $("#statusLine"),
+  transcript: $("#transcript"),
+  emptyHint: $("#emptyHint"),
+  timers: $("#timers"),
+  chips: $("#chips"),
+  composer: $("#composer"),
+  input: $("#textInput"),
+  btnSend: $("#btnSend"),
+  btnStop: $("#btnStop"),
+  btnMute: $("#btnMute"),
+  spkWaves: $("#spkWaves"),
+  spkSlash: $("#spkSlash"),
+  modelHint: $("#modelHint"),
+  dlgSettings: $("#dlgSettings"),
+  dlgPrivacy: $("#dlgPrivacy"),
+  dlgVoice: $("#dlgVoice"),
+  btnVoiceEnable: $("#btnVoiceEnable"),
+  btnVoiceConsent: $("#btnVoiceConsent"),
+  voiceConsentState: $("#voiceConsentState"),
+  apiKey: $("#apiKey"),
+  btnShowKey: $("#btnShowKey"),
+  keyPass: $("#keyPass"),
+  btnKeyLock: $("#btnKeyLock"),
+  keyLockState: $("#keyLockState"),
+  keyLockHelp: $("#keyLockHelp"),
+  modelSel: $("#modelSel"),
+  voiceSel: $("#voiceSel"),
+  rate: $("#rate"),
+  rateVal: $("#rateVal"),
+  sttWeb: $("#sttWeb"),
+  sttLocal: $("#sttLocal"),
+  btnErase: $("#btnErase"),
+  btnSettings: $("#btnSettings"),
+  btnPrivacy: $("#btnPrivacy"),
+  btnTheme: $("#btnTheme"),
+};
+
+/* ============================================================
+   UI state machine
+   ============================================================ */
+function setState(state) {
+  el.body.dataset.state = state; // idle | listening | thinking | speaking
+}
+function setStatus(html, tone) {
+  el.status.innerHTML = html;
+  if (tone) el.status.dataset.tone = tone; else delete el.status.dataset.tone;
+}
+function idleStatus() {
+  if (!getKey()) {
+    if (KeySeal.isLocked()) {
+      setStatus('Your API key is sealed at rest. Unlock it in <b>Settings</b> for this session.');
+    } else {
+      setStatus('Add your Anthropic API key in <b>Settings</b> to begin — it never leaves this browser except to reach Anthropic.');
+    }
+    el.btnSettings.dataset.attn = "1";
+    return;
+  }
+  el.btnSettings.removeAttribute("data-attn");
+  if (stt.available()) {
+    if (store.get(LS.VOICE_CONSENT, "0") !== "1") {
+      setStatus('Voice is <b>off</b> — turning it on sends audio to Google. Hold the orb to review &amp; enable, or type below (stays local).');
+    } else {
+      setStatus('Hold the orb — or hold <span class="hint-key">space</span> — to talk. Release to send. Or type below.');
+    }
+  } else {
+    setStatus("Voice input isn’t available in this browser, but typing works fully — and it’s the most private path anyway.");
+  }
+}
+
+/* ============================================================
+   Transcript rendering
+   ============================================================ */
+function addTurn(role, text) {
+  el.emptyHint.style.display = "none";
+  const li = document.createElement("li");
+  li.className = "turn " + role;
+  const who = document.createElement("div");
+  who.className = "who";
+  who.textContent = role === "user" ? "you" : "sotto";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  li.append(who, bubble);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "end", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  return { li, bubble };
+}
+function addSystemNote(text) {
+  el.emptyHint.style.display = "none";
+  const li = document.createElement("li");
+  li.className = "turn assistant";
+  const sys = document.createElement("div");
+  sys.className = "sys";
+  sys.textContent = text;
+  li.appendChild(sys);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "end" });
+}
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/* ============================================================
+   Speech OUT — on-device TTS (speechSynthesis)
+   ============================================================ */
+const tts = {
+  voices: [],
+  loadVoices() {
+    this.voices = (window.speechSynthesis ? speechSynthesis.getVoices() : []) || [];
+    const sel = el.voiceSel;
+    sel.innerHTML = "";
+    if (!window.speechSynthesis) {
+      sel.appendChild(new Option("Speech synthesis unavailable in this browser", ""));
+      sel.disabled = true;
+      return;
+    }
+    const saved = store.get(LS.VOICE, "");
+    const def = new Option("System default voice", "");
+    sel.appendChild(def);
+    this.voices
+      .forEach(v => {
+        const o = new Option(`${v.name} (${v.lang})${v.localService ? "" : " ⚠ network voice"}`, v.voiceURI);
+        if (v.voiceURI === saved) o.selected = true;
+        sel.appendChild(o);
+      });
+  },
+  pick() {
+    const uri = store.get(LS.VOICE, "");
+    return this.voices.find(v => v.voiceURI === uri) || null;
+  },
+  muted() { return store.get(LS.MUTE, "0") === "1"; },
+  enqueue(sentence) {
+    if (!window.speechSynthesis || this.muted()) return;
+    const clean = sentence.replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    ttsQueue.push(clean);
+    this.pump();
+  },
+  pump() {
+    if (ttsSpeaking || ttsQueue.length === 0 || !window.speechSynthesis) return;
+    const text = ttsQueue.shift();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = this.pick();
+    if (v) u.voice = v;
+    u.rate = parseFloat(store.get(LS.RATE, "1")) || 1;
+    ttsSpeaking = true;
+    if (!busy) setState("speaking");
+    u.onend = u.onerror = () => {
+      ttsSpeaking = false;
+      if (ttsQueue.length) this.pump();
+      else if (!busy) { setState("idle"); syncStopBtn(); }
+    };
+    speechSynthesis.speak(u);
+  },
+  stop() {
+    ttsQueue = [];
+    ttsSpeaking = false;
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  },
+};
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = () => tts.loadVoices();
+}
+
+/* Strip things that read badly aloud (defense in depth; the prompt already forbids markdown) */
+function speakable(text) {
+  return text.replace(/[*_`#>|]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
+}
+
+/* ============================================================
+   Speech IN — swappable STT engines behind one interface.
+   Engine contract: { id, label, available():bool,
+                      start({onInterim,onFinal,onError}), stop() }
+   ============================================================ */
+
+/* Engine 1: browser Web Speech API (may send audio to the browser vendor) */
+const WebSpeechEngine = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  let rec = null, finals = "", interim = "", cb = null, stopping = false;
+  return {
+    id: "webspeech",
+    label: "Browser (Web Speech API)",
+    available: () => !!SR,
+    start(callbacks) {
+      if (!SR) { callbacks.onError("Speech recognition is not available in this browser."); return; }
+      cb = callbacks; finals = ""; interim = ""; stopping = false;
+      rec = new SR();
+      rec.lang = navigator.language || "en-US";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (ev) => {
+        interim = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (r.isFinal) finals += r[0].transcript;
+          else interim += r[0].transcript;
+        }
+        cb.onInterim((finals + " " + interim).trim());
+      };
+      rec.onerror = (ev) => {
+        if (stopping && (ev.error === "aborted" || ev.error === "no-speech")) return;
+        const msgs = {
+          "not-allowed": "Microphone permission was denied. Sotto only listens while you hold to talk — allow the mic to use voice, or keep typing.",
+          "no-speech": "Didn’t catch anything — hold and try again, or type instead.",
+          "audio-capture": "No microphone found. Typing works fully.",
+          "network": "The browser’s speech service couldn’t be reached. Typing is fully local and always works.",
+        };
+        cb.onError(msgs[ev.error] || ("Speech recognition error: " + ev.error));
+      };
+      rec.onend = () => {
+        if (!cb) return;
+        const text = (finals + " " + interim).trim();
+        const done = cb.onFinal; cb = null;
+        done(text);
+      };
+      try { rec.start(); } catch (e) { cb && cb.onError("Couldn’t start the microphone: " + e.message); cb = null; }
+    },
+    stop() {
+      stopping = true;
+      if (rec) { try { rec.stop(); } catch {} }
+    },
+  };
+})();
+
+/* Engine 2: on-device Whisper — the slot the real product fills.
+   Deliberately honest stub: selectable in code, disabled in UI,
+   so swapping in whisper.cpp-wasm later touches only this object. */
+const OnDeviceWhisperEngine = {
+  id: "ondevice",
+  label: "On-device Whisper (whisper.cpp / WASM)",
+  available: () => false, // flips to true when a wasm build + model are bundled
+  start({ onError }) {
+    onError("The on-device Whisper engine isn’t bundled in this prototype yet. Until it is, typing is the fully local path.");
+  },
+  stop() {},
+};
+
+const STT_ENGINES = { webspeech: WebSpeechEngine, ondevice: OnDeviceWhisperEngine };
+
+const stt = {
+  engine() {
+    const want = store.get(LS.STT, "webspeech");
+    const e = STT_ENGINES[want] || WebSpeechEngine;
+    return e.available() ? e : WebSpeechEngine;
+  },
+  available() { return this.engine().available(); },
+  start(cbs) { this.engine().start(cbs); },
+  stop() { this.engine().stop(); },
+};
+
+/* ============================================================
+   Izbushka voice-command grammar — a small LOCAL parser.
+   No network: recognized speech/text is mapped to an INTENT and
+   handed to Izbushka via the shared same-origin localStorage key.
+   The intent is a PROPOSAL only — it never executes or grants a task;
+   Izbushka still requires the user's explicit, scoped, expiring consent.
+
+   Intent shape:
+     { action: "declare"|"grant"|"schedule"|"pause"|"revoke"|"list",
+       task, description?, schedule?, formula }
+   ============================================================ */
+function slugifyTask(x) {
+  return String(x || "").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+}
+
+function parseIzbushkaCommand(raw) {
+  if (!raw) return null;
+  let s = " " + raw.toLowerCase().replace(/[.,!?;:]+/g, " ").replace(/\s+/g, " ").trim() + " ";
+
+  // 1) The ritual formula: "Izbushka, izbushka — turn your face to me"
+  let formula = null, addressed = false;
+  const ritualRe = /\bizbushka(?:\s+izbushka)?\s+turn(?:\s+your)?\s+face\s+to\s+me\b/;
+  if (ritualRe.test(s)) { formula = IZBUSHKA_RITUAL; addressed = true; s = s.replace(ritualRe, " "); }
+
+  // 2) Wake word "izbushka" anywhere = the utterance is addressed to the hut.
+  if (/\bizbushka\b/.test(s)) { addressed = true; s = s.replace(/\bizbushka\b/g, " "); }
+
+  s = s.replace(/\s+/g, " ").trim();
+  // strip conversational filler around the verb
+  s = s.replace(/^(and|then|now|please|ok|okay|hey|could you|can you|would you)\b/g, "").trim();
+
+  const mentionsTask = /\btasks?\b/.test(s);
+  const fin = (intent) => ({ task: null, description: null, schedule: null, formula, source: null, ...intent });
+
+  // Bare ritual with no further command → a standalone consent grant.
+  if (formula && s === "") return fin({ action: "grant" });
+
+  // list tasks
+  if (/^(list|show|what are)(\s+(all|my|the))?\s+tasks?$/.test(s) || s === "list tasks" || s === "tasks") {
+    if (!addressed && !mentionsTask) return null;
+    return fin({ action: "list" });
+  }
+
+  // declare a task to <description> [every <schedule>]
+  let m = s.match(/^declare\s+(?:a\s+|the\s+)?task\s+(?:to\s+|that\s+|which\s+)?(.+?)(?:\s+every\s+(.+?)|\s+on\s+(?:a\s+)?schedule\s+(.+?)|\s+(nightly|daily|hourly|weekly|monthly))?$/);
+  if (m) {
+    const description = m[1].trim();
+    const schedule = (m[2] || m[3] || m[4] || null);
+    return fin({ action: "declare", description, schedule: schedule ? schedule.trim() : null, task: slugifyTask(description.split(/\s+/).slice(0, 5).join(" ")) || null });
+  }
+
+  // schedule <task> [every <schedule>]   (needs an Izbushka context to avoid hijacking Claude)
+  m = s.match(/^schedule\s+(?:the\s+|a\s+|my\s+)?(?:task\s+)?(.+?)(?:\s+every\s+(.+?)|\s+(nightly|daily|hourly|weekly|monthly))?$/);
+  if (m && (addressed || mentionsTask)) {
+    const name = m[1].trim();
+    const schedule = (m[2] || m[3] || null);
+    return fin({ action: "schedule", task: slugifyTask(name), description: name, schedule: schedule ? schedule.trim() : null });
+  }
+
+  // pause <task>
+  m = s.match(/^pause\s+(?:the\s+|a\s+|my\s+)?(?:task\s+)?(.+)$/);
+  if (m && (addressed || mentionsTask)) return fin({ action: "pause", task: slugifyTask(m[1]), description: m[1].trim() });
+
+  // revoke <task>   (also "cancel/stop the task")
+  m = s.match(/^(?:revoke|cancel|stop)\s+(?:the\s+|a\s+|my\s+)?(?:task\s+)?(.+)$/);
+  if (m && (addressed || mentionsTask)) return fin({ action: "revoke", task: slugifyTask(m[1]), description: m[1].trim() });
+
+  // grant <task> — an explicit grant for a named task
+  m = s.match(/^(?:grant|approve|allow)\s+(?:the\s+|a\s+|my\s+)?(?:task\s+)?(.+)$/);
+  if (m && (addressed || mentionsTask || formula)) return fin({ action: "grant", task: slugifyTask(m[1]), description: m[1].trim() });
+
+  return null; // not an Izbushka command → let Claude handle it
+}
+
+/* Build the shared hand-off contract and drop it in Izbushka's same-origin inbox. */
+function emitIzbushkaIntent(parsed) {
+  const intent = {
+    v: 1,
+    source: "sotto",
+    action: parsed.action,
+    task: parsed.task || null,
+    description: parsed.description || null,
+    schedule: parsed.schedule || null,
+    formula: parsed.formula || null,     // the spoken ritual, if any; else null (Izbushka will require it)
+    createdAt: new Date().toISOString(),
+    status: "proposed",                  // NEVER "granted"/"executed" — awaits explicit confirmation in Izbushka
+    note: "Prefilled by Sotto. Requires the user's explicit, scoped, expiring confirmation in Izbushka before anything runs. No task executes and no capability is granted from here.",
+  };
+  store.set(IZBUSHKA_INTENT_KEY, JSON.stringify(intent));
+  return intent;
+}
+
+const IZB_ACTION_VERB = {
+  declare: "Declare a task", grant: "Grant consent", schedule: "Schedule a task",
+  pause: "Pause a task", revoke: "Revoke a task", list: "List tasks",
+};
+
+/* Render the hand-off as a transcript card with copy + deep-link (both same-origin). */
+function renderIzbushkaCard(intent) {
+  el.emptyHint.style.display = "none";
+  const li = document.createElement("li");
+  li.className = "turn assistant";
+  const card = document.createElement("div");
+  card.className = "izb-card";
+
+  const h4 = document.createElement("h4");
+  h4.textContent = "◮ Izbushka · request prepared";
+  card.appendChild(h4);
+
+  const consent = document.createElement("p");
+  consent.className = "izb-consent" + (intent.formula ? " granted" : "");
+  consent.textContent = intent.formula
+    ? "Ritual spoken. Izbushka will still ask you to confirm the scope + expiry before the door turns."
+    : "No ritual spoken. This is only a proposal — Izbushka will require your explicit, scoped, expiring consent (“Izbushka, turn your face to me”) before anything runs.";
+  card.appendChild(consent);
+
+  const dl = document.createElement("dl");
+  const row = (k, v, mono) => {
+    if (v == null || v === "") return;
+    const dt = document.createElement("dt"); dt.textContent = k;
+    const dd = document.createElement("dd"); dd.textContent = v; if (mono) dd.className = "izb-code";
+    dl.append(dt, dd);
+  };
+  row("Action", IZB_ACTION_VERB[intent.action] || intent.action);
+  row("Task", intent.task, true);
+  row("Description", intent.description);
+  row("Schedule", intent.schedule, true);
+  row("Formula", intent.formula, true);
+  row("Status", intent.status + " — awaits your confirmation");
+  card.appendChild(dl);
+
+  const actions = document.createElement("div");
+  actions.className = "izb-actions";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "hbtn"; copyBtn.type = "button"; copyBtn.textContent = "Copy request";
+  copyBtn.addEventListener("click", async () => {
+    const json = JSON.stringify(intent, null, 2);
+    try { await navigator.clipboard.writeText(json); copyBtn.textContent = "Copied ✓"; }
+    catch { copyBtn.textContent = "Copy failed"; }
+    setTimeout(() => { copyBtn.textContent = "Copy request"; }, 2000);
+  });
+  actions.appendChild(copyBtn);
+
+  // Same-origin relative deep-link to the sibling Izbushka app (intent also encoded in the hash).
+  const link = document.createElement("a");
+  link.className = "hbtn";
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(intent)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  link.href = "../izbushka/#izbushka-intent=" + b64;
+  link.textContent = "Open Izbushka →";
+  link.setAttribute("rel", "noreferrer");
+  actions.appendChild(link);
+
+  card.appendChild(actions);
+
+  const hint = document.createElement("p");
+  hint.className = "izb-hint";
+  hint.textContent = "Handed off locally via localStorage “izbushka.intent” (same origin, no network). Nothing was sent anywhere.";
+  card.appendChild(hint);
+
+  li.appendChild(card);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "end", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+}
+
+/* An Izbushka command was recognized — hand it off locally; do NOT call Claude. */
+function handleIzbushkaCommand(userText, parsed) {
+  tts.stop();
+  addTurn("user", userText);
+  const intent = emitIzbushkaIntent(parsed);
+  renderIzbushkaCard(intent);
+  const spoken = intent.formula
+    ? "Request prepared for Izbushka. The ritual was spoken, but nothing runs until you confirm the scope and expiry."
+    : "Request prepared for Izbushka. Nothing runs until you confirm it there, with the ritual.";
+  tts.enqueue(spoken);
+  setStatus('Handed a request to <b>Izbushka</b> — it awaits your explicit confirmation there. Nothing was sent anywhere.', null);
+  setTimeout(() => { if (!el.status.dataset.tone) idleStatus(); }, 6000);
+}
+
+/* ---------- push-to-talk ---------- */
+let ptt = false;
+
+function pttStart() {
+  if (ptt || busy) return;
+  if (!getKey()) { openSettings(); return; }
+  if (!stt.available()) {
+    setStatus("Voice input isn’t available here — type below instead (it’s the most private path).", "err");
+    return;
+  }
+  // Opt-in gate: speech recognition streams audio to Google — never capture without explicit consent.
+  if (store.get(LS.VOICE_CONSENT, "0") !== "1") { openVoiceConsent(); return; }
+  ptt = true;
+  tts.stop();                    // barge-in: talking interrupts Sotto
+  setState("listening");
+  setStatus("Listening… release to send.", "live");
+  stt.start({
+    onInterim: (text) => { if (ptt) setStatus(escapeHtml(text) || "Listening… release to send.", "live"); },
+    onFinal: (text) => {
+      setState("idle");
+      if (text) { send(text); }
+      else { setStatus("Didn’t catch that — hold and try again, or type below.", "err"); setTimeout(idleStatus, 3500); }
+    },
+    onError: (msg) => {
+      ptt = false;
+      setState("idle");
+      setStatus(escapeHtml(msg), "err");
+      setTimeout(idleStatus, 5000);
+    },
+  });
+}
+function pttStop() {
+  if (!ptt) return;
+  ptt = false;
+  setStatus("…", null);
+  stt.stop(); // onFinal fires from engine's end event
+}
+
+el.orb.addEventListener("pointerdown", (e) => { e.preventDefault(); el.orb.setPointerCapture(e.pointerId); pttStart(); });
+el.orb.addEventListener("pointerup", () => pttStop());
+el.orb.addEventListener("pointercancel", () => pttStop());
+el.orb.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); pttStart(); } });
+el.orb.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); pttStop(); } });
+
+/* global space-bar hold (when not typing in a field / dialog) */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== " " || e.repeat) return;
+  const a = document.activeElement;
+  const typing = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT" || a.isContentEditable);
+  const dialogOpen = el.dlgSettings.open || el.dlgPrivacy.open || el.dlgVoice.open;
+  if (typing || dialogOpen || a === el.orb) return;
+  e.preventDefault();
+  pttStart();
+});
+document.addEventListener("keyup", (e) => {
+  if (e.key !== " ") return;
+  if (document.activeElement === el.orb) return;
+  pttStop();
+});
+window.addEventListener("blur", () => { pttStop(); }); // never leave the mic hot
+
+/* ============================================================
+   Claude — direct browser → api.anthropic.com, streaming SSE.
+   The ONLY network call in this file.
+   ============================================================ */
+function getKey() {
+  if (KeySeal.isSealed()) return (KeySeal.key() || "").trim();
+  return (store.get(LS.KEY, "") || "").trim();
+}
+function setKey(v) {
+  if (KeySeal.isSealed()) KeySeal.update(v); // re-seal; never write plaintext while locked mode is on
+  else store.set(LS.KEY, v);
+}
+function getModel() { return store.get(LS.MODEL, DEFAULT_MODEL); }
+
+async function send(userText) {
+  if (busy) return;
+
+  // Izbushka voice/text commands are handled entirely locally (no Claude, no network).
+  const izb = parseIzbushkaCommand(userText);
+  if (izb) { handleIzbushkaCommand(userText, izb); return; }
+
+  const key = getKey();
+  if (!key) { openSettings(); return; }
+
+  busy = true;
+  syncStopBtn();
+  tts.stop();
+  addTurn("user", userText);
+  const histMark = history.length; // rollback point: on failure, drop the whole turn
+  history.push({ role: "user", content: userText });
+
+  setState("thinking");
+  setStatus("Thinking…");
+  abortCtl = new AbortController();
+
+  let assistantBubble = null;
+  let spokenUpTo = 0;
+  let fullText = "";
+
+  const onText = (delta) => {
+    if (!assistantBubble) {
+      assistantBubble = addTurn("assistant", "").bubble;
+      assistantBubble.classList.add("streaming");
+      setStatus("");
+    }
+    fullText += delta;
+    assistantBubble.textContent = fullText;
+    assistantBubble.parentElement.scrollIntoView({ block: "end" });
+    // speak completed sentences as they stream in (low perceived latency)
+    let m;
+    const re = /[.!?…]["')\]]?\s/g;
+    re.lastIndex = spokenUpTo;
+    while ((m = re.exec(fullText)) !== null) {
+      tts.enqueue(speakable(fullText.slice(spokenUpTo, m.index + m[0].length)));
+      spokenUpTo = m.index + m[0].length;
+    }
+  };
+
+  try {
+    await runTurn(onText, MAX_TOOL_ROUNDS);
+    // speak the tail
+    if (fullText.slice(spokenUpTo).trim()) tts.enqueue(speakable(fullText.slice(spokenUpTo)));
+    if (assistantBubble) assistantBubble.classList.remove("streaming");
+    if (!fullText.trim() && assistantBubble) assistantBubble.textContent = "(no reply)";
+  } catch (err) {
+    if (assistantBubble) assistantBubble.classList.remove("streaming");
+    // Roll conversation memory back to before this turn so history never ends
+    // with a dangling tool_use (which would invalidate the next request).
+    history.length = histMark;
+    if (err.name === "AbortError") {
+      addSystemNote("Stopped.");
+    } else {
+      const msg = friendlyError(err);
+      setStatus(escapeHtml(msg), "err");
+      addSystemNote(msg);
+    }
+  } finally {
+    busy = false;
+    abortCtl = null;
+    setState(ttsSpeaking ? "speaking" : "idle");
+    syncStopBtn();
+    if (!el.status.dataset.tone) idleStatus();
+  }
+}
+
+/* One assistant turn, following tool_use rounds as needed. */
+async function runTurn(onText, roundsLeft) {
+  const { content, stopReason } = await streamMessage(onText);
+  history.push({ role: "assistant", content });
+
+  if (stopReason === "tool_use" && roundsLeft > 0) {
+    const results = content
+      .filter(b => b.type === "tool_use")
+      .map(b => ({ type: "tool_result", tool_use_id: b.id, content: runTool(b.name, b.input) }));
+    if (results.length) {
+      history.push({ role: "user", content: results });
+      return runTurn(onText, roundsLeft - 1);
+    }
+  }
+  if (stopReason === "refusal") {
+    onText(" I can’t help with that request.");
+  }
+}
+
+/* POST /v1/messages with stream:true and parse the SSE stream. */
+async function streamMessage(onText) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    signal: abortCtl.signal,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": getKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: getModel(),
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT + "\nToday's date is " + new Date().toDateString() + ".",
+      tools: TOOLS,
+      messages: history,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json())?.error?.message || ""; } catch {}
+    const e = new Error(detail || res.statusText);
+    e.status = res.status;
+    e.retryAfter = res.headers.get("retry-after");
+    throw e;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const blocks = [];   // ordered content blocks for the assistant turn
+  let stopReason = null;
+
+  const handleEvent = (ev) => {
+    switch (ev.type) {
+      case "content_block_start":
+        blocks[ev.index] =
+          ev.content_block.type === "tool_use"
+            ? { type: "tool_use", id: ev.content_block.id, name: ev.content_block.name, input: {}, _json: "" }
+            : { type: "text", text: "" };
+        break;
+      case "content_block_delta":
+        if (ev.delta.type === "text_delta") {
+          blocks[ev.index].text += ev.delta.text;
+          onText(ev.delta.text);
+        } else if (ev.delta.type === "input_json_delta") {
+          blocks[ev.index]._json += ev.delta.partial_json;
+        }
+        break;
+      case "content_block_stop": {
+        const b = blocks[ev.index];
+        if (b && b.type === "tool_use") {
+          try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; }
+          delete b._json;
+        }
+        break;
+      }
+      case "message_delta":
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        break;
+      case "error": {
+        const e = new Error(ev.error?.message || "stream error");
+        e.status = ev.error?.type === "overloaded_error" ? 529 : 500;
+        throw e;
+      }
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch { continue; }
+        handleEvent(ev);
+      }
+    }
+  }
+
+  return { content: blocks.filter(Boolean), stopReason };
+}
+
+function friendlyError(err) {
+  if (err.status === 401) return "Anthropic rejected that API key. Check it in Settings (it should start with sk-ant-…).";
+  if (err.status === 403) return "That API key doesn’t have permission for this model. Try another model in Settings.";
+  if (err.status === 404) return "Model not found — it may not be enabled for your account. Pick another model in Settings.";
+  if (err.status === 429) return "Rate limited by Anthropic." + (err.retryAfter ? ` Try again in ~${err.retryAfter}s.` : " Give it a moment and try again.");
+  if (err.status === 400) return "Anthropic rejected the request: " + (err.message || "invalid request.");
+  if (err.status === 529 || err.status >= 500) return "Anthropic’s API is briefly overloaded. Try again in a few seconds.";
+  if (err instanceof TypeError) return "Couldn’t reach api.anthropic.com — check your connection. (Nothing was sent anywhere else.)";
+  return "Something went wrong: " + (err.message || String(err));
+}
+
+/* ============================================================
+   Client-side tools — the things Sotto can actually DO locally
+   ============================================================ */
+function runTool(name, input) {
+  try {
+    if (name === "get_current_time") {
+      const now = new Date();
+      return now.toLocaleString(undefined, {
+        weekday: "long", year: "numeric", month: "long", day: "numeric",
+        hour: "numeric", minute: "2-digit",
+      }) + " (local time)";
+    }
+    if (name === "set_timer") {
+      const secs = Math.max(1, Math.floor(Number(input.seconds) || 0));
+      if (!secs) return "Error: no duration given.";
+      const label = (input.label || "").toString().slice(0, 40) || "timer";
+      const t = {
+        id: "t" + Date.now() + Math.random().toString(36).slice(2, 6),
+        label,
+        endsAt: Date.now() + secs * 1000,
+        fired: false,
+      };
+      timers.push(t);
+      renderTimers();
+      startTimerLoop();
+      return `Timer "${label}" set for ${fmtDur(secs)}; it will chime at ${new Date(t.endsAt).toLocaleTimeString()}.`;
+    }
+    return `Error: unknown tool "${name}".`;
+  } catch (e) {
+    return "Error running tool: " + e.message;
+  }
+}
+
+function fmtDur(totalSecs) {
+  const h = Math.floor(totalSecs / 3600), m = Math.floor((totalSecs % 3600) / 60), s = totalSecs % 60;
+  const parts = [];
+  if (h) parts.push(h + (h === 1 ? " hour" : " hours"));
+  if (m) parts.push(m + (m === 1 ? " minute" : " minutes"));
+  if (s || parts.length === 0) parts.push(s + (s === 1 ? " second" : " seconds"));
+  return parts.join(" ");
+}
+function fmtClock(msLeft) {
+  const t = Math.max(0, Math.ceil(msLeft / 1000));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+}
+
+function startTimerLoop() {
+  if (timerTick) return;
+  timerTick = setInterval(() => {
+    let anyActive = false;
+    for (const t of timers) {
+      if (!t.fired && Date.now() >= t.endsAt) {
+        t.fired = true;
+        chime();
+        addSystemNote(`⏱ Timer done: ${t.label}`);
+        tts.enqueue(`Your ${t.label === "timer" ? "" : t.label + " "}timer is done.`);
+      }
+      if (!t.fired) anyActive = true;
+    }
+    renderTimers();
+    if (!anyActive && timers.every(t => t.fired)) { clearInterval(timerTick); timerTick = null; }
+  }, 250);
+}
+
+function renderTimers() {
+  el.timers.innerHTML = "";
+  for (const t of timers) {
+    const chip = document.createElement("span");
+    chip.className = "timer-chip" + (t.fired ? " done" : "");
+    const count = document.createElement("span");
+    count.className = "t-count";
+    count.textContent = t.fired ? "done" : fmtClock(t.endsAt - Date.now());
+    const label = document.createElement("span");
+    label.className = "t-label";
+    label.textContent = t.label;
+    const x = document.createElement("button");
+    x.className = "t-x";
+    x.setAttribute("aria-label", `Dismiss ${t.label} timer`);
+    x.textContent = "✕";
+    x.onclick = () => { timers = timers.filter(o => o.id !== t.id); renderTimers(); };
+    chip.append(count, label, x);
+    el.timers.appendChild(chip);
+  }
+}
+
+/* small on-device chime via WebAudio */
+function chime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    [523.25, 659.25, 783.99].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, now + i * 0.18);
+      g.gain.linearRampToValueAtTime(0.22, now + i * 0.18 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.9);
+      o.connect(g).connect(ctx.destination);
+      o.start(now + i * 0.18); o.stop(now + i * 0.18 + 1);
+    });
+    setTimeout(() => ctx.close(), 2500);
+  } catch {}
+}
+
+/* ============================================================
+   Composer, chips, controls
+   ============================================================ */
+el.composer.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = el.input.value.trim();
+  if (!text || busy) return;
+  el.input.value = "";
+  send(text);
+});
+
+el.chips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip && !busy) send(chip.textContent.trim());
+});
+
+el.btnStop.addEventListener("click", () => {
+  if (abortCtl) abortCtl.abort();
+  tts.stop();
+  setState("idle");
+  syncStopBtn();
+  idleStatus();
+});
+function syncStopBtn() {
+  el.btnStop.disabled = !busy && !ttsSpeaking && ttsQueue.length === 0;
+}
+setInterval(syncStopBtn, 400);
+
+el.btnMute.addEventListener("click", () => {
+  const muted = !(store.get(LS.MUTE, "0") === "1");
+  store.set(LS.MUTE, muted ? "1" : "0");
+  applyMuteUI();
+  if (muted) tts.stop();
+});
+function applyMuteUI() {
+  const muted = store.get(LS.MUTE, "0") === "1";
+  el.btnMute.setAttribute("aria-pressed", String(muted));
+  el.btnMute.setAttribute("aria-label", muted ? "Unmute spoken replies" : "Mute spoken replies");
+  el.btnMute.title = muted ? "Unmute spoken replies" : "Mute spoken replies";
+  el.spkWaves.style.display = muted ? "none" : "";
+  el.spkSlash.style.display = muted ? "" : "none";
+}
+
+/* ============================================================
+   Dialogs & settings
+   ============================================================ */
+function openSettings() { syncSettingsUI(); el.dlgSettings.showModal(); el.apiKey.focus(); }
+el.btnSettings.addEventListener("click", openSettings);
+el.modelHint.addEventListener("click", openSettings);
+el.btnPrivacy.addEventListener("click", () => el.dlgPrivacy.showModal());
+document.querySelectorAll("dialog [data-close]").forEach(b =>
+  b.addEventListener("click", (e) => e.target.closest("dialog").close()));
+[el.dlgSettings, el.dlgPrivacy, el.dlgVoice].forEach(d =>
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); })); // click backdrop to close
+
+/* ---- voice-input consent (opt-in; speech recognition streams audio to Google) ---- */
+function openVoiceConsent() { syncVoiceConsentUI(); el.dlgVoice.showModal(); }
+function syncVoiceConsentUI() {
+  const on = store.get(LS.VOICE_CONSENT, "0") === "1";
+  if (el.voiceConsentState) {
+    el.voiceConsentState.textContent = on
+      ? "On — while you hold to talk, your microphone audio is streamed to Google’s servers for transcription (not on-device)."
+      : "Off — voice is opt-in. Text and manual entry stay local to this tab.";
+    el.voiceConsentState.className = "voice-consent-state" + (on ? " on" : "");
+  }
+  if (el.btnVoiceConsent) el.btnVoiceConsent.textContent = on ? "Turn voice off" : "Review & enable voice";
+}
+el.btnVoiceEnable && el.btnVoiceEnable.addEventListener("click", () => {
+  store.set(LS.VOICE_CONSENT, "1");
+  el.dlgVoice.close();
+  syncVoiceConsentUI();
+  setStatus('Voice enabled — audio goes to Google while you hold to talk. Hold the orb, or hold <span class="hint-key">space</span>, and release to send.', "live");
+  setTimeout(idleStatus, 4500);
+});
+el.btnVoiceConsent && el.btnVoiceConsent.addEventListener("click", () => {
+  const on = store.get(LS.VOICE_CONSENT, "0") === "1";
+  if (on) { store.set(LS.VOICE_CONSENT, "0"); pttStop(); syncVoiceConsentUI(); idleStatus(); }
+  else { openVoiceConsent(); }
+});
+
+el.apiKey.addEventListener("change", () => { setKey(el.apiKey.value.trim()); idleStatus(); });
+el.apiKey.addEventListener("input", () => { setKey(el.apiKey.value.trim()); });
+
+/* ---- optional key lock (seal at rest) ---- */
+function keyLockMsg(text, isErr) {
+  el.keyLockState.textContent = text;
+  el.keyLockState.style.color = isErr ? "#c0392b" : "";
+}
+function refreshSealLabel() {
+  if (!el.keyLockHelp) return;
+  if (KeySeal.real()) {
+    el.keyLockHelp.innerHTML = 'Locking seals the key with the real <b>XChaCha20-Poly1305 + Argon2id</b> core ' +
+      '(<code>postern-core</code>, wired through <code>postern-sdk</code>) — 64&nbsp;MiB, t=3, memory-hard. ' +
+      'localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means ' +
+      're-entering the key. <b>Without a lock, the key sits readable in this browser’s localStorage</b> — any ' +
+      'code or person with access to this browser profile can read it.';
+  } else {
+    el.keyLockHelp.innerHTML = 'Locking seals the key with <b>AES-256-GCM</b> under a key derived from your passphrase ' +
+      '(<b>PBKDF2-SHA-256, 310,000 it.</b> — a WebCrypto stand-in for the product’s <b>Argon2id</b>, the same construction as Chiave, our sign-in reference). ' +
+      'localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means ' +
+      're-entering the key. <b>Without a lock, the key sits readable in this browser’s localStorage</b> — any ' +
+      'code or person with access to this browser profile can read it. <em>(postern-sdk core not loaded here — honest stand-in.)</em>';
+  }
+}
+function syncKeyLockUI() {
+  const sealed = KeySeal.isSealed(), locked = KeySeal.isLocked();
+  refreshSealLabel();
+  el.apiKey.disabled = locked;
+  el.apiKey.value = locked ? "" : getKey();
+  el.apiKey.placeholder = locked ? "sealed — unlock below" : "sk-ant-…";
+  el.keyPass.style.display = (sealed && !locked) ? "none" : "";
+  el.btnKeyLock.textContent = locked ? "unlock" : sealed ? "remove lock" : "lock key";
+  if (locked) keyLockMsg("Sealed. localStorage holds only " + KeySeal.cipherLabel() + " ciphertext — enter your passphrase to unlock for this session.");
+  else if (sealed) keyLockMsg("Sealed and unlocked for this session. Edits re-seal automatically; the readable key lives only in this tab’s memory.");
+  else keyLockMsg("Not locked — the key sits readable in this browser’s localStorage. Set a passphrase to seal it.");
+}
+el.btnKeyLock.addEventListener("click", async () => {
+  if (KeySeal.isLocked()) {
+    const ok = await KeySeal.unlock(el.keyPass.value);
+    el.keyPass.value = "";
+    if (!ok) { syncKeyLockUI(); keyLockMsg("Wrong passphrase. Decryption is all-or-nothing — nothing was revealed.", true); return; }
+    syncKeyLockUI(); idleStatus();
+    return;
+  }
+  if (KeySeal.isSealed()) { // currently unlocked → remove the lock
+    if (!confirm("Remove the lock? Your API key will again be stored readable (plaintext) in this browser’s localStorage.")) return;
+    KeySeal.removeLock();
+    syncKeyLockUI();
+    return;
+  }
+  const key = el.apiKey.value.trim();
+  if (!key) { keyLockMsg("Add your API key above first — then lock it.", true); return; }
+  if (el.keyPass.value.length < 6) { keyLockMsg("Use at least 6 characters — it protects your key.", true); return; }
+  await KeySeal.lock(el.keyPass.value, key);
+  el.keyPass.value = "";
+  syncKeyLockUI();
+});
+
+el.btnShowKey.addEventListener("click", () => {
+  const isPw = el.apiKey.type === "password";
+  el.apiKey.type = isPw ? "text" : "password";
+  el.btnShowKey.textContent = isPw ? "hide" : "show";
+});
+el.modelSel.addEventListener("change", () => { store.set(LS.MODEL, el.modelSel.value); syncModelHint(); });
+el.voiceSel.addEventListener("change", () => store.set(LS.VOICE, el.voiceSel.value));
+el.rate.addEventListener("input", () => {
+  store.set(LS.RATE, el.rate.value);
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+});
+document.querySelectorAll('input[name="stt"]').forEach(r =>
+  r.addEventListener("change", () => { store.set(LS.STT, r.value); idleStatus(); }));
+
+el.btnErase.addEventListener("click", () => {
+  if (!confirm("Erase your API key, settings, and this conversation from the browser?")) return;
+  Object.values(LS).forEach(store.del); // includes the sealed-key ciphertext
+  KeySeal.forget();
+  history = [];
+  timers = [];
+  tts.stop();
+  if (abortCtl) abortCtl.abort();
+  el.transcript.innerHTML = "";
+  el.emptyHint.style.display = "";
+  renderTimers();
+  syncSettingsUI();
+  syncModelHint();
+  applyMuteUI();
+  applyTheme();
+  el.dlgSettings.close();
+  setState("idle");
+  setStatus("Everything erased. Nothing about you exists anywhere anymore — there was never a server copy.");
+});
+
+function syncSettingsUI() {
+  syncKeyLockUI();
+  el.modelSel.value = getModel();
+  el.rate.value = store.get(LS.RATE, "1");
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+  const sttPref = store.get(LS.STT, "webspeech");
+  el.sttWeb.checked = sttPref === "webspeech";
+  el.sttLocal.checked = sttPref === "ondevice";
+  el.sttLocal.disabled = !OnDeviceWhisperEngine.available();
+  el.sttWeb.disabled = !WebSpeechEngine.available();
+  syncVoiceConsentUI();
+  tts.loadVoices();
+}
+function syncModelHint() { el.modelHint.textContent = MODELS[getModel()] || getModel(); }
+
+/* ---------- theme ---------- */
+el.btnTheme.addEventListener("click", () => {
+  const cur = store.get(LS.THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS.THEME, next);
+  applyTheme();
+});
+function applyTheme() {
+  const t = store.get(LS.THEME, "auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = t;
+  el.btnTheme.textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  el.btnTheme.setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+
+/* ---------- misc ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ============================================================
+   boot
+   ============================================================ */
+applyTheme();
+applyMuteUI();
+syncModelHint();
+tts.loadVoices();
+idleStatus();
+syncStopBtn();
+document.documentElement.dataset.booted = "1"; // init completed without throwing
+</script>
+</body>
+</html>

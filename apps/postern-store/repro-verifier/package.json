@@ -1,0 +1,17 @@
+{
+  "name": "postern-repro-verifier",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "HOST-testable Depot reproducible-build verifier + signed build-record. See docs/store-fdroid/{02-reproducible-builds.md,POC-repro-and-agpl.md}.",
+  "scripts": {
+    "gen-builder-keys": "node scripts/gen-builder-keys.mjs",
+    "two-builder-check": "node scripts/two-builder-check.mjs",
+    "sign-record": "node scripts/sign-record.mjs",
+    "verify-record": "node scripts/verify-record-cli.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,48 @@
+#!/sbin/openrc-run
+# Postern for postmarketOS -- Arti (Rust Tor) SOCKS proxy service.
+#
+# HONESTY / UNBOOTED: this is the community, NON-attestable tier. This file has
+# been syntax-checked (sh -n) but never started on a device. See overlay/README.md.
+#
+# This provides the "in-process Tor via Arti" privacy layer as a transparent,
+# on-device SOCKS entry point on loopback only. Arti is the Rust implementation
+# of the Tor protocols; the Postern node embeds arti-client in-process, and this
+# standalone `arti proxy` gives the app suite and any external tooling the same
+# Tor path without a C tor daemon. Everything it does is user-visible in
+# /etc/postern/arti.toml -- no covert routing, no telemetry.
+
+name="Postern Arti (Tor) proxy"
+description="On-device Tor SOCKS proxy (Arti, Rust) for the Postern app suite"
+
+: "${postern_config:=/etc/postern/arti.toml}"
+: "${postern_statedir:=/var/lib/postern/arti}"
+: "${postern_cachedir:=/var/cache/postern/arti}"
+
+supervisor="supervise-daemon"
+command="/usr/bin/arti"
+# `arti proxy` is the only implemented subcommand; -c points at our config.
+# Arti stays in the foreground by default, which is exactly what
+# supervise-daemon needs.
+command_args="proxy -c ${postern_config}"
+command_user="postern:postern"
+pidfile="/run/postern-tor.pid"
+output_log="/var/log/postern/arti.log"
+error_log="/var/log/postern/arti.log"
+
+depend() {
+	need net
+	after firewall postern-firewall
+	provide postern-tor-proxy
+}
+
+start_pre() {
+	. /usr/libexec/postern/postern-common.sh
+	postern_ensure_user
+	postern_ensure_dir "$postern_statedir"
+	postern_ensure_dir "$postern_cachedir"
+	checkpath -d -m 0750 -o postern:postern /var/log/postern
+	if [ ! -r "$postern_config" ]; then
+		eerror "Missing Arti config: $postern_config"
+		return 1
+	fi
+}

@@ -1,0 +1,271 @@
+# untested-inventory.yml — the built-but-UNTESTED / built-but-UNBOOTED ledger
+# =============================================================================
+# Honesty rail for the four gates (repo-wide, non-negotiable):
+#   G1  built  != designed  — a status/badge flips to "built" only when the code
+#                             COMPILES and its tests PASS.
+#   G2  built  != booted != hardware — compiling is not booting; booting a VM is
+#                             not running on real silicon.
+#   G3  attestation claims need REAL hardware — a "Genuine"/attested verdict is
+#                             a claim only a launched TEE quote can back.
+#   G4  unaudited STAYS unaudited until a third party finishes an audit.
+#
+# This file is the machine-readable companion to scripts/check-trust-labels.sh.
+# The script is the mechanical tripwire on the *labels*; this ledger is the
+# honest inventory of *what those labels are hiding*: things that exist as code
+# but have not crossed the next gate. Source of truth:
+#   docs/design/RESUME-DOSSIER-2026-07-16.md (PMO consolidation of 8 area reports).
+#
+# `stage` vocabulary (each strictly weaker than the next):
+#   designed   — spec/scaffold only; no compiling artifact.
+#   compiles   — builds, no meaningful test evidence yet.
+#   tested     — unit/vector tests PASS on the host (G1 satisfied).  <-- ceiling
+#                for almost everything below; NOTHING here is past this.
+#   booted     — has run as a VM/emulator process (G2 partial).
+#   hardware   — proven on real silicon (G2/G3 satisfied).  <-- NOTHING is here.
+#
+# RULE: do not flip any `stage` upward here (or any badge elsewhere) without
+# fresh, reproducible evidence. "By inspection" is not evidence.
+version: 1
+generated_from: docs/design/RESUME-DOSSIER-2026-07-16.md
+generated_on: 2026-07-16
+
+# --- The one hard invariant the whole tree must respect ----------------------
+global_invariants:
+  - id: nothing-on-hardware
+    statement: >
+      NOTHING in this repository has been validated on real hardware. The SEV-SNP
+      verifier has proven REJECTIONS only against a fixture; no "Genuine" verdict
+      has ever been produced. No OS image has ever booted. No Android tree has
+      ever compiled. Any hardware/attestation claim is therefore GATED (G3).
+  - id: unaudited-everywhere
+    statement: >
+      No product audit is contracted. The base-protocol audit is contracted but
+      NOT performed. The `unaudited` badge stays on every product surface (G4).
+
+# --- Built AND host-tested (G1 satisfied; still G2/G3 GATED) ------------------
+# The only items whose tests actually pass on the host today.
+tested_host_only:
+  - component: postern-seal-companion
+    path: crates/postern-seal-companion
+    stage: tested
+    evidence: 23 unit + 12 vector tests green against the Milan SEV-SNP fixture.
+    caveat: >
+      Only REJECTION paths are proven. The positive/"Genuine" path has NEVER run
+      on real hardware — G3 GATED (needs a launched SEV-SNP VM, e.g. GCP).
+  - component: postern-* crates (core/keys/vault/policy/courier/… )
+    path: crates
+    stage: tested
+    caveat: Re-verify green — dossier graduated these "by inspection"; not re-run here.
+  - component: mobile/core (Rust + UniFFI)
+    path: mobile/core
+    stage: tested
+    caveat: >
+      Engine crypto tests pass; UniFFI bindings exported. NOT attested — a passing
+      on-device test proves the engine RUNS, not that keys are hardware-backed.
+  - component: gate kernels (gate-store)
+    path: apps/noporis-gate
+    stage: tested
+  - component: Porog reconcile kernel + gate-state schema
+    path: apps/porog-crossprofile
+    stage: tested
+    caveat: >
+      Pure decision kernel + golden vectors pass with NO Android in the loop. The
+      Kotlin DPC that APPLIES the directives does not exist yet (see android gated).
+  - component: Terem core + gate (terem.rs ~1005 LoC, terem-gate ~2106 LoC)
+    path: os-portal-v2/terem-core, apps/terem-gate
+    stage: tested
+    caveat: >
+      24/24 tests pass, but ONLY under TCG on macOS — NEVER on Linux/KVM. Guest is
+      the non-attestable tier by construction; Linux/KVM verification is GATED
+      (needs a Linux box with KVM — dossier items 27).
+  - component: signed-CRL pipeline (Bucket C)
+    path: scripts, functions
+    stage: tested
+    caveat: >
+      Code-complete, verified live across all four hops. Publishing GATED on two
+      operator secrets (LICENSE_ADMIN_TOKEN on Pages, ADMIN_TOKEN on Fly) — not set.
+  # --- L2 (Bloch EVM) + data (bloch-data / "Kalinov") standalone crates --------
+  # STANDALONE Cargo workspaces (own empty [workspace]), so they are NOT root
+  # members and `cargo test --workspace` never touched them: built-but-UNTESTED
+  # in the pipeline until the t0:l2-data-offline gate. Every one is SCAFFOLD,
+  # UNAUDITED, not a working L2/backup. Offline vectors PASS on the host (G1);
+  # every live/on-chain/proving/upload path is GATED (G2/G3).
+  - component: bloch-l2-anchor (L2V0 anchor-envelope codec)
+    path: l2/bloch-l2-anchor
+    stage: tested
+    evidence: 33 unit + 7 vector tests green offline (zero deps).
+    caveat: >
+      Wire codec + extraction rules ONLY — off-consensus reader convention, zero
+      consensus change. No sequencer/prover/node/bridge. Fleet-owned source; its
+      CI gate lands with the fleet slice. Live L1 anchoring GATED.
+  - component: bloch-l2-bridge (deposit/withdrawal types + Merkle math)
+    path: l2/bloch-l2-bridge
+    stage: tested
+    evidence: 50 unit + 10 harness-config + 5 vector tests green offline.
+    caveat: >
+      Types + math only; the v1 L1 vault is CUSTODY — nothing here moves value.
+      WBLCH/Uniswap-v2 config is validation-only (no compile, no deploy, no chain).
+      Fleet-owned source. Real bridge / on-chain settlement GATED.
+  - component: bloch-l2-sequencer (ordering / fee logic)
+    path: l2/bloch-l2-sequencer
+    stage: tested
+    evidence: 53 unit + 2 pipeline tests green offline (zero deps).
+    caveat: >
+      Pure two-lane FIFO ordering, batch sealing, EIP-1559 basefee math only. No
+      network, no execution, no signing, no anchoring. Fleet-owned source. Live
+      single-operator sequencing GATED.
+  - component: bloch-l2-evm (revm state-transition scaffold)
+    path: l2/bloch-l2-evm
+    stage: tested
+    evidence: 33 unit tests green offline (unmodified revm @ CANCUN, in-memory state).
+    caveat: >
+      Deposit-mint + vault-fee routing over an in-memory revm state layer only.
+      keccak-MPT state root, eth_* RPC, txpool, Reth-SDK node embedding, SP1 guest
+      target are all honest labelled stubs (t1). NOT a Reth node, NOT a sequencer,
+      NOT a prover. Live eth_* node / real MPT GATED.
+  - component: bloch-l2-prover (SP1-guest RSP-pattern skeleton)
+    path: l2/bloch-l2-prover
+    stage: tested
+    evidence: 43 unit + 3 pipeline tests green offline (MockProver).
+    caveat: >
+      The MockProver proves NOTHING cryptographically — plumbing so the batch
+      pipeline runs end-to-end in tests over a SIMPLIFIED account-map STF (NOT
+      revm, NOT an MPT). Real SP1 program/riscv32im guest / MPT-witness / FRI /
+      vkey pinning are `// SCAFFOLD:`-gated. A real zk proof GATED (needs a prover
+      host / GPU — t1:l2-data-live, UNTESTED-until-infra).
+  - component: bloch-data ("Kalinov" user-backup — DATA0 + manifest + seams)
+    path: data/postern-data
+    stage: tested
+    evidence: >
+      150 tests green in the DEFAULT zero-dep build (133 unit + 17 vector);
+      167 green with `--features live,hash` (adds the real SHAKE-256 KATs +
+      live-client offline unit tests).
+    caveat: >
+      DATA0 anchor codec + PBM0 backup-manifest codec + the untrusted-world
+      seams (StorageBackend, Sealer/Opener, Hasher) ONLY. The DEFAULT build does
+      NOT hash content (SHAKE-256 root is an opaque slot), does NOT run the PQ
+      signer (ML-DSA sig is an opaque slot), does NOT encrypt (in-crate
+      MockSealer has ZERO confidentiality), and has NO network client. Two
+      opt-in, OFF-by-default, UNAUDITED features cross specific slots into real
+      primitives: `hash` = the real SHAKE-256/256 Shake256Hasher + SHA3-256(pk)
+      signer_commit (pulls `sha3`, KAT-tested); `live` = the real Lighthouse
+      LiveBackend network client (zero-dep hand-rolled HTTP/1.1, NEEDS a local
+      TLS-terminating proxy for the HTTPS hosts). Neither makes it a working
+      backup system. Sealing + the ML-DSA/Falcon PQ signer + Storacha/Tor
+      transport remain GATED in a later crate (postern-backup-net) —
+      t1:l2-data-live.
+
+# --- Built as UI/console but backed by stand-ins (NOT a real backend) --------
+stub_backed:
+  - component: Consiglio / Chiave console
+    path: enterprise
+    stage: compiles
+    caveat: >
+      Rich console, 100% localStorage — classic stand-ins, ZERO backend. The whole
+      Enterprise backend (Directory, volume-key broker, audit store) is fake today.
+
+# --- Built/scaffolded but NEVER compiled ------------------------------------
+compiled_never:
+  - component: Android (Porog DPC, NoporIS control-plane, wallet, container)
+    path: android-bridge, android-common, android-container, apps/porog-crossprofile (Kotlin side)
+    stage: designed
+    caveat: >
+      All Kotlin is designed/scaffolded but has NEVER compiled. No Linux+Nix VM
+      exists, no gradlew is committed, no Android container has ever booted.
+      jniLibs/uniffi are PLACE_*_HERE placeholders. DPC/managed-profile (the
+      Container's defining feature) has ZERO code. GATED on the Linux+Nix VM
+      (dossier item 5) + committed gradlew wrappers (item 6).
+
+# --- Built config but NEVER built/booted as an image ------------------------
+image_never_built:
+  - component: Postern OS images (Node, Desktop, Cloud, attested, mobile) — 5 targets
+    path: os
+    stage: designed
+    caveat: >
+      NONE of the 5 images has ever been built. flake.lock is an empty seed; all
+      GO-LIVE §0 blockers open. The FOD-hash -> repo-flake pivot is DECIDED
+      (PACKAGE-FOD-HASHES.md SUPERSEDED) but NOT implemented; 5 bucketA docs still
+      point at the dead path. `.#attested-image` may build green and fail to boot.
+      GATED on the Linux+Nix host + the build-pivot implementation (items 5,7,8).
+  - component: OS-mobile image
+    path: os/mobile.nix, mobile
+    stage: designed
+    caveat: >
+      Root cause found and fixed; build reached ~770/777 derivations then broke on
+      qemu-user. Resumable step is a NATIVE build on the existing aarch64 Graviton
+      (dossier item 26). Never booted.
+  - component: os/sloboda-compat.nix (Waydroid, non-attestable tier)
+    path: os/sloboda-compat.nix
+    stage: designed
+    caveat: Referenced by the tree but authored; first Waydroid boot GATED on a binder VM.
+
+# --- Not durable: exists only in a working tree (LITERAL data-loss risk) -----
+# Not "untested" so much as unsaved — one `git clean`/checkout erases these.
+undurable_worktree_only:
+  - component: Bloch fleet nodes 7-10 + primary re-peering
+    detail: >
+      4 untracked node configs + an unstaged fly.toml edit (external peer
+      45.32.154.137), mid A/B peering test. A `git clean` loses all of it.
+  - component: bp-wt-site multi-bucket diff
+    detail: Large uncommitted diff awaiting a coordinated PM commit.
+  - component: bloch-protocol source.rs + unpushed commit
+    detail: Untracked source.rs + one commit not pushed.
+
+# --- CI honesty coverage: what THIS change closed, and what stays open -------
+ci_trust_label_coverage:
+  closed_by_this_change:
+    - check: scripts/check-trust-labels.sh CRITICAL 4
+      covers:
+        - apps/porog-crossprofile   # Porog Container DPC kernel + schema
+        - android-container         # Porog Container source (design + Kotlin attest)
+        - android-common            # shared Kotlin DPC
+        - android-bridge            # NoporIS control-plane
+        - apps/terem-gate           # Terem gate
+        - os-portal-v2/terem-core   # Terem core
+        - os/terem-compat.nix       # Terem OS integration
+      catches: >
+        An attestation SELF-claim overclaim (measured-boot / Seal-covered /
+        os_roothash / postern-seal / "attestable" workspace / marketing absolutes)
+        on any of the above. Tolerates the TRUE device-key vocabulary (Porog
+        key-attests the phone on real StrongBox/Secure-Enclave hardware) and the
+        "attested"-as-contrast references to the Postern OS host. Was previously
+        UNSCANNED — an overclaim on these surfaces merged clean (dossier item 10).
+    - check: .gitlab-ci.yml t0:l2-data-offline (Rust t0 gate) + t1:l2-data-live (t1)
+      covers:
+        - l2/bloch-l2-evm     # revm state-transition scaffold
+        - l2/bloch-l2-prover  # SP1-guest RSP-pattern skeleton (MockProver)
+        - data/postern-data   # bloch-data "Kalinov" user-backup skeleton
+      catches: >
+        These standalone-workspace crates carry their own [workspace] table, so the
+        root `cargo test --workspace` in build-and-test NEVER ran them — a regression
+        in the off-consensus codecs / mock proving pipeline / backup manifest would
+        have merged with ZERO CI signal. t0:l2-data-offline now runs their offline
+        unit + vector tests as a BLOCKING gate (host-testable Rust that MUST pass).
+        t1:l2-data-live carries the live/hardware path (real SP1 proof, live L1
+        anchoring, eth_* node, Filecoin upload) as `when: manual` on the NON-existent
+        bloch-l2-live runner ⇒ UNTESTED-until-infra, never faked green. G1 satisfied
+        for the offline path; G2/G3 stay GATED for the live path.
+  still_open:
+    - check: l2 anchor/bridge/sequencer CI gate
+      note: >
+        l2/bloch-l2-anchor, l2/bloch-l2-bridge, l2/bloch-l2-sequencer are owned by a
+        concurrent fleet; their offline vectors pass on the host (33+7 / 50+10+5 /
+        53+2 green) but their blocking CI gate lands with the fleet's slice, not this
+        host-only change — kept out of t0:l2-data-offline's lane to avoid a cross-pod
+        collision. Live single-operator sequencing / bridge settlement stay GATED.
+    - check: l2-data live path (real proof / anchoring / upload)
+      note: >
+        t1:l2-data-live can only turn green once a bloch-l2-live runner (prover host /
+        GPU / funded Bloch-L1 endpoint / backup operator secrets) exists AND the real
+        SP1/anchor/eth_*/Filecoin code (prover-service, postern-backup-net) is built.
+        Both are GATED — out of this host-only change's scope. A MockProver proof is
+        not a zk proof; an in-memory revm run is not a live L2.
+    - check: android-bridge CI gate
+      note: >
+        The dossier's item 10 also asks for an android-bridge build/CI gate and
+        t0:/t1: job split. That requires the Linux+Nix VM (item 5) — GATED, out of
+        this host-only change's scope.
+    - check: Google RKP root rotation
+      note: >
+        Root RKP rotated 2026-02; the Key-Attestation verifier does no CRL/revocation
+        yet. Not a label problem — a verifier gap, tracked separately.

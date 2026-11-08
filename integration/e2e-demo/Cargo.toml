@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-phone-signer-e2e — a RUNNABLE end-to-end walkthrough of the whole
+# mobile<->desktop phone-as-signer flow, wired ONLY through the public APIs of
+# the three shipped crates:
+#
+#   * postern-pairing          (Dev1) — the QR/SAS pairing ceremony + the
+#                                        PQ-hybrid (ML-KEM-1024‖X25519) channel.
+#   * postern-signer-protocol  (Dev2) — the desktop-requests / phone-approves
+#                                        SignRequest/Approval protocol + WYSIWYS.
+#   * postern-mobile-signer    (Dev3) — the phone side: MobileSigner orchestrator,
+#                                        the real WalletCore hybrid Falcon‖ML-DSA
+#                                        signer, and the pairing<->protocol bridge.
+#
+# It drives ONE honest round-trip over an in-process loopback transport (no
+# sockets, no network): desktop pairs with the phone, the desktop asks it to
+# sign a wallet-login challenge, the phone renders WYSIWYS + a per-sign presence
+# check and signs, and the desktop verifies the signature with the SAME real
+# hybrid verifier the node / consiglio server runs. Every step prints.
+#
+# RAILS: SCAFFOLD, UNAUDITED — nothing here is built, attested, or deployed. The
+# private key NEVER crosses the wire (structural). Software signing in RAM is NOT
+# a hardware wallet. Local-first, no cloud. The coin (BLCH) is not a security.
+# Community edition is "Postern for postmarketOS — community edition", never
+# "Postern OS". The assurance name is never "BABA YAGA".
+
+[package]
+name = "postern-phone-signer-e2e"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — runnable end-to-end demo of the Postern phone-as-signer flow: QR/SAS pairing + PQ-hybrid channel + desktop-requests-login -> phone-approves-and-signs -> real hybrid-signature verify, over an in-process loopback. Consumes postern-pairing, postern-signer-protocol, and postern-mobile-signer via their public APIs. Not secure, not deployed."
+publish = false
+
+# Detach from the ancestor bloch-protocol virtual workspace (its `members` list
+# is frozen/off-limits): this demo builds and runs on its own.
+[workspace]
+
+[[bin]]
+name = "phone-signer-e2e"
+path = "src/main.rs"
+
+[dependencies]
+# The three shipped crates, consumed ONLY through their public APIs. Each carries
+# its own `[workspace]`, so pointing at them by path does not pull them into this
+# crate's workspace.
+postern-pairing = { path = "../pairing" }
+postern-signer-protocol = { path = "../signer-protocol" }
+postern-mobile-signer = { path = "../../mobile/signer" }
+
+# The REAL hybrid Falcon‖ML-DSA verifier — the exact `crypto::verify` the node /
+# consiglio server runs. Used only to prove the phone's signature is genuine at
+# the end of the round-trip (this is PUBLIC verification, no secret material).
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+hex = "0.4"
+
+# Mirror the repo root + mobile/signer: bloch-crypto's seeded PQ keygen needs the
+# seeded-RNG fork of pqcrypto-internals, and a [patch] only applies from a
+# workspace root, so it must be replicated here.
+[patch.crates-io]
+pqcrypto-internals = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+# Keep Argon2id (pulled transitively by bloch-crypto) optimized so the demo is
+# not unusably slow, matching the root + mobile/signer profile intent.
+[profile.dev.package.argon2]
+opt-level = 3

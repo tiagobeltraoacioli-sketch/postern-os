@@ -1,0 +1,17 @@
+SYNTHETIC TEST FIXTURE — NOT A REAL DOCUMENT, NOT A REAL COMPANY.
+Fabricated "certificate of incorporation" transcript used only to exercise
+the fail-closed free-text field extractor in ocr-engine.test.mjs.
+
+CERTIFICATE OF INCORPORATION
+
+This is to certify that
+
+ACME ROBOTICS SYNTHETIC TESTCASE INCORPORATED
+
+has been duly incorporated under the laws of the jurisdiction below.
+
+United States
+
+Filed with the Secretary of State. Authorized signatory: see attached
+board resolution. This document is a synthetic test fixture and grants
+no real authority to any real party.

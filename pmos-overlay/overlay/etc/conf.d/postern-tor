@@ -1,0 +1,13 @@
+# Configuration for the postern-tor (Arti) OpenRC service.
+# Override any of these here; the init script reads them at start time.
+
+# Path to the Arti TOML config.
+postern_config="/etc/postern/arti.toml"
+
+# State (long-term keys/consensus) and cache (short-lived) directories.
+# Kept 0700 and owned by the postern user by the service's start_pre().
+postern_statedir="/var/lib/postern/arti"
+postern_cachedir="/var/cache/postern/arti"
+
+# Restart the proxy if it dies; back off between rapid restarts.
+supervise_daemon_args="--respawn-delay 5 --respawn-max 0"

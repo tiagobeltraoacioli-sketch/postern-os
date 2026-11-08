@@ -1,0 +1,6 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs; NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "https://directplus.documentation.dnb.com/ (OAuth2 error envelope shape, e.g. invalid_client on bad DNB_CLIENT_ID/DNB_CLIENT_SECRET)",
+  "error": "invalid_client",
+  "error_description": "Client authentication failed"
+}

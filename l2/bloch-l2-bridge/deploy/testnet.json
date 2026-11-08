@@ -1,0 +1,39 @@
+{
+  "network": "bloch-l2-testnet",
+  "chain_id": 700771,
+  "solc_version": "^0.8.24",
+  "predeploys": [
+    {
+      "name": "WBLCH",
+      "address": "0x4200000000000000000000000000000000000006",
+      "source_path": "../../contracts/wblch/WBLCH.sol",
+      "source_keccak256": "0xe8fe5025049f4002a10cd0b2b678733faa752d0a7bdc1cecbaa362dabea21982",
+      "compiler": {
+        "solc_version_exact": "0.8.24",
+        "optimizer_enabled": true,
+        "optimizer_runs": 200,
+        "evm_version": "shanghai",
+        "metadata_bytecode_hash": "none"
+      },
+      "deployed_bytecode_keccak256": "0x6845b4a02d09276da9d5c13495fbf9eb707bf02ee8b7224f9c751cd6b13fcfeb",
+      "notes": "WETH9-style wrapper for the native gas-BLCH, fixed OP-convention predeploy address per BLOCH-L2-EVM-DESIGN.md section 5. Genesis-alloc'd, never deployed by tx. deployed_bytecode_keccak256 is the REAL keccak-256 of the runtime bytecode solc 0.8.24 emits under the pinned settings (metadata bytecodeHash=none, optimizer runs=200, evmVersion=shanghai); the harness test recompiles and asserts it, failing if WBLCH.sol or the compiler pin drifts. UNAUDITED; inert until the published activation gates clear."
+    }
+  ],
+  "uniswap_v2": {
+    "factory": {
+      "name": "UniswapV2Factory",
+      "origin": "unchanged Uniswap v2 mainnet artifact (deploys byte-for-byte; that is the point of the EVM L2)",
+      "ethereum_mainnet_address": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+      "artifact_keccak256": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "placeholder": true
+    },
+    "router02": {
+      "name": "UniswapV2Router02",
+      "origin": "unchanged Uniswap v2 mainnet artifact (deploys byte-for-byte; that is the point of the EVM L2)",
+      "ethereum_mainnet_address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+      "artifact_keccak256": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "placeholder": true
+    }
+  },
+  "honesty": "SCAFFOLD, UNAUDITED, not a working L2. This file DESCRIBES a would-be testnet deploy; nothing reads it to deploy anything. The v1 L1 vault is CUSTODY, full stop - nothing here moves value. chain_id 700771 is a placeholder pending ethereum-lists/chains registration. The WBLCH deployed_bytecode_keccak256 IS a real compiled hash (solc 0.8.24, pinned settings) that the harness test enforces; the Uniswap factory/router artifact hashes remain labelled placeholders (placeholder=true) until those unchanged 0.5.16/0.6.6 mainnet artifacts are vendored and byte-matched - out of scope for the WBLCH compile item. Testnet / zero-value until the POSTERNDEX-BRIDGE-DESIGN section 0 gates clear."
+}

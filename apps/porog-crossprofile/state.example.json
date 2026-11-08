@@ -1,0 +1,39 @@
+{
+  "schema": "postern.porog-gate.state",
+  "version": 1,
+  "tier": "key-attested-device",
+  "lang": "en",
+  "consent": {
+    "accepted": false,
+    "scope": "session",
+    "acceptedAtIso": null,
+    "standing": false
+  },
+  "killSwitch": {
+    "engaged": false,
+    "engagedAtIso": null
+  },
+  "crossings": {
+    "intents": {
+      "direction": "none"
+    },
+    "files": {
+      "direction": "none"
+    },
+    "clipboard": {
+      "direction": "none"
+    },
+    "contacts": {
+      "direction": "none"
+    },
+    "calendar": {
+      "direction": "none"
+    },
+    "connectedApp": {
+      "direction": "none"
+    }
+  },
+  "sealedWallet": {
+    "preserved": true
+  }
+}

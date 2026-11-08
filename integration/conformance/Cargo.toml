@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-signer-conformance — canonical WIRE-FORMAT test vectors for the
+# mobile<->desktop phone-as-signer protocol, plus a build-failing drift guard.
+#
+# The vectors PIN the byte formats an independent implementation (a real mobile
+# app, a real desktop terminal, a hardware signer) must reproduce to interop:
+#
+#   * the pairing QR / PairingInit encodings (Dev1, `postern-pairing`)
+#   * the channel-binding + 6-digit SAS derivation transcript (Dev1)
+#   * the paired-channel frame layout + derived session id (Dev1)
+#   * the SignRequest / Approval / SignPayload JSON encodings (Dev2,
+#     `postern-signer-protocol`)
+#   * the consiglio-compatible wallet-login + transfer signing digests (Dev2)
+#   * the protocol frame codec, the WYSIWYS confirmation fragment, and the
+#     deterministic REFERENCE scaffold signature (Dev2)
+#
+# The checker (`tests/conformance.rs`) RECOMPUTES every vector from the two
+# crates' public APIs and asserts it equals the pinned golden value: if any crate
+# ever changes a wire format, `cargo test` fails here. `src/bin/dump-vectors`
+# prints the whole table (and `--emit` regenerates the pinned tuples).
+#
+# RAILS: SCAFFOLD, UNAUDITED. These vectors pin a REFERENCE (unaudited) protocol,
+# NOT an attested or deployed one. The private key never appears in any vector
+# (only public digests, signatures, and encodings). The deterministic scaffold
+# signature is a REFERENCE stand-in, NOT real cryptography. The coin (BLCH) is not
+# a security. Community edition is "Postern for postmarketOS — community edition",
+# never "Postern OS"; the assurance name is never "BABA YAGA".
+
+[package]
+name = "postern-signer-conformance"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — canonical wire-format conformance vectors for the Postern phone-as-signer protocol (QR/PairingInit encodings, SAS + channel-binding transcript, channel frame layout, SignRequest/Approval/SignPayload JSON, consiglio-compatible signing digests, WYSIWYS fragment, reference scaffold signature) with a build-failing drift guard that recomputes each from the crates. Pins a reference, unaudited protocol; not secure, not deployed."
+publish = false
+
+# Detach from the ancestor bloch-protocol virtual workspace (frozen/off-limits).
+[workspace]
+
+[lib]
+name = "postern_signer_conformance"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dump-vectors"
+path = "src/bin/dump-vectors.rs"
+
+[dependencies]
+# The two protocol crates under test — consumed ONLY through their public APIs.
+# Each carries its own `[workspace]`, so a path dep does not pull them in here.
+postern-pairing = { path = "../pairing" }
+postern-signer-protocol = { path = "../signer-protocol" }
+
+# Fixed-key SAS/channel fixtures need the same zeroizing wrapper the crate uses.
+zeroize = { version = "1", features = ["zeroize_derive"] }
+# SHA-256 to fingerprint the large structural blobs (QR / PairingInit) compactly.
+sha2 = "0.10"
+hex = "0.4"
+# The SAME serializer the protocol crate uses for SignRequest/Approval on the
+# wire, so the pinned JSON is byte-identical to what a real requester emits.
+serde_json = "1"
+
+[dev-dependencies]
+# Recompute the reference scaffold SECRET (SHA3-256) in the drift-guard test that
+# asserts no vector value ever contains it — a belt-and-suspenders on the crate's
+# own structural key-material denylist.
+sha3 = "0.10"

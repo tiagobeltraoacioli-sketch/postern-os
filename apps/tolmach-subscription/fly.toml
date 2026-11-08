@@ -1,0 +1,52 @@
+# Tolmach Subscription proxy — Fly deploy target (operator-owned; NOT deployed
+# by this repo's CI and NOT wired into assemble-public.sh — that stays commented
+# until the operator stands this up). Matches the repo's Fly convention
+# (primary_region = gru; see postern-apk-build.fly.toml).
+#
+# This app is STATEFUL: it holds the subscriber/usage JSON store on a volume.
+# Secrets are injected out-of-band and are NOT in this file:
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-… \
+#                   STRIPE_SECRET_KEY=sk_live_… STRIPE_WEBHOOK_SECRET=whsec_… \
+#                   STRIPE_PRICE_BASIC=price_… STRIPE_PRICE_PRO=price_…
+# Create the volume once before the first deploy:
+#   fly volumes create tolmach_data --region gru --size 1
+#
+# Rename `app` to your own Fly app before `fly deploy`.
+app = "tolmach-subscription-proxy"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8787"
+  DATA_DIR = "/data"
+  # Non-secret config. Set ALLOWED_ORIGIN / PUBLIC_BASE_URL to the real client
+  # origin at deploy (kept as placeholders here so a stray deploy fails closed).
+  ALLOWED_ORIGIN = "https://proxy.invalid"
+  PUBLIC_BASE_URL = "https://proxy.invalid"
+
+[mounts]
+  source = "tolmach_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Stateful billing/quota service: keep at least one machine warm rather than
+  # cold-starting mid-checkout. Operator may relax this once comfortable.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"

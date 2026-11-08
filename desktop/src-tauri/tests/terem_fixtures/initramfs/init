@@ -1,0 +1,20 @@
+#!/bin/busybox sh
+# TEREM POC marker-boot init (PID 1). Standard "QEMU CI smoke test" shape
+# (busybox-static init, per docs/os-portal-v2/POC-SCOPE.md §2.2): mounts the
+# bare minimum pseudo-filesystems, prints one deterministic marker line to
+# the console (captured by QEMU's -serial file:<path>), then powers off.
+# This fixture proves nothing about a real OS install — it only proves the
+# QEMU/QMP lifecycle (create -> start -> query-status -> boot-to-marker ->
+# destroy) the terem.rs integration test drives.
+/bin/busybox mkdir -p /proc /sys /dev
+/bin/busybox mount -t proc proc /proc
+/bin/busybox mount -t sysfs sysfs /sys
+/bin/busybox echo "TEREM-POC-BOOT-OK"
+/bin/busybox sync
+# Stay alive a few seconds so the QMP control plane has a stable window in
+# which query-status observably returns "running" before the guest self-
+# powers-off. Under -accel tcg the whole boot is only a few seconds, so
+# without this the guest can reach poweroff before the test's first QMP
+# round-trip — a genuine fast-boot race, not a control-plane defect.
+/bin/busybox sleep 6
+/bin/busybox poweroff -f

@@ -1,0 +1,37 @@
+{
+  "//": "SPDX-License-Identifier: MIT OR Apache-2.0 — Postern CLOUD (control plane) data-residency options. NOT LEGAL ADVICE. Mirrors enterprise/comms/compliance/residency.config.json for the managed control plane. Residency choice has legal consequences (adequacy, transfer mechanisms) that require legal review — this file only declares the DEPLOYMENT options honestly. See docs/specs/POSTERN-ENTERPRISE.md §9.",
+  "schema": "postern.cloud.residency/1",
+  "appliesTo": "managed control plane + managed nodes it provisions (tenant metadata, node lifecycle records, ops metrics, audit)",
+  "options": [
+    {
+      "id": "eu",
+      "label": "European Union",
+      "regulation": "GDPR (Regulation (EU) 2016/679)",
+      "storesInRegion": ["tenant-store", "node-lifecycle-store", "ops-metrics-store", "audit-store"],
+      "crossBorderTransfer": "None by default. Any transfer of personal data outside the EEA requires an Art. 44-49 mechanism (adequacy decision / SCCs) — legal review required.",
+      "notes": "Recommended default for EU-established tenants / EU-employed data subjects."
+    },
+    {
+      "id": "br",
+      "label": "Brazil",
+      "regulation": "LGPD (Lei nº 13.709/2018)",
+      "storesInRegion": ["tenant-store", "node-lifecycle-store", "ops-metrics-store", "audit-store"],
+      "crossBorderTransfer": "International transfer governed by LGPD Arts. 33-36 (adequacy, SCCs, specific consent) — legal review required.",
+      "notes": "Recommended for BR-established tenants / BR-employed data subjects. ANPD is the supervisory authority."
+    },
+    {
+      "id": "self-hosted",
+      "label": "Self-hosted / on-premises (customer-controlled)",
+      "regulation": "Determined by the customer's own jurisdiction & deployment",
+      "storesInRegion": ["tenant-store", "node-lifecycle-store", "ops-metrics-store", "audit-store"],
+      "crossBorderTransfer": "Entirely under the customer's control; the customer is the controller and its own operator, and sets residency.",
+      "notes": "Postern Labs operates no control plane in this mode and is NOT a processor. The customer holds all stores. Strongest residency guarantee and the more-private path; self-hosting stays free."
+    }
+  ],
+  "rails": [
+    "Residency is a DEPLOYMENT config, not a legal opinion. Choosing 'eu' does not by itself make a deployment GDPR-compliant.",
+    "When Postern Labs runs the managed plane it is a DATA PROCESSOR (tenant = controller); a DPA is required (LGPD Arts. 39-40 / GDPR Art. 28). See COMPLIANCE.md and spec §9.",
+    "Hosted is LESS private than self-hosting; residency affects WHERE tenant metadata and node records physically live, not who operates the plane.",
+    "Cross-border transfer of personal data is a legally gated act — the transfer mechanism must be reviewed by counsel before enabling."
+  ]
+}

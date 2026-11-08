@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-mobile-signer — the MOBILE (phone) side of phone-as-signer v1.
+#
+# This crate is the thin INTEGRATION that wires the phone's real wallet into the
+# frozen interfaces the PMO devs shipped, and exposes the flow to the app layer:
+#
+#   * postern-signer-protocol (Dev2) — the request/approve PROTOCOL: SignRequest /
+#     Approval wire types, the ReplayGuard (fresh nonce + monotonic counter +
+#     session binding), WYSIWYS + the three ConsequenceTiers, ApprovalGrant, and
+#     the `WalletSigner` + `Channel` trait seams. We CONSUME it; we do not
+#     reimplement it. Our `WalletCoreSigner` is the real `WalletSigner` that
+#     replaces its deterministic `ScaffoldSigner`.
+#   * postern-pairing (Dev1) — the mutually-authenticated PQ-hybrid session
+#     `Channel` + `Transport`. Our `bridge` adapts a paired session into the
+#     signer-protocol `Channel` (seal->transport->open) so requests ride the real
+#     encrypted, replay-guarded pipe.
+#   * bloch-mobile `WalletCore` — the signing oracle (hybrid Falcon‖ML-DSA; seed +
+#     secret zeroized on Drop). bloch-crypto decodes a real node transaction for
+#     the transfer WYSIWYS (address_from_hash), with an honest "fee unverifiable
+#     from the bytes" disclosure.
+#
+# RAILS (carried in code, not rounded off): the key/seed NEVER leaves the device —
+# structural (the signer trait yields only public outputs; secret types have no
+# Serialize; nothing here can put a key on the wire). Software keystore, NOT
+# hardware — the PQ key is in RAM at sign time (WalletCore zeroizes on drop);
+# community edition is a pure software keystore. Replay-proof. UNAUDITED scaffold.
+# The mobile image is UNBOOTED — this is a core/binding, NOT a shipped app. The
+# coin is not a security. Community edition is "Postern for postmarketOS —
+# community edition", never "Postern OS".
+#
+# STANDALONE WORKSPACE: the `[workspace]` table below detaches this crate from the
+# root virtual workspace (whose `members` list is frozen and off-limits) so
+# `cargo build` / `cargo test` run in-place. The `[patch.crates-io]` mirrors the
+# repo root so bloch-crypto's seeded PQ keygen (pqcrypto-internals fork) resolves.
+[package]
+name = "postern-mobile-signer"
+version = "0.1.0"
+edition = "2021"
+description = "Mobile (phone) side of Postern phone-as-signer v1: adapts WalletCore to postern-signer-protocol's WalletSigner, bridges postern-pairing's secure channel, decodes real node transactions for WYSIWYS, enforces per-sign user presence + three consequence tiers, and exposes the flow via UniFFI. Key/seed never leaves the device (structural). Software keystore, not hardware. UNAUDITED scaffold; mobile image UNBOOTED."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_mobile_signer"
+# rlib for tests + the folded facade; staticlib/cdylib so the `ffi` surface can be
+# linked into a mobile artifact once the app shells exist (image UNBOOTED).
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[features]
+default = []
+# `ffi` adds the UniFFI (`#[uniffi::export]`) surface WITHOUT its own
+# `setup_scaffolding!()` — the ONE shipped scaffolding is `crates/postern-sdk`.
+# ADAPTER (not wired here, since postern-sdk is out of scope): to ship these
+# bindings, add `postern-mobile-signer = { path = "../../mobile/signer",
+# features = ["ffi"] }` to `crates/postern-sdk/Cargo.toml` and `pub use` the
+# exports from its lib.rs; the facade's single scaffolding then collects them.
+ffi = ["dep:uniffi"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+thiserror = "2"
+zeroize = "1"
+
+# ── The frozen PMO interfaces (consumed via their documented public API) ─────
+# Path deps: each carries its OWN [workspace] and no in-tree path/git deps, so
+# pointing at them here does not drag them into this workspace.
+postern-signer-protocol = { path = "../../integration/signer-protocol" }
+postern-pairing = { path = "../../integration/pairing" }
+
+# ── The signing oracle + the real tx decoder for transfer WYSIWYS ────────────
+bloch-mobile = { path = "../core" }
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+# UniFFI proc-macro surface (feature `ffi`). NO `cli`, NO `setup_scaffolding!()`
+# here — the facade owns the single scaffolding.
+uniffi = { version = "0.28", optional = true }
+
+# Detach from the root virtual workspace (its `members` list is frozen/off-limits).
+[workspace]
+
+# Mirror the repo root: bloch-crypto's PQ keygen needs the seeded-RNG fork of
+# pqcrypto-internals; a [patch] only applies from a workspace root, so replicate it.
+[patch.crates-io]
+pqcrypto-internals = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+# Keep Argon2id (pulled transitively by bloch-crypto) optimized in dev/test so the
+# suite is not unusably slow, matching the root profile intent.
+[profile.dev.package.argon2]
+opt-level = 3

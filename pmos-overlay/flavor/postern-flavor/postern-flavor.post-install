@@ -1,0 +1,50 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# post-install for the postern-flavor package (Postern for postmarketOS).
+# OpenRC-native (pmOS uses OpenRC, NOT systemd).
+#
+# HONESTY / UNBOOTED: community, NON-attestable tier. Syntax-checked (sh -n)
+# only; never run on a device. This is NOT "Postern OS". See ../README.md.
+#
+# Jobs:
+#   1. Recompile the glib schemas so the wallet-first phosh defaults apply
+#      (belt-and-suspenders; Alpine's glib also triggers on the schema dir).
+#   2. Enable the Postern OpenRC services at boot (firewall + Arti Tor proxy).
+#      The node service is NOT enabled: its binary is not shipped by the current
+#      packages (fails fast if started; see ../../overlay/etc/init.d/postern-node).
+#   3. Print the honest tier notice.
+set -e
+
+# 1) Apply the wallet-first phosh app-grid defaults.
+if command -v glib-compile-schemas >/dev/null 2>&1; then
+	glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+fi
+
+# 2) Enable services at boot. Guarded so this is a no-op in a minimal build
+#    chroot with no OpenRC tooling; failures never abort the apk install.
+if command -v rc-update >/dev/null 2>&1; then
+	# Firewall first (default-deny inbound), then the Arti (Tor) SOCKS proxy.
+	rc-update add postern-firewall default 2>/dev/null || true
+	rc-update add postern-tor default 2>/dev/null || true
+fi
+
+# 3) Honest tier notice.
+cat >&2 <<'EOF'
+
+  Postern for postmarketOS flavor (community edition) installed.
+
+  This is Postern SOFTWARE on postmarketOS. It is NOT "Postern OS":
+  no reproducible build, no attestation, no verity-sealed image, no
+  Postern Seal. Wallet keys are stored in software (no hardware keystore).
+
+  Enabled at boot: default-deny firewall + Arti (Tor) SOCKS proxy on
+  127.0.0.1:9150. Every knob is a readable file under /etc/postern.
+  Full notice: /usr/share/postern/first-run/about-tier.txt
+
+  Start them now with:
+    rc-service postern-firewall start
+    rc-service postern-tor start        # needs the `arti` package present
+
+EOF
+
+exit 0

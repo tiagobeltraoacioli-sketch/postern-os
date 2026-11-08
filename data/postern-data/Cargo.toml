@@ -1,0 +1,74 @@
+# bloch-data — Postern user-backup scaffold: DATA0 anchor + manifest + seams (SCAFFOLD).
+#
+# HONESTY (non-negotiable, mirrored in the crate docs and README):
+#   * SCAFFOLD, UNAUDITED, NOT A WORKING BACKUP SYSTEM. This crate is the
+#     offline, trust-bearing skeleton of the Postern → Filecoin user-backup
+#     path from docs/specs/POSTERN-DATA-FILECOIN-DESIGN.md: the DATA0 anchor
+#     envelope codec, the PBM0 backup-manifest codec, and the two seams
+#     (StorageBackend, Sealer/Opener) where the untrusted world begins.
+#     designed != built != booted. Nothing here uploads, seals, hashes, or
+#     signs anything for real.
+#   * ZERO dependencies, ZERO network, ZERO live crypto. This crate does NOT
+#     hash content (the SHAKE-256 manifest root is an opaque [u8;32] *slot*),
+#     does NOT run the PQ signer (the ML-DSA signature is an opaque Vec<u8>
+#     *slot*), and does NOT encrypt (the Sealer/Opener traits are seams that
+#     real postern-core plugs into; the in-crate MockSealer is a test fixture
+#     with ZERO confidentiality). Real hashing/signing/sealing and the live
+#     Storacha/Lighthouse client live in a separate, later crate
+#     (postern-backup-net) — structurally out of this crate's honesty scope.
+#   * ZERO consensus change. The DATA0 envelope is an OFF-consensus reader
+#     convention riding the script_pubkey of an ordinary zero-value Bloch
+#     TxOutput (the L2V0/TKV0 idiom). Bloch nodes never parse it; a malformed
+#     envelope is a layer no-op and NEVER invalidates the carrying tx.
+#   * Bloch stays ownerless. Anchoring is permissionless — any fee-payer can
+#     write DATA0 bytes, so a decoded envelope is only a *claim* until a
+#     reader recomputes the manifest root and verifies the PQ signature.
+#
+# Standalone-workspace pattern (same as l2/bloch-l2-anchor and
+# crates/bloch-tokens): its own empty [workspace] table so it builds and
+# tests offline with ZERO dependencies, outside any frozen root members list.
+[package]
+name = "bloch-data"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "SCAFFOLD — unaudited, not a working backup system. Offline, zero-dep skeleton for the Postern → Filecoin user-backup path: the DATA0 zero-value Bloch anchor codec, the PBM0 backup-manifest codec, and the StorageBackend / Sealer-Opener seams (real hashing, signing, sealing, and the live provider client are out of scope)."
+
+# Deliberately empty: this crate is its own workspace root (re-homeable,
+# offline-buildable, zero deps).
+[workspace]
+
+[features]
+# Default build stays exactly as before: ZERO dependencies, ZERO network,
+# offline, and network-INCAPABLE (the ~150 offline tests run under this, all
+# on the MockHasher test double — see `src/hash.rs`).
+default = []
+# `hash` compiles the REAL post-quantum integrity primitive —
+# `hash::Shake256Hasher`, a `Hasher` adapter over the `sha3` crate's
+# `SHAKE-256/256` XOF (domain-tagged, squeezed to 32 bytes), with
+# `signer_commit` overridden to the real `SHA3-256(pk)`. It is the concrete
+# instance of the seam that `src/hash.rs` documents living in the later
+# `postern-backup-net` wiring crate; gating it here keeps the DEFAULT build
+# zero-dep and network-incapable while making the genuine primitive available
+# and KAT-tested (`tests/hash_kat.rs`) behind an explicit opt-in. This is the
+# ONLY feature that pulls a cryptographic dependency (`sha3`). Enabling it does
+# NOT make the crate a working backup system — sealing, the PQ signer, and the
+# live provider client remain out of this crate's scope. UNAUDITED.
+hash = ["dep:sha3"]
+# `live` compiles the real hosted-provider client — `backend::LiveBackend`
+# (Lighthouse). It is OFF by default so the honesty gate (no network client in
+# the default build) is preserved. It adds NO external dependencies: the HTTP/1.1
+# client is hand-rolled over `std::net::TcpStream`, keeping the crate zero-dep
+# even when live. See `src/live.rs`. TLS is not linked in-crate; reaching the
+# real HTTPS Lighthouse endpoints requires a local TLS-terminating proxy (the
+# same local-egress model the spec's Tor SOCKS rail already assumes) — see the
+# `live` module docs and README.
+live = []
+
+[dependencies]
+# OPTIONAL, off by default — pulled in ONLY by the `hash` feature so the
+# default build stays zero-dep. Provides the real `SHAKE-256/256` XOF and
+# `SHA3-256` used by `hash::Shake256Hasher`. Pinned to the same 0.10 line the
+# rest of the workspace uses (RustCrypto `sha3`).
+sha3 = { version = "0.10", optional = true }

@@ -1,0 +1,21 @@
+# Cloudflare Pages config for the posternlabs.com static site.
+#
+# Binds the KV namespaces used by the Pages Functions:
+#   - DL_COUNTS  → functions/dl/[[path]].js (privacy-preserving download counter)
+#   - LICENSES   → functions/license/master.js (business master-license generator;
+#                  stores only DUNS + issue/expiry to honor + dedupe — no PII)
+# The vendor license-signing key is a SECRET (VENDOR_PRIV_PKCS8_B64), set via
+#   wrangler pages secret put VENDOR_PRIV_PKCS8_B64 --project-name posternlabs
+# The static tree is assembled by ./assemble-public.sh into ./public;
+# deploy with:  wrangler pages deploy --branch main
+name = "posternlabs"
+pages_build_output_dir = "public"
+compatibility_date = "2024-11-01"
+
+[[kv_namespaces]]
+binding = "DL_COUNTS"
+id = "aa64a681a7624692969186d0a75eee46"
+
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "ce9372c124b84ddc9eb26ce1172bc126"

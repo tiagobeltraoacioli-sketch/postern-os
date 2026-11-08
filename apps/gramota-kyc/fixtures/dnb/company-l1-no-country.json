@@ -1,0 +1,11 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs (companyinfo_L1_v1 Data Block); NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "https://directplus.documentation.dnb.com/openAPI.html?apiID=companyinfo — edge case: primaryAddress present but addressCountry absent (must map country -> \"\", never throw).",
+  "organization": {
+    "duns": "111222333",
+    "primaryName": "Borderless Trading Co",
+    "primaryAddress": {
+      "addressRegion": { "name": "Unknown" }
+    }
+  }
+}

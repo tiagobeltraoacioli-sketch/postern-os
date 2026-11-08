@@ -1,0 +1,1972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src data:; connect-src https://api.anthropic.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Consiglio — enterprise admin console · Postern Labs</title>
+<style>
+/* ============================================================
+   CONSIGLIO · Postern Labs
+   "consiglio" — the council. The enterprise admin console:
+   corporate identity, dual-control escrow (a quorum, not a
+   super-admin), RBAC+ABAC, Brewer–Nash Chinese Walls, the
+   provision/offboard ceremonies, the tamper-evident audit
+   chain, and the employee transparency panel.
+   Graphite/ink instrument panel + one cobalt accent.
+   (Sotto wears brass, Vedetta steel blue, Tolmach verdigris,
+   the Store amethyst, Chiave iris, Sarto madder; Consiglio
+   wears cobalt.)
+   Reference prototype — unaudited, pre-production. Dual-control
+   escrow, RBAC+ABAC and the tamper-evident audit chain shown
+   here are unaudited, pre-production controls, not certified
+   safeguards.
+   NOT LEGAL ADVICE — this console demonstrates controls that
+   ENABLE compliance work; compliance itself needs a DPO +
+   counsel. The UI repeats this, on purpose.
+   Only possible network call: the user's OWN Claude request to
+   api.anthropic.com (optional policy assistant). Everything
+   else is fully local.
+   ============================================================ */
+
+/* ============================================================
+   SHARED TOKEN CONTRACT — postern-enterprise design system
+   index.html and console.html define the IDENTICAL token set
+   (same names, same values). If you change one file, mirror
+   the other.
+   Neutral ramp (graphite/ink):
+     --bg --bg-glow --surface --surface-2 --surface-3
+     --border --border-hi --text --text-dim --muted
+   Cobalt accent set (Consiglio wears cobalt):
+     --acc --acc-hi --acc-dim --acc-ink
+     dark: #5f87d6 / #7ea2e6 / #44619e / #0d1322
+     light: #35569e / #2a4680 / #6c83b8 / #f6f8ff
+   Status: --ok --warn --err   Chrome: --shadow --radius
+   Fonts: --font-ui --font-mono
+   Theming: dark is the :root default; light overrides live in
+   :root[data-theme="light"] and, when no data-theme is set, in
+   @media (prefers-color-scheme: light) :root:not([data-theme]).
+   ============================================================ */
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #0d1014;
+  --bg-glow:   #10141d;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e9ee;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --acc:       #5f87d6;   /* cobalt — Consiglio's own accent */
+  --acc-hi:    #7ea2e6;
+  --acc-dim:   #44619e;
+  --acc-ink:   #0d1322;
+
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+
+:root[data-theme="light"] {
+  --bg:        #eff0f4;
+  --bg-glow:   #f4f6fa;
+  --surface:   #fbfbfd;
+  --surface-2: #eaecf2;
+  --surface-3: #dfe3ec;
+  --border:    #d0d5e0;
+  --border-hi: #b5bccd;
+  --text:      #22242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --acc:       #35569e;
+  --acc-hi:    #2a4680;
+  --acc-dim:   #6c83b8;
+  --acc-ink:   #f6f8ff;
+
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(44,54,80,.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#eff0f4; --bg-glow:#f4f6fa; --surface:#fbfbfd; --surface-2:#eaecf2;
+    --surface-3:#dfe3ec; --border:#d0d5e0; --border-hi:#b5bccd;
+    --text:#22242b; --text-dim:#4f555e; --muted:#767d87;
+    --acc:#35569e; --acc-hi:#2a4680; --acc-dim:#6c83b8; --acc-ink:#f6f8ff;
+    --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(44,54,80,.14);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--acc); color: var(--acc-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.wordmark {
+  font-family: var(--font-mono); font-size: 17px; font-weight: 700;
+  letter-spacing: .3em; text-indent: .3em; color: var(--text); user-select: none;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+  border-left: 1px solid var(--border); padding-left: 12px; margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border); border-radius: 9px;
+  padding: 6px 12px; font-family: var(--font-mono); font-size: 11.5px;
+  letter-spacing: .06em; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+
+/* ---------- the PERMANENT not-legal-advice strip ---------- */
+.legal-strip {
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+  font-size: 12.5px; color: var(--text-dim); line-height: 1.5;
+}
+.legal-strip .wrap { padding-top: 8px; padding-bottom: 8px; }
+.legal-strip strong { color: var(--warn); }
+
+/* ---------- tabs ---------- */
+nav.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 6px; }
+nav.tabs button {
+  background: transparent; border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 15px; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .06em; color: var(--text-dim);
+}
+nav.tabs button[aria-selected="true"] {
+  background: var(--acc); border-color: var(--acc); color: var(--acc-ink); font-weight: 700;
+}
+nav.tabs button:hover:not([aria-selected="true"]) { border-color: var(--border-hi); color: var(--text); }
+
+/* ---------- cards ---------- */
+.view { margin: 16px 0 40px; }
+.card {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px 22px; margin-bottom: 16px;
+}
+.card h2 {
+  margin: 0 0 12px; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc); font-weight: 700;
+}
+.card p.lead { margin: 0 0 14px; font-size: 14.5px; color: var(--text-dim); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+@media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+
+.field { margin-bottom: 14px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field input[type="password"], .field input[type="text"], .field textarea, .field select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 9px 12px; color: var(--text);
+}
+.field textarea { font-family: var(--font-mono); font-size: 13px; min-height: 70px; resize: vertical; }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--acc); outline: none; }
+
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 9px 17px; font-size: 14px; font-weight: 600;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-acc:disabled { opacity: .45; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 10px; padding: 9px 15px; font-size: 14px;
+}
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text); }
+.btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 8px 15px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+button.linkish {
+  background: none; border: none; padding: 0; color: var(--muted);
+  text-decoration: underline; text-underline-offset: 3px; font-size: 12.5px;
+}
+button.linkish:hover { color: var(--text-dim); }
+.err-line { color: var(--err); font-size: 13px; min-height: 1.4em; margin-top: 8px; }
+.ok-line { color: var(--ok); font-size: 13px; min-height: 1.4em; margin-top: 8px; }
+
+.warnbox {
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+  border-radius: 10px; padding: 12px 14px; margin: 12px 0;
+  font-size: 13.5px; line-height: 1.55;
+}
+.warnbox strong { color: var(--warn); }
+.legalflag {
+  display: inline-block; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .1em; padding: 2px 7px; border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--warn) 60%, var(--border));
+  color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent);
+  vertical-align: 1px;
+}
+.standin {
+  border: 1px dashed var(--border-hi); border-radius: 10px; padding: 9px 12px;
+  margin-top: 14px; font-family: var(--font-mono); font-size: 11px; line-height: 1.6;
+  color: var(--muted);
+}
+.standin b { color: var(--acc); font-weight: 600; }
+
+/* mono chips + status pills */
+.mono { font-family: var(--font-mono); }
+.fpr { font-family: var(--font-mono); color: var(--acc); overflow-wrap: anywhere; }
+.pill {
+  display: inline-block; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .08em; text-transform: uppercase; padding: 2px 9px;
+  border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+}
+.pill.ok    { border-color: color-mix(in srgb, var(--ok) 60%, var(--border));  color: var(--ok); }
+.pill.warn  { border-color: color-mix(in srgb, var(--warn) 60%, var(--border)); color: var(--warn); }
+.pill.err   { border-color: color-mix(in srgb, var(--err) 60%, var(--border));  color: var(--err); }
+.pill.acc   { border-color: color-mix(in srgb, var(--acc) 60%, var(--border));  color: var(--acc); }
+
+/* tables */
+.tblwrap { overflow-x: auto; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+table.grid th, table.grid td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+table.grid th {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); background: var(--surface-2);
+}
+table.grid td .rowbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+table.grid td button { font-size: 12px; padding: 4px 10px; }
+
+/* org tree */
+.orgtree { margin: 6px 0; }
+.dept { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.dept > .dept-name {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-dim); background: var(--surface-2);
+  padding: 6px 12px;
+}
+.dept ul { list-style: none; margin: 0; padding: 6px 12px; }
+.dept li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: 13.5px; flex-wrap: wrap; }
+.dept li .u-role { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+
+/* wall / volume grid */
+.volgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px; margin: 10px 0; }
+.vol {
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px;
+  background: var(--surface-2); font-size: 13px;
+}
+.vol .v-name { font-weight: 600; }
+.vol .v-meta { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); margin: 3px 0 8px; }
+.vol[data-st="open"]    { border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); }
+.vol[data-st="walled"]  { border-color: color-mix(in srgb, var(--err) 55%, var(--border)); }
+.vol[data-st="rbac"]    { opacity: .75; }
+.vol[data-st="bound"]   { border-color: color-mix(in srgb, var(--acc) 60%, var(--border)); }
+
+/* audit log */
+.audit { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; }
+.audit .a-row { border-bottom: 1px solid var(--border); padding: 7px 2px; display: grid; grid-template-columns: 34px 1fr; gap: 10px; }
+.audit .a-row:last-child { border-bottom: 0; }
+.audit .a-seq { color: var(--muted); text-align: right; }
+.audit .a-act { color: var(--acc); }
+.audit .a-hash { color: var(--muted); overflow-wrap: anywhere; }
+.audit .a-detail { color: var(--text-dim); overflow-wrap: anywhere; }
+
+/* ceremony steps */
+.steps { list-style: none; margin: 10px 0; padding: 0; }
+.steps li {
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px;
+  margin-bottom: 8px; font-size: 13.5px; display: grid; grid-template-columns: 26px 1fr; gap: 10px;
+}
+.steps li .s-mark { font-family: var(--font-mono); color: var(--muted); }
+.steps li[data-st="done"] { border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+.steps li[data-st="done"] .s-mark { color: var(--ok); }
+.steps li[data-st="active"] { border-color: color-mix(in srgb, var(--acc) 55%, var(--border)); }
+.steps li[data-st="active"] .s-mark { color: var(--acc); }
+.steps li h3 { margin: 0 0 3px; font-size: 13.5px; }
+.steps li p { margin: 0 0 6px; color: var(--text-dim); font-size: 12.8px; }
+
+/* transparency panel */
+.tp-panel {
+  border: 1.5px solid color-mix(in srgb, var(--acc) 55%, var(--border));
+  border-radius: var(--radius); background: var(--surface); padding: 18px 20px; margin: 10px 0;
+}
+.tp-panel[data-sig="bad"] { border-color: var(--err); }
+.tp-badge {
+  display: inline-block; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .12em; text-transform: uppercase; background: var(--acc);
+  color: var(--acc-ink); border-radius: 6px; padding: 3px 9px; font-weight: 700;
+}
+.tp-panel[data-sig="bad"] .tp-badge { background: var(--err); color: #fff; }
+.tp-panel h3 { margin: 12px 0 5px; font-size: 14px; }
+.tp-panel ul { margin: 4px 0 10px; padding-left: 0; list-style: none; }
+.tp-panel li { display: flex; gap: 9px; font-size: 13.3px; padding: 3px 0; color: var(--text-dim); }
+.tp-panel li .lm { flex: none; }
+.tp-panel li.good .lm { color: var(--ok); }
+.tp-panel li.bad .lm { color: var(--err); }
+.kv { margin: 8px 0 0; font-size: 13px; }
+.kv dt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: 9px; }
+.kv dd { margin: 3px 0 0; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+
+/* assistant */
+.chatout {
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  padding: 12px 14px; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere;
+  min-height: 40px; max-height: 320px; overflow-y: auto;
+}
+
+/* dialogs */
+dialog {
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  color: var(--text); padding: 0; width: min(640px, calc(100vw - 36px));
+  max-height: min(86vh, 780px); box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(6,8,10,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px; padding: 16px 20px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0;
+  background: var(--surface); z-index: 2; border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--acc); font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+.pv-note { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 12px 0 16px; }
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; color: var(--ok); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--acc); }
+table.standins { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 10px 0 6px; }
+table.standins th, table.standins td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+table.standins th { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+
+footer.site {
+  padding: 8px 0 26px; text-align: center; font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase;
+}
+.foot-lock { color: var(--acc); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body data-state="boot">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Consiglio">C<span class="tick">·</span>ONSIGLIO</div>
+    <div class="byline">Postern Labs · enterprise admin console</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnHonesty">How it works</button>
+      <a class="hbtn" href="./console.html" style="text-decoration:none" title="App/feature policy, licensing &amp; sub-access">Policy &amp; licensing</a>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<!-- PERMANENT not-legal-advice strip: rendered on every view, admin and employee
+     alike. There is no code path that hides it — that is the design. -->
+<div class="legal-strip" role="note" aria-label="Not legal advice">
+  <div class="wrap"><strong>Reference prototype — unaudited, pre-production.</strong>
+  <strong>NOT LEGAL ADVICE.</strong> This console demonstrates technical controls that
+  <em>enable</em> LGPD / GDPR / CCPA compliance work. It does not and cannot make an organization
+  compliant: lawful bases, retention periods, DPIAs, transfer mechanisms and breach duties are
+  decisions for a qualified <strong>DPO / Encarregado and legal counsel</strong>. Every such point below is
+  flagged <span class="legalflag">LEGAL: DPO/counsel</span>. The dual-control escrow, RBAC+ABAC and
+  tamper-evident audit chain below are unaudited, pre-production controls.</div>
+</div>
+
+<main class="wrap">
+
+  <!-- ================= BOOTSTRAP ================= -->
+  <section class="view" id="viewBootstrap" hidden>
+    <div class="card">
+      <h2>Found the council — org bootstrap</h2>
+      <p class="lead">Corporate Postern has <strong>no single silent super-admin, by refusal</strong>. Powers that
+      touch people's data — escrow release, offboarding handover — require an <strong>M-of-N governance
+      quorum</strong> (here: 2 of 3) plus a tamper-evident audit entry. You are creating the
+      <strong>admin-of-record</strong> (named, fingerprinted, shown to every employee) and three
+      <strong>officers</strong> whose keys jointly guard the escrow.</p>
+      <div class="grid2">
+        <div class="field"><label for="bsOrg">Organization name</label><input type="text" id="bsOrg" placeholder="Acme Ltda."></div>
+        <div class="field"><label for="bsAdmin">Admin-of-record (your name, as employees will see it)</label><input type="text" id="bsAdmin" placeholder="Dana Reyes, IT"></div>
+      </div>
+      <div class="field"><label for="bsPass">Admin console passphrase (min 8 chars — seals the admin signing key on this machine)</label><input type="password" id="bsPass" autocomplete="new-password"></div>
+      <div class="grid2">
+        <div class="field"><label for="bsOff1">Officer 1 — IT admin (name)</label><input type="text" id="bsOff1" placeholder="Officer name"></div>
+        <div class="field"><label for="bsOff1p">Officer 1 passphrase</label><input type="password" id="bsOff1p" autocomplete="new-password"></div>
+        <div class="field"><label for="bsOff2">Officer 2 — compliance / DPO <span class="legalflag">LEGAL: DPO/counsel</span></label><input type="text" id="bsOff2" placeholder="Officer name"></div>
+        <div class="field"><label for="bsOff2p">Officer 2 passphrase</label><input type="password" id="bsOff2p" autocomplete="new-password"></div>
+        <div class="field"><label for="bsOff3">Officer 3 — executive (name)</label><input type="text" id="bsOff3" placeholder="Officer name"></div>
+        <div class="field"><label for="bsOff3p">Officer 3 passphrase</label><input type="password" id="bsOff3p" autocomplete="new-password"></div>
+      </div>
+      <p class="fhelp">Appointing a DPO/Encarregado is a legal act, not a software feature — the role here just
+      gives that person real technical teeth (quorum share, audit custody).
+      Each officer key is sealed under that officer's own passphrase; in the product each officer's key
+      lives in that officer's own device TEE.</p>
+      <p class="err-line" id="bsErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnBootstrap">Create org &amp; quorum</button>
+        <button class="btn-ghost" id="btnSample">Load a sample org instead (demo data)</button>
+      </div>
+      <p class="standin">Officer &amp; admin keys: <b>Ed25519 / P-256 via WebCrypto</b> — classical stand-ins for
+      <b>Falcon-1024 ‖ ML-DSA-65 in each person's device TEE</b>. Keyfiles are sealed with the REAL
+      <b>Argon2id (64&nbsp;MiB, t=3) + XChaCha20-Poly1305</b> from <b>postern-sdk</b> when this page runs inside a
+      Postern host shell (globalThis.PosternSDK); in a plain browser tab (this page's strict CSP forbids fetching
+      wasm) it falls back to the honestly-labeled classical stand-in — AES-256-GCM under PBKDF2 (310k it.).
+      Design of record: <b>docs/specs/POSTERN-ENTERPRISE.md</b>.</p>
+    </div>
+  </section>
+
+  <!-- ================= LOCKED ================= -->
+  <section class="view" id="viewLocked" hidden>
+    <div class="card">
+      <h2>Unlock the admin console</h2>
+      <p class="lead" id="lockLead"></p>
+      <form id="unlockForm">
+        <div class="field">
+          <label for="unlockPass">Admin console passphrase</label>
+          <input type="password" id="unlockPass" autocomplete="current-password">
+        </div>
+        <p class="err-line" id="unlockErr" aria-live="assertive"></p>
+        <div class="btnrow"><button type="submit" class="btn-acc">Unlock</button></div>
+      </form>
+      <div style="margin-top:14px">
+        <button class="linkish" id="btnEraseLocked">erase this demo org from the browser</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CONSOLE ================= -->
+  <section class="view" id="viewConsole" hidden>
+    <nav class="tabs" role="tablist" aria-label="Console sections">
+      <button role="tab" data-tab="org"  aria-selected="true">Organization</button>
+      <button role="tab" data-tab="wall" aria-selected="false">Chinese Walls</button>
+      <button role="tab" data-tab="life" aria-selected="false">Offboarding</button>
+      <button role="tab" data-tab="audit" aria-selected="false">Audit chain</button>
+      <button role="tab" data-tab="tp"   aria-selected="false">Transparency (employee view)</button>
+      <button role="tab" data-tab="set"  aria-selected="false">Settings &amp; assistant</button>
+    </nav>
+
+    <!-- ---- TAB: organization ---- -->
+    <div class="tabpane" id="tab-org">
+      <div class="card">
+        <h2>Org &amp; governance</h2>
+        <div id="orgSummary"></div>
+      </div>
+      <div class="card">
+        <h2>Provision a user — enrollment ceremony</h2>
+        <p class="lead">Creates the directory entry, an <strong>enrollment certificate</strong> signed by the org
+        (binding the user's device key — generated in the employee's device TEE in the product), the
+        <strong>escrow record</strong> (recovery key split 2-of-3 to the officers with real Shamir shares,
+        whole key destroyed), and the role's machine profile. Every step lands in the audit chain.</p>
+        <div class="grid2">
+          <div class="field"><label for="pvName">Full name</label><input type="text" id="pvName" placeholder="Ana Souza"></div>
+          <div class="field"><label for="pvDept">Department</label><input type="text" id="pvDept" list="deptList" placeholder="Engineering"><datalist id="deptList"></datalist></div>
+          <div class="field"><label for="pvRole">Role (RBAC — the machine profile)</label><select id="pvRole"></select></div>
+          <div class="field"><label for="pvClear">Clearance (ABAC attribute)</label>
+            <select id="pvClear"><option value="1">1 — general</option><option value="2">2 — sensitive</option><option value="3">3 — restricted</option></select></div>
+          <div class="field"><label for="pvRegion">Region (ABAC attribute — data residency tag)</label>
+            <select id="pvRegion"><option>BR</option><option>EU</option><option>US</option></select></div>
+          <div class="field"><label for="pvProject">Project (ABAC attribute, optional)</label><input type="text" id="pvProject" placeholder="atlas"></div>
+        </div>
+        <p class="err-line" id="pvErr" aria-live="polite"></p>
+        <div class="btnrow"><button class="btn-acc" id="btnProvision">Run enrollment ceremony</button></div>
+        <div id="pvResult"></div>
+      </div>
+      <div class="card">
+        <h2>Directory — people &amp; org tree</h2>
+        <div class="orgtree" id="orgTree"></div>
+        <div class="tblwrap" id="userTable"></div>
+      </div>
+      <div class="card">
+        <h2>Role catalog — RBAC + per-role machine profiles</h2>
+        <p class="lead">A role bundles entitlements: apps installed, volume families mountable, network egress
+        classes. On Postern OS a machine profile is a declarative NixOS expression selected by role —
+        reprovisioning is a rebuild, not hand-configured drift. Note <span class="mono">it-admin</span>
+        has <strong>no data-volume entitlements</strong>: admin ≠ access.</p>
+        <div class="tblwrap" id="roleTable"></div>
+      </div>
+    </div>
+
+    <!-- ---- TAB: walls ---- -->
+    <div class="tabpane" id="tab-wall" hidden>
+      <div class="card">
+        <h2>Conflict-of-interest classes (Brewer–Nash)</h2>
+        <p class="lead">Datasets live in <strong>per-project encrypted volumes</strong>; volumes belong to
+        <strong>dataset groups</strong> (a client, a deal), and groups to a <strong>COI class</strong> (a market where
+        the groups conflict). The rule is history-based and <strong>mandatory</strong>: touch one group in a class and
+        the volume-key broker will never release keys for a conflicting group to you — no override button
+        exists; unbinding is an audited quorum act.
+        <span class="legalflag">LEGAL: DPO/counsel</span> cooling-off periods and wall-crossing standards are
+        professional-conduct decisions, not engineering ones.</p>
+        <div id="coiList"></div>
+        <div class="grid2">
+          <div class="field"><label for="coiName">New COI class name</label><input type="text" id="coiName" placeholder="Banking clients"></div>
+          <div class="field" style="align-self:end"><button class="btn-ghost" id="btnAddCoi">Add COI class</button></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="volName">New volume — name</label><input type="text" id="volName" placeholder="Client A / deal room"></div>
+          <div class="field"><label for="volGroup">Dataset group (or general pool)</label><select id="volGroup"></select></div>
+          <div class="field"><label for="volRole">Entitled role</label><select id="volRole"></select></div>
+          <div class="field"><label for="volClear">Required clearance</label>
+            <select id="volClear"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+          <div class="field"><label for="volGroupClass">…or create a new group in class</label><select id="volGroupClass"></select></div>
+          <div class="field"><label for="volGroupName">New group name</label><input type="text" id="volGroupName" placeholder="Client B"></div>
+        </div>
+        <p class="err-line" id="volErr"></p>
+        <div class="btnrow"><button class="btn-ghost" id="btnAddVol">Add volume</button></div>
+      </div>
+      <div class="card">
+        <h2>Simulated file view — the wall, enforced</h2>
+        <p class="lead">Pick a user and open volumes. First access to a group <strong>binds</strong> (audited);
+        conflicting groups then show as walled — the key is simply never released.</p>
+        <div class="field"><label for="wallUser">Acting user</label><select id="wallUser"></select></div>
+        <div class="volgrid" id="volGrid"></div>
+        <div class="warnbox"><strong>Honest enforcement limit.</strong> Cryptographic key-withholding is hard denial
+        for data at rest. In-session containment needs OS-level MAC (SELinux/AppArmor domains per volume) —
+        Postern OS provides that in the machine profile; <em>this page is client-side and therefore advisory</em>:
+        it demonstrates and audits the model, it cannot physically stop a determined insider. And no OS stops a
+        human photographing a screen — a wall is a technical <em>plus</em> contractual <em>plus</em> supervisory control.</div>
+      </div>
+    </div>
+
+    <!-- ---- TAB: lifecycle / offboarding ---- -->
+    <div class="tabpane" id="tab-life" hidden>
+      <div class="card">
+        <h2>Offboard a user — termination ceremony</h2>
+        <p class="lead">In order: revoke (instant), kill sessions, <strong>freeze — nobody gains read access by
+        termination itself</strong>, dual-control escrow release (2 of 3 officers, stated purpose, employee
+        notification on by default), handover to a successor, key rotation, wipe/reprovision, retention
+        disposition. Every step is chained into the audit log.</p>
+        <div class="grid2">
+          <div class="field"><label for="obUser">User to offboard</label><select id="obUser"></select></div>
+          <div class="field"><label for="obSuccessor">Successor / receiving manager</label><select id="obSuccessor"></select></div>
+        </div>
+        <div class="field"><label for="obPurpose">Stated purpose (recorded verbatim in the signed release)</label>
+          <input type="text" id="obPurpose" placeholder="Termination 2026-07-31; handover of project data to successor"></div>
+        <div class="btnrow"><button class="btn-acc" id="btnStartOffboard">Start offboarding</button></div>
+        <p class="err-line" id="obErr" aria-live="polite"></p>
+        <ol class="steps" id="obSteps"></ol>
+      </div>
+    </div>
+
+    <!-- ---- TAB: audit ---- -->
+    <div class="tabpane" id="tab-audit" hidden>
+      <div class="card">
+        <h2>Tamper-evident audit chain</h2>
+        <p class="lead">Every sensitive act — provision, role change, wall binding, escrow approval, revocation,
+        wipe — is an entry with <span class="mono">hash = SHA-256(entry ‖ prev-hash)</span>. Honest limit: in
+        this demo the whole chain lives in this browser's localStorage, so "Verify" catches accidental edits,
+        not a local attacker — anyone who can edit localStorage can rewrite an entry and recompute every hash
+        after it. The real tamper-evidence arrives in the product, where the chain head is countersigned by the
+        compliance officer and replicated outside IT's custody, so erasing
+        evidence means corrupting a log the watched party doesn't control. Audit logs record <strong>events, not
+        employee content</strong> — minimization applies to the trail too.
+        <span class="legalflag">LEGAL: DPO/counsel</span> audit-log retention: the log itself is employees'
+        personal data under LGPD/GDPR and needs a documented basis and schedule.</p>
+        <div class="btnrow">
+          <button class="btn-ghost" id="btnVerifyChain">Verify the chain</button>
+          <span id="chainStatus" class="ok-line" style="margin:0"></span>
+        </div>
+        <div class="audit" id="auditLog"></div>
+      </div>
+    </div>
+
+    <!-- ---- TAB: transparency ---- -->
+    <div class="tabpane" id="tab-tp" hidden>
+      <div class="card">
+        <h2>What the employee sees — the transparency panel</h2>
+        <p class="lead">This exact panel is permanent and unremovable on every managed device (the Sarto pattern).
+        Corporate control is <strong>transparent, never covert</strong> — no hidden-monitoring mode exists in the
+        product, by refusal, not by omission. Pick a user to preview their device's panel.</p>
+        <div class="field"><label for="tpUser">Preview as</label><select id="tpUser"></select></div>
+        <div id="tpPanel"></div>
+      </div>
+      <div class="card">
+        <h2>Privacy — honest panel</h2>
+        <p class="lead">This console is a single static file. Everything — org keys, policy, users, walls, the
+        audit chain — lives in this browser; there is no server, no account, no login. <strong>No telemetry, no
+        analytics, no phone-home.</strong> The ONLY network destination this page can reach is
+        <span class="mono">api.anthropic.com</span>, and only if <em>you</em> choose to use the optional policy
+        assistant under <em>your own</em> Claude key (CSP <span class="mono">connect-src</span> allows nothing
+        else); without a key the console works fully offline.</p>
+        <p class="pv-note">Design/reference prototype — unaudited, pre-production. We do not claim
+        "100% private" or "unhackable" — no honest software can. No telemetry, no phone-home. Offline
+        verification. Not legal advice — DPO/counsel required for compliance.</p>
+      </div>
+    </div>
+
+    <!-- ---- TAB: settings + assistant ---- -->
+    <div class="tabpane" id="tab-set" hidden>
+      <div class="card">
+        <h2>Signed org policy</h2>
+        <p class="lead">The policy every employee sees is canonicalized and signed by the admin-of-record key
+        (Chiave-style; the managed device pins the org key at enrollment and re-verifies on every render —
+        tampering shows red on the employee panel).</p>
+        <div id="policyBox" class="kv"></div>
+      </div>
+      <div class="card">
+        <h2>Policy assistant — optional, your own Claude key</h2>
+        <p class="lead">Ask questions about this org's policy model (e.g. "draft the employee notice for the
+        monitoring items in this policy"). The request goes directly from your browser to
+        <span class="mono">api.anthropic.com</span> under <em>your</em> key — the only network destination this
+        page can reach; without a key the whole console works fully offline.
+        <strong>Assistant output is also not legal advice</strong> — it drafts, your DPO/counsel decides.</p>
+        <div class="grid2">
+          <div class="field"><label for="apiKey">Anthropic API key (this browser only — lockable below)</label>
+            <input type="password" id="apiKey" autocomplete="off" placeholder="sk-ant-…"></div>
+          <div class="field"><label for="modelSel">Claude model</label>
+            <select id="modelSel">
+              <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest (default)</option>
+              <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+              <option value="claude-opus-4-8">Claude Opus 4.8 — most capable</option>
+            </select></div>
+        </div>
+        <div class="field">
+          <span class="flabel">Key at rest (optional lock)</span>
+          <p class="fhelp" id="keyLockState" aria-live="polite" style="margin:0 0 6px"></p>
+          <div class="btnrow">
+            <input type="password" id="keyPass" placeholder="passphrase (min 6 characters)" autocomplete="off" spellcheck="false" aria-label="Passphrase to seal the API key" style="width:auto;flex:1 1 220px">
+            <button type="button" class="hbtn" id="btnKeyLock">lock key</button>
+          </div>
+          <p class="fhelp">Locking seals the key with the REAL <b>Argon2id + XChaCha20-Poly1305</b> from
+          <b>postern-sdk</b> when this page runs inside a Postern host shell — the same construction that then
+          also protects this console's admin and officer keys — or the honestly-labeled classical stand-in
+          (<b>AES-256-GCM</b> under <b>PBKDF2-SHA-256, 310,000 it.</b>) in a plain browser tab. localStorage then
+          holds only ciphertext; you unlock once per session, and forgetting the passphrase means re-entering the
+          key. <b>Without a lock, the key sits readable in this browser's localStorage</b> — any code or person
+          with access to this browser profile can read it.</p>
+        </div>
+        <div class="field"><label for="askBox">Question</label><textarea id="askBox" placeholder="Which decisions in this console still need our DPO?"></textarea></div>
+        <p class="err-line" id="askErr" aria-live="polite"></p>
+        <div class="btnrow"><button class="btn-acc" id="btnAsk">Ask</button></div>
+        <div class="chatout" id="askOut" aria-live="polite" hidden></div>
+      </div>
+      <div class="card">
+        <h2>Erase</h2>
+        <p class="lead">Deletes the demo org — keys, users, walls, audit chain — from this browser. There is no
+        server copy to erase.</p>
+        <div class="btnrow"><button class="btn-danger" id="btnEraseAll">Erase org, quorum, users &amp; audit</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site wrap"><span class="foot-lock">●</span> local demo · reference prototype — unaudited, pre-production · only possible network call: your own optional Claude request · not legal advice — DPO/counsel required for compliance</footer>
+
+<!-- ================= OFFICER PASSPHRASE DIALOG ================= -->
+<dialog id="dlgOfficer" aria-labelledby="offTitle">
+  <div class="dlg-head"><h2 id="offTitle">Officer approval</h2><button class="x" data-close aria-label="Close">✕</button></div>
+  <form class="dlg-body" id="offForm">
+    <p class="pv-note" id="offLead" style="margin-top:0"></p>
+    <div class="field"><label for="offSel" id="offSelLabel">Officer</label><select id="offSel"></select></div>
+    <div class="field"><label for="offPass">Officer passphrase (unlocks their key — their approval IS a signature)</label>
+      <input type="password" id="offPass" autocomplete="off"></div>
+    <p class="err-line" id="offErr" aria-live="assertive"></p>
+    <div class="btnrow"><button type="submit" class="btn-acc">Approve &amp; sign</button></div>
+  </form>
+</dialog>
+
+<!-- ================= HONESTY ================= -->
+<dialog id="dlgHonesty" aria-labelledby="honestyTitle">
+  <div class="dlg-head"><h2 id="honestyTitle">How it works — honestly</h2><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">
+      Consiglio is the reference console for <strong>Postern Enterprise</strong>
+      (<code>docs/specs/POSTERN-ENTERPRISE.md</code>): corporate identity that is <em>not</em> the self-custody
+      wallet — provisioned, revocable, recoverable under a governance quorum — plus Brewer–Nash walls,
+      lifecycle ceremonies and a tamper-evident audit chain. One static file; the only possible network call
+      is your own optional Claude request.
+    </p>
+    <div class="ledger">
+      <div class="ledger-row"><div class="mark">●</div><div>
+        <h3>Personal vs corporate — the honest trade</h3>
+        <p>Personal Postern is self-sovereign: your seed, no admin, no recovery authority. Corporate Postern
+        trades some employee self-sovereignty for company governance — the company owns the device and is the
+        data controller. What is <strong>not</strong> traded: transparency (every power is displayed to the
+        employee), minimization (posture, not content), dual control, and audit. The employee's <em>personal</em>
+        Postern identity stays out of the org's reach.</p></div></div>
+      <div class="ledger-row"><div class="mark">●</div><div>
+        <h3>No single silent admin — real dual control</h3>
+        <p>Each user's recovery key is split with <strong>real Shamir 2-of-3 over GF(256)</strong> in this page;
+        shares are ECIES-encrypted to officer keys (P-256 ECDH + AES-GCM). A release needs a stated purpose +
+        two officers' passphrases, and lands in the hash chain <em>before</em> reconstruction. Honest limit:
+        officers colluding at quorum scale <em>can</em> read corporate data — that is escrow's stated purpose
+        (continuity, lawful access), not a backdoor; the control is that it cannot happen silently, singly,
+        or deniably.</p></div></div>
+      <div class="ledger-row"><div class="mark">●</div><div>
+        <h3>The wall is mandatory — and its limit is stated</h3>
+        <p>Brewer–Nash: first access binds, conflicting groups go cryptographically unavailable (key never
+        released). Hard at rest; in-session containment needs the OS MAC layer (Postern OS machine profiles);
+        client-side enforcement — including this page — is advisory. No software stops a camera.</p></div></div>
+      <div class="ledger-row"><div class="mark">●</div><div>
+        <h3>Not legal advice — repeated on purpose</h3>
+        <p>Every control here <em>supports</em> a requirement area of LGPD / GDPR / CCPA; whether the org is
+        compliant is a determination only a DPO / Encarregado + admitted counsel can make. Retention periods,
+        lawful bases, DPIAs, transfer mechanisms, breach timelines, employee-consultation duties: all flagged
+        <span class="legalflag">LEGAL: DPO/counsel</span> in the UI, none decided by this software.</p></div></div>
+    </div>
+    <p class="pv-note"><strong>Stand-ins, labeled (the flows are the design of record; the primitives are browser stand-ins):</strong></p>
+    <div class="tblwrap">
+    <table class="standins">
+      <tr><th>In this demo</th><th>In the product</th></tr>
+      <tr><td>Ed25519 / P-256 via WebCrypto</td><td>Hybrid <strong>Falcon-1024 ‖ ML-DSA-65</strong> per person, in each device's TEE, non-exportable</td></tr>
+      <tr><td>PBKDF2-SHA-256, 310,000 it. (plain browser tab — strict CSP forbids wasm)</td><td><strong>Argon2id</strong> (64 MiB, t=3) + XChaCha20-Poly1305, via <code>postern-sdk</code> — REAL already when this page runs inside a Postern host shell that installs <code>globalThis.PosternSDK</code></td></tr>
+      <tr><td>localStorage directory + audit replica</td><td>Self-hosted Postern Directory (or OIDC/SAML federation) + dual-custody audit with compliance-officer countersignature</td></tr>
+      <tr><td>In-page wall check + simulated volumes</td><td>The OS volume-key broker (keys wrapped per user) + SELinux/AppArmor MAC domains per volume</td></tr>
+      <tr><td>Shamir 2-of-3 over GF(256), shares ECIES-sealed to officer keys (real, in-page)</td><td>The same construction with officer keys in TEEs and a ceremonial, attested release path</td></tr>
+      <tr><td>"Kill sessions" / "wipe device" as state changes</td><td>Directory push + short-lived assertions (revocation ≤ TTL even offline) and cryptographic erase of TEE-held profile keys</td></tr>
+    </table>
+    </div>
+    <p class="pv-note"><strong>What we won't claim:</strong> that any purchase makes an org LGPD/GDPR/CCPA
+    compliant; that walls stop a determined cleared insider; that a browser can protect keys like a TEE; or
+    that escrow is anything other than what it is — a governed, audited company recovery power over
+    <em>company</em> data, never over the employee's personal space.</p>
+    <p style="text-align:right; margin: 14px 0 0"><button class="btn-acc" data-close>Understood</button></p>
+  </div>
+</dialog>
+
+<script id="pec-core">
+"use strict";
+/* ============================================================
+   CONSIGLIO — core (DOM-free; parses in Node ≥ 18).
+   Crypto: WebCrypto only. Zero network in this block.
+   ============================================================ */
+const PEC = (() => {
+  const te = new TextEncoder();
+  const td = new TextDecoder();
+  const subtle = () => crypto.subtle;
+
+  /* ---- bytes ---- */
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => {
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  const rand = (n) => crypto.getRandomValues(new Uint8Array(n));
+  const concat = (...arrs) => {
+    const out = new Uint8Array(arrs.reduce((n, a) => n + a.length, 0));
+    let o = 0;
+    for (const a of arrs) { out.set(a, o); o += a.length; }
+    return out;
+  };
+
+  /* ---- canonical JSON: sorted keys → sign/verify/hash see identical bytes ---- */
+  function stableStringify(v) {
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+    return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + stableStringify(v[k])).join(",") + "}";
+  }
+  async function sha256Hex(str) {
+    return hex(await subtle().digest("SHA-256", te.encode(str)));
+  }
+
+  /* ---- passphrase KDF + AEAD keyfile ----
+     Adopts the ONE postern-sdk wiring seam (globalThis.PosternSDK): when a
+     Postern host shell (Tauri / mobile WebView / relaxed-CSP build) has
+     installed the wasm core, officer/admin keyfiles are sealed with the REAL
+     Argon2id(64 MiB, t=3) + XChaCha20-Poly1305 from postern-core — killing
+     stand-in S2 for the most sensitive secrets this app holds. In a plain
+     browser tab (strict CSP forbids fetching wasm) the seam is absent and we
+     keep the honest classical stand-in: PBKDF2-SHA-256 (310,000 it.) →
+     AES-256-GCM. Dispatch is on the blob's OWN kdf.algo tag, never on current
+     seam state — a real-core keyfile can never be silently opened (or
+     downgraded) by the stand-in path. */
+  const KDF_ITER = 310000;
+  const KDF_REAL = "Argon2id-postern-sdk";  // on-disk tag for real-core seals
+  const sdk = () => (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null;
+  const kdfReal = () => { const s = sdk(); return !!(s && s.kdf && s.kdf.available); };
+  async function passKey(passphrase, salt, iterations) {
+    const base = await subtle().importKey("raw", te.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+    return subtle().deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function sealJSON(key, obj, aad) {
+    const iv = rand(12);
+    const ct = await subtle().encrypt({ name: "AES-GCM", iv, additionalData: te.encode(aad) },
+      key, te.encode(JSON.stringify(obj)));
+    return { iv: b64(iv), ct: b64(ct) };
+  }
+  async function openJSON(key, ivB64, ctB64, aad) {
+    const pt = await subtle().decrypt({ name: "AES-GCM", iv: unb64(ivB64), additionalData: te.encode(aad) },
+      key, unb64(ctB64)); // throws on wrong key — all-or-nothing
+    return JSON.parse(td.decode(pt));
+  }
+  async function sealBlob(passphrase, payload, aad) {
+    if (kdfReal()) {                                    // REAL postern-sdk core path
+      const s = sdk();
+      const salt = s.kdf.generateSalt();
+      const key = s.kdf.deriveKey(te.encode(passphrase), salt);
+      const blob = s.kdf.seal(key, te.encode(aad), te.encode(JSON.stringify(payload)));
+      try { key.free(); } catch {}
+      return { v: 1, kdf: { algo: KDF_REAL, label: s.kdf.label || "Argon2id", salt: b64(salt) }, cipher: { algo: "XChaCha20-Poly1305", blob: b64(blob) } };
+    }
+    const salt = rand(16);
+    const key = await passKey(passphrase, salt, KDF_ITER);
+    const { iv, ct } = await sealJSON(key, payload, aad);
+    return { v: 1, kdf: { algo: "PBKDF2-SHA-256", iter: KDF_ITER, salt: b64(salt) }, cipher: { algo: "AES-256-GCM", iv, ct } };
+  }
+  async function openBlob(passphrase, blob, aad) {
+    if (blob.kdf && blob.kdf.algo === KDF_REAL) {         // sealed by the real core — never downgrade
+      const s = sdk();
+      if (!kdfReal()) throw new Error("This keyfile was sealed by the real postern-sdk core, which isn't loaded here — open it inside the Postern host shell.");
+      const key = s.kdf.deriveKey(te.encode(passphrase), unb64(blob.kdf.salt));
+      const pt = s.kdf.open(key, te.encode(aad), unb64(blob.cipher.blob)); // throws on wrong key — all-or-nothing
+      try { key.free(); } catch {}
+      return JSON.parse(td.decode(pt));
+    }
+    const key = await passKey(passphrase, unb64(blob.kdf.salt), blob.kdf.iter);
+    return openJSON(key, blob.cipher.iv, blob.cipher.ct, aad);
+  }
+
+  /* ---- signing keypairs — CLASSICAL STAND-IN for Falcon-1024 ‖ ML-DSA-65 ---- */
+  async function genSignKeypair() {
+    try {
+      const kp = await subtle().generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+      return { alg: "Ed25519", priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)), pub: b64(await subtle().exportKey("raw", kp.publicKey)) };
+    } catch {
+      const kp = await subtle().generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+      return { alg: "ECDSA-P256", priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)), pub: b64(await subtle().exportKey("raw", kp.publicKey)) };
+    }
+  }
+  const algParams = (alg) => alg === "Ed25519" ? { name: "Ed25519" } : { name: "ECDSA", namedCurve: "P-256" };
+  const sigParams = (alg) => alg === "Ed25519" ? { name: "Ed25519" } : { name: "ECDSA", hash: "SHA-256" };
+  const importSigner = (alg, privB64) => subtle().importKey("pkcs8", unb64(privB64), algParams(alg), false, ["sign"]);
+  const importVerifier = (alg, pubB64) => subtle().importKey("raw", unb64(pubB64), algParams(alg), false, ["verify"]);
+  async function signObj(alg, privB64, obj) {
+    const signer = await importSigner(alg, privB64);
+    return b64(await subtle().sign(sigParams(alg), signer, te.encode(stableStringify(obj))));
+  }
+  async function verifyObj(alg, pubB64, obj, sigB64) {
+    try {
+      const v = await importVerifier(alg, pubB64);
+      return await subtle().verify(sigParams(alg), v, unb64(sigB64), te.encode(stableStringify(obj)));
+    } catch { return false; }
+  }
+  async function fingerprint(pubB64) {
+    const d = new Uint8Array(await subtle().digest("SHA-256", unb64(pubB64)));
+    const h = hex(d.slice(0, 8)).toUpperCase();
+    return `PL-${h.slice(0, 4)}-${h.slice(4, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}`;
+  }
+
+  /* ---- ECIES to officers: P-256 ECDH + SHA-256 KDF + AES-GCM ----
+     So provisioning can encrypt escrow shares TO officers without their
+     passphrases; only the officer's sealed private key decrypts. ---- */
+  async function genEcdhKeypair() {
+    const kp = await subtle().generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+    return { priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)), pub: b64(await subtle().exportKey("raw", kp.publicKey)) };
+  }
+  async function ecdhAesKey(privKey, pubRawB64, tag) {
+    const pub = await subtle().importKey("raw", unb64(pubRawB64), { name: "ECDH", namedCurve: "P-256" }, false, []);
+    const bits = await subtle().deriveBits({ name: "ECDH", public: pub }, privKey, 256);
+    const raw = await subtle().digest("SHA-256", concat(new Uint8Array(bits), te.encode(tag)));
+    return subtle().importKey("raw", new Uint8Array(raw), "AES-GCM", false, ["encrypt", "decrypt"]);
+  }
+  async function eciesSeal(officerEcdhPubB64, bytes, aad) {
+    const eph = await subtle().generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+    const key = await ecdhAesKey(eph.privateKey, officerEcdhPubB64, "consiglio:ecies:v1");
+    const iv = rand(12);
+    const ct = await subtle().encrypt({ name: "AES-GCM", iv, additionalData: te.encode(aad) }, key, bytes);
+    return { eph: b64(await subtle().exportKey("raw", eph.publicKey)), iv: b64(iv), ct: b64(ct) };
+  }
+  async function eciesOpen(officerEcdhPrivB64, box, aad) {
+    const priv = await subtle().importKey("pkcs8", unb64(officerEcdhPrivB64), { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+    const key = await ecdhAesKey(priv, box.eph, "consiglio:ecies:v1");
+    const pt = await subtle().decrypt({ name: "AES-GCM", iv: unb64(box.iv), additionalData: te.encode(aad) }, key, unb64(box.ct));
+    return new Uint8Array(pt);
+  }
+
+  /* ---- Shamir secret sharing over GF(256) — REAL threshold, not theater ---- */
+  const GF_EXP = new Uint8Array(512), GF_LOG = new Uint8Array(256);
+  (() => {
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+      GF_EXP[i] = x; GF_LOG[x] = i;
+      // multiply by generator 3: x ^= xtime(x)
+      const xt = ((x << 1) ^ ((x & 0x80) ? 0x11b : 0)) & 0xff;
+      x ^= xt;
+    }
+    for (let i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255];
+  })();
+  const gfMul = (a, b) => (a && b) ? GF_EXP[GF_LOG[a] + GF_LOG[b]] : 0;
+  const gfDiv = (a, b) => a ? GF_EXP[(GF_LOG[a] - GF_LOG[b] + 255) % 255] : 0;
+
+  /* split: returns n shares, each {x, y: Uint8Array(secret.length)}; any k reconstruct */
+  function shamirSplit(secret, n, k) {
+    const shares = Array.from({ length: n }, (_, j) => ({ x: j + 1, y: new Uint8Array(secret.length) }));
+    for (let byte = 0; byte < secret.length; byte++) {
+      const coeffs = new Uint8Array(k);
+      coeffs[0] = secret[byte];
+      const r = rand(k - 1);
+      for (let c = 1; c < k; c++) coeffs[c] = c === k - 1 ? (r[c - 1] || 1) : r[c - 1]; // top coeff nonzero
+      for (const sh of shares) {
+        let acc = 0;
+        for (let c = k - 1; c >= 0; c--) acc = gfMul(acc, sh.x) ^ coeffs[c];
+        sh.y[byte] = acc;
+      }
+    }
+    return shares;
+  }
+  /* reconstruct from k shares via Lagrange interpolation at x = 0 */
+  function shamirJoin(shares) {
+    const len = shares[0].y.length;
+    const out = new Uint8Array(len);
+    for (let byte = 0; byte < len; byte++) {
+      let acc = 0;
+      for (let i = 0; i < shares.length; i++) {
+        let num = 1, den = 1;
+        for (let j = 0; j < shares.length; j++) {
+          if (i === j) continue;
+          num = gfMul(num, shares[j].x);
+          den = gfMul(den, shares[j].x ^ shares[i].x);
+        }
+        acc ^= gfMul(shares[i].y[byte], gfDiv(num, den));
+      }
+      out[byte] = acc;
+    }
+    return out;
+  }
+
+  /* ---- audit chain: hash-linked entries ---- */
+  async function auditAppend(chain, actor, action, detail) {
+    const prev = chain.length ? chain[chain.length - 1].hash : "GENESIS";
+    const entry = { seq: chain.length + 1, ts: new Date().toISOString(), actor, action, detail, prev };
+    entry.hash = await sha256Hex(stableStringify({ seq: entry.seq, ts: entry.ts, actor, action, detail, prev }));
+    chain.push(entry);
+    return entry;
+  }
+  async function auditVerify(chain) {
+    let prev = "GENESIS";
+    for (const e of chain) {
+      const h = await sha256Hex(stableStringify({ seq: e.seq, ts: e.ts, actor: e.actor, action: e.action, detail: e.detail, prev: e.prev }));
+      if (e.prev !== prev || e.hash !== h) return { ok: false, at: e.seq };
+      prev = e.hash;
+    }
+    return { ok: true, count: chain.length };
+  }
+
+  /* ---- Brewer–Nash wall check (pure; volumes carry groupId+classId) ----
+     A user may access volume V in group g of COI class c only if they have
+     never accessed a volume of a DIFFERENT group in the same class c.
+     Mandatory: evaluated in the key broker, no discretionary override. ---- */
+  function wallCheck(user, vol, volumes) {
+    if (!vol.classId) return { ok: true };
+    for (const accessedId of user.accessed || []) {
+      const av = volumes.find(v => v.id === accessedId);
+      if (av && av.classId === vol.classId && av.groupId !== vol.groupId) {
+        return { ok: false, boundTo: av.groupId };
+      }
+    }
+    return { ok: true };
+  }
+  /* RBAC + ABAC gate (role entitlement + clearance).
+     Status is checked FIRST and is not overridable: offboarding's "freeze —
+     nobody gains read access" step is only real if the key broker's own gate
+     enforces it, not just a UI list that happens to hide non-active users. */
+  function rbacCheck(user, vol, roles) {
+    if (user.status !== "active") return { ok: false, why: "user is not active (status: " + user.status + ") — termination/offboarding freezes all access, no override" };
+    const role = roles.find(r => r.id === user.role);
+    if (!role) return { ok: false, why: "no role" };
+    if (!role.volumes.includes(vol.family)) return { ok: false, why: "role not entitled to " + vol.family + " volumes" };
+    if ((user.attrs.clearance | 0) < (vol.clearance | 0)) return { ok: false, why: "clearance " + user.attrs.clearance + " < required " + vol.clearance };
+    return { ok: true };
+  }
+
+  /* ---- role catalog: RBAC roles = machine profiles ---- */
+  const ROLES = [
+    { id: "engineer",           name: "Engineer",            volumes: ["engineering"],  apps: ["IDE", "Forge client", "Sotto"],            egress: ["code forges", "package mirrors", "directory"] },
+    { id: "finance-analyst",    name: "Finance analyst",     volumes: ["finance"],      apps: ["Ledger", "Sheets"],                        egress: ["ERP", "banking endpoints", "directory"] },
+    { id: "counsel",            name: "Counsel",             volumes: ["client-matter"],apps: ["Matters", "Docs", "Hygiene (metadata scrub)"], egress: ["court portals", "legal research", "directory"] },
+    { id: "it-admin",           name: "IT admin",            volumes: [],               apps: ["Fleet console", "Directory admin"],       egress: ["directory", "update channel"] },
+    { id: "compliance-officer", name: "Compliance officer",  volumes: [],               apps: ["Audit viewer", "Processing registry"],    egress: ["regulator portals", "directory"] },
+  ];
+  /* separation-of-duty pairs (declared, enforced at assignment) */
+  const SOD = [["it-admin", "compliance-officer"]];
+
+  return {
+    te, td, b64, unb64, hex, rand, concat,
+    stableStringify, sha256Hex,
+    KDF_ITER, KDF_REAL, kdfReal, passKey, sealJSON, openJSON, sealBlob, openBlob,
+    genSignKeypair, signObj, verifyObj, fingerprint,
+    genEcdhKeypair, eciesSeal, eciesOpen,
+    shamirSplit, shamirJoin,
+    auditAppend, auditVerify,
+    wallCheck, rbacCheck,
+    ROLES, SOD,
+  };
+})();
+if (typeof globalThis !== "undefined") globalThis.PEC = PEC;
+</script>
+
+<script id="pec-ui">
+"use strict";
+/* ============================================================
+   CONSIGLIO — UI wiring. States: bootstrap | locked | console
+   Only network call possible: the user's own Claude request in
+   ask() — everything else is local.
+   ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+const LS = { STATE: "consiglio.state", KEY: "consiglio.apikey", SEALED: "consiglio.apikey.sealed", MODEL: "consiglio.model", THEME: "consiglio.theme" };
+const AAD_ADMIN = "consiglio.adminkey.v1";
+const AAD_OFFICER = "consiglio.officerkey.v1";
+const AAD_SHARE = "consiglio.escrow.share.v1";
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------- sealed key at rest (optional lock) ----------
+   Adopts the ONE postern-sdk wiring seam (globalThis.PosternSDK): when a Postern
+   host shell (Tauri / mobile WebView / relaxed-CSP build) has installed the wasm
+   core, the key is sealed with the REAL Argon2id(64 MiB, t=3) + XChaCha20-Poly1305
+   from postern-core — killing stand-in S2. In a plain browser tab (this page's
+   strict CSP forbids fetching wasm) the seam is absent and we keep the honest
+   classical stand-in: PBKDF2-SHA-256 (310,000 it.) → AES-256-GCM. Never silently
+   weaker — a blob sealed by the real core refuses to open without it (fail-closed),
+   and the on-disk record is tagged with the KDF that produced it so open() can't
+   be tricked into a downgrade. (Same module as sotto/store/vedetta; only the AAD
+   differs. This covers the assistant's Anthropic key — the admin/officer keys are
+   sealed separately via PEC.sealBlob/openBlob, using the SAME real-core seam.) */
+const KeySeal = (() => {
+  const te = new TextEncoder(), td = new TextDecoder();
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  const KDF_ITER = 310000;      // classical stand-in iterations (PBKDF2-SHA-256)
+  const KDF_REAL = "Argon2id-postern-sdk";  // on-disk tag for real-core seals
+  const AAD = "consiglio.apikey.v1";
+  let plain = null;             // unlocked key — this tab's memory only, never persisted
+  let aesKey = null;            // PBKDF2-derived AES key (stand-in path); kept so edits re-seal without re-running the KDF
+  let realKey = null;           // opaque postern-sdk VaultKey handle (real path); kept for re-seals, lives in wasm memory
+  let realLabel = "";           // the core's honest KDF label, stored alongside the blob
+  let saltB64 = null;
+  let writing = Promise.resolve(); // serialize re-seals (last write wins)
+
+  const sdk = () => (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null;
+  const kdfReal = () => { const s = sdk(); return !!(s && s.kdf && s.kdf.available); };
+
+  const record = () => { try { return JSON.parse(store.get(LS.SEALED, "null")); } catch { return null; } };
+  const derive = async (pass, salt, iter) => {
+    const base = await crypto.subtle.importKey("raw", te.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iter },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  };
+  async function persist() {
+    if (realKey) {                                     // REAL postern-sdk core path
+      const blob = sdk().kdf.seal(realKey, te.encode(AAD), te.encode(JSON.stringify({ key: plain })));
+      store.set(LS.SEALED, JSON.stringify({
+        v: 1,
+        kdf: { algo: KDF_REAL, label: realLabel, salt: saltB64 },
+        cipher: { algo: "XChaCha20-Poly1305", blob: b64(blob) },
+      }));
+      return;
+    }
+    const iv = crypto.getRandomValues(new Uint8Array(12)); // fresh IV per write, always
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: te.encode(AAD) },
+      aesKey, te.encode(JSON.stringify({ key: plain })));
+    store.set(LS.SEALED, JSON.stringify({
+      v: 1,
+      kdf: { algo: "PBKDF2-SHA-256", iter: KDF_ITER, salt: saltB64 },
+      cipher: { algo: "AES-256-GCM", iv: b64(iv), ct: b64(ct) },
+    }));
+  }
+  return {
+    isSealed: () => !!record(),
+    isLocked: () => !!record() && plain === null,
+    key: () => plain,
+    real: () => kdfReal(),                             // is the real core installed right now?
+    cipherLabel: () => {                               // what actually sealed the current blob
+      const r = record();
+      if (r && r.kdf && r.kdf.algo === KDF_REAL) return "XChaCha20-Poly1305 (real Argon2id, via postern-sdk)";
+      return "AES-256-GCM (PBKDF2-SHA-256 stand-in)";
+    },
+    async lock(pass, currentKey) {          // seal, then drop the plaintext copy from disk
+      plain = currentKey;
+      const s = sdk();
+      if (kdfReal()) {
+        const salt = s.kdf.generateSalt();
+        realKey = s.kdf.deriveKey(te.encode(pass), salt);
+        realLabel = s.kdf.label || "Argon2id"; saltB64 = b64(salt); aesKey = null;
+      } else {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        aesKey = await derive(pass, salt, KDF_ITER);
+        saltB64 = b64(salt); realKey = null;
+      }
+      await persist();
+      store.del(LS.KEY);
+    },
+    async unlock(pass) {                    // per-session; a wrong passphrase fails the AEAD tag
+      const r = record(); if (!r) return false;
+      if (r.kdf && r.kdf.algo === KDF_REAL) {   // sealed by the real core — never downgrade
+        const s = sdk();
+        if (!kdfReal()) return false;           // honest fail-closed: the core isn't loaded here
+        try {
+          const key = s.kdf.deriveKey(te.encode(pass), unb64(r.kdf.salt));
+          const pt = s.kdf.open(key, te.encode(AAD), unb64(r.cipher.blob));
+          plain = JSON.parse(td.decode(pt)).key;
+          realKey = key; realLabel = r.kdf.label || (s.kdf.label || "Argon2id"); saltB64 = r.kdf.salt; aesKey = null;
+          return true;
+        } catch { return false; }
+      }
+      try {
+        const k = await derive(pass, unb64(r.kdf.salt), r.kdf.iter);
+        const pt = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: unb64(r.cipher.iv), additionalData: te.encode(AAD) },
+          k, unb64(r.cipher.ct));
+        plain = JSON.parse(td.decode(pt)).key;
+        aesKey = k; saltB64 = r.kdf.salt; realKey = null;
+        return true;
+      } catch { return false; }             // all-or-nothing: nothing decrypted, nothing leaked
+    },
+    update(newKey) {                        // edits while unlocked re-seal automatically
+      if (!aesKey && !realKey) return;
+      plain = newKey;
+      writing = writing.then(persist).catch(() => {});
+    },
+    removeLock() {                          // back to plaintext-at-rest, by explicit choice only
+      if (plain === null) return false;
+      store.set(LS.KEY, plain);
+      store.del(LS.SEALED);
+      if (realKey) { try { realKey.free(); } catch {} }
+      aesKey = null; realKey = null; saltB64 = null;
+      return true;
+    },
+    forget() { plain = null; aesKey = null; if (realKey) { try { realKey.free(); } catch {} } realKey = null; saltB64 = null; },
+  };
+})();
+
+/* ---------- persistent state ---------- */
+let S = null;              // the whole org state (see bootstrap for shape)
+let adminSigner = null;    // { alg, priv } — in memory only while console is unlocked
+function loadS() { try { S = JSON.parse(store.get(LS.STATE, "null")); } catch { S = null; } }
+function saveS() { store.set(LS.STATE, JSON.stringify(S)); }
+
+/* ---------- view switching ---------- */
+function show(state) {
+  document.body.dataset.state = state;
+  $("#viewBootstrap").hidden = state !== "bootstrap";
+  $("#viewLocked").hidden = state !== "locked";
+  $("#viewConsole").hidden = state !== "console";
+}
+function showTab(id) {
+  $$("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === id)));
+  $$(".tabpane").forEach(p => { p.hidden = p.id !== "tab-" + id; });
+}
+$$("nav.tabs button").forEach(b => b.addEventListener("click", () => { showTab(b.dataset.tab); renderAll(); }));
+
+/* ---------- audit helper (persists) ---------- */
+async function audit(actor, action, detail) {
+  await PEC.auditAppend(S.audit, actor, action, detail);
+  saveS();
+}
+
+/* ============================================================
+   BOOTSTRAP — org + admin + 2-of-3 governance quorum
+   ============================================================ */
+const OFFICER_TITLES = ["IT admin", "Compliance / DPO", "Executive"];
+
+async function makeOfficer(name, title, passphrase) {
+  const sign = await PEC.genSignKeypair();
+  const ecdh = await PEC.genEcdhKeypair();
+  const keyfile = await PEC.sealBlob(passphrase, { alg: sign.alg, signPriv: sign.priv, ecdhPriv: ecdh.priv }, AAD_OFFICER);
+  return {
+    id: "off-" + PEC.hex(PEC.rand(4)), name, title,
+    alg: sign.alg, signPub: sign.pub, ecdhPub: ecdh.pub,
+    fpr: await PEC.fingerprint(sign.pub), keyfile,
+  };
+}
+
+async function bootstrapOrg({ orgName, adminName, adminPass, officers }) {
+  const adminKp = await PEC.genSignKeypair();
+  const adminFpr = await PEC.fingerprint(adminKp.pub);
+  const adminKeyfile = await PEC.sealBlob(adminPass, { alg: adminKp.alg, priv: adminKp.priv }, AAD_ADMIN);
+  const offs = [];
+  for (let i = 0; i < 3; i++) offs.push(await makeOfficer(officers[i].name, OFFICER_TITLES[i], officers[i].pass));
+  const policyPayload = {
+    v: "postern:enterprise:policy:v1",
+    org: orgName, adminOfRecord: adminName, adminFpr,
+    policyVersion: 1,
+    quorum: { m: 2, n: 3, officers: offs.map(o => ({ name: o.name, title: o.title, fpr: o.fpr })) },
+    monitored: [
+      "device inventory (model, OS build, enrollment state)",
+      "security posture (disk encryption on, attestation result, patch level)",
+      "policy state (which signed policy version is applied)",
+      "administrative events about your account (provision, role change, wall bindings, escrow approvals — all visible to you)",
+    ],
+    notMonitored: [
+      "keystrokes, screen contents, or file contents",
+      "browsing content or communications content",
+      "anything in a personal profile (its keys are never escrowed)",
+      "location (unless lost-device mode is enabled — in which case it appears in the monitored list)",
+    ],
+    escrowNotice: "Any escrow release names its purpose and approvers and notifies you by default; delaying notification is itself a logged, quorum-approved act.",
+    offlineGraceHours: 24,
+    issued: new Date().toISOString(),
+  };
+  const policySig = await PEC.signObj(adminKp.alg, adminKp.priv, policyPayload);
+  S = {
+    v: 1,
+    org: { name: orgName, adminName, adminAlg: adminKp.alg, adminPub: adminKp.pub, adminFpr, created: new Date().toISOString() },
+    adminKeyfile,
+    officers: offs,
+    users: [],
+    coi: [],       // [{id, name, groups:[{id, name}]}]
+    volumes: [],   // [{id, name, family, groupId, classId, clearance, region}]
+    policy: { payload: policyPayload, sig: policySig },
+    audit: [],
+  };
+  await PEC.auditAppend(S.audit, adminName, "org.bootstrap",
+    `org "${orgName}" founded; quorum 2-of-3: ${offs.map(o => o.name + " (" + o.title + ")").join(", ")}; policy v1 signed`);
+  saveS();
+  adminSigner = { alg: adminKp.alg, priv: adminKp.priv };
+}
+
+$("#btnBootstrap").addEventListener("click", async () => {
+  const orgName = $("#bsOrg").value.trim(), adminName = $("#bsAdmin").value.trim(), adminPass = $("#bsPass").value;
+  const officers = [1, 2, 3].map(i => ({ name: $("#bsOff" + i).value.trim(), pass: $("#bsOff" + i + "p").value }));
+  const err = $("#bsErr");
+  if (!orgName || !adminName) { err.textContent = "Org name and admin-of-record are required — the admin is named, never anonymous."; return; }
+  if (adminPass.length < 8) { err.textContent = "Admin passphrase: at least 8 characters."; return; }
+  if (officers.some(o => !o.name || o.pass.length < 8)) { err.textContent = "All three officers need a name and a passphrase (min 8 chars) — the quorum is the whole point."; return; }
+  err.textContent = "";
+  $("#btnBootstrap").disabled = true;
+  try {
+    await bootstrapOrg({ orgName, adminName, adminPass, officers });
+    show("console"); showTab("org"); renderAll();
+  } catch (e) { err.textContent = "Bootstrap failed: " + e.message; }
+  finally { $("#btnBootstrap").disabled = false; }
+});
+
+/* ---------- sample org (same code paths, demo values) ---------- */
+$("#btnSample").addEventListener("click", async () => {
+  const err = $("#bsErr");
+  err.textContent = "";
+  $("#btnSample").disabled = true;
+  try {
+    await bootstrapOrg({
+      orgName: "Meridian Advisory (demo)",
+      adminName: "Dana Reyes, IT",
+      adminPass: "consiglio-demo",
+      officers: [
+        { name: "Iris Tan", pass: "itadmin-demo" },
+        { name: "Bruno Costa", pass: "dpo-demo" },
+        { name: "Elif Aydın", pass: "exec-demo" },
+      ],
+    });
+    // COI structure: one conflicted market, one general pool
+    const cls = { id: "coi-" + PEC.hex(PEC.rand(3)), name: "Banking clients", groups: [] };
+    const gA = { id: "grp-" + PEC.hex(PEC.rand(3)), name: "Client A (Banco Norte)" };
+    const gB = { id: "grp-" + PEC.hex(PEC.rand(3)), name: "Client B (Banco Sul)" };
+    cls.groups.push(gA, gB);
+    S.coi.push(cls);
+    S.volumes.push(
+      { id: "vol-" + PEC.hex(PEC.rand(3)), name: "Banco Norte — deal room", family: "client-matter", groupId: gA.id, classId: cls.id, clearance: 2, region: "BR" },
+      { id: "vol-" + PEC.hex(PEC.rand(3)), name: "Banco Norte — diligence", family: "client-matter", groupId: gA.id, classId: cls.id, clearance: 2, region: "BR" },
+      { id: "vol-" + PEC.hex(PEC.rand(3)), name: "Banco Sul — deal room", family: "client-matter", groupId: gB.id, classId: cls.id, clearance: 2, region: "BR" },
+      { id: "vol-" + PEC.hex(PEC.rand(3)), name: "Engineering — monorepo secrets", family: "engineering", groupId: null, classId: null, clearance: 1, region: "EU" },
+      { id: "vol-" + PEC.hex(PEC.rand(3)), name: "Finance — ledger close", family: "finance", groupId: null, classId: null, clearance: 2, region: "BR" },
+    );
+    await audit(S.org.adminName, "wall.define", `COI class "Banking clients" with groups "Client A", "Client B"; 5 volumes registered`);
+    await provisionUser({ name: "Ana Souza", dept: "Legal", role: "counsel", clearance: 2, region: "BR", project: "meridian-m&a" });
+    await provisionUser({ name: "Rafael Lima", dept: "Legal", role: "counsel", clearance: 2, region: "BR", project: "meridian-m&a" });
+    await provisionUser({ name: "Mei Chen", dept: "Engineering", role: "engineer", clearance: 1, region: "EU", project: "atlas" });
+    await provisionUser({ name: "Sofia Duarte", dept: "Finance", role: "finance-analyst", clearance: 2, region: "BR", project: "" });
+    show("console"); showTab("org"); renderAll();
+    setTimeout(() => alert(
+      "Sample org loaded.\n\nAdmin console passphrase: consiglio-demo\nOfficer passphrases (for dual-control ceremonies):\n  Iris Tan (IT admin): itadmin-demo\n  Bruno Costa (Compliance/DPO): dpo-demo\n  Elif Aydın (Executive): exec-demo\n\nTry: open a Banco Norte volume as Ana in the Chinese Walls tab (it binds her), then watch Banco Sul wall off. Then offboard Rafael with two officer approvals."), 50);
+  } catch (e) { err.textContent = "Sample bootstrap failed: " + e.message; }
+  finally { $("#btnSample").disabled = false; }
+});
+
+/* ============================================================
+   LOCK / UNLOCK
+   ============================================================ */
+function toLocked() {
+  adminSigner = null;
+  show("locked");
+  $("#lockLead").innerHTML = "Org <strong>" + escapeHtml(S.org.name) + "</strong> — admin-of-record <strong>" +
+    escapeHtml(S.org.adminName) + "</strong> <span class='fpr'>" + escapeHtml(S.org.adminFpr) + "</span>. " +
+    "The admin signing key is sealed on this machine; unlock it to act. Officer keys stay sealed under their own passphrases regardless.";
+  $("#unlockErr").textContent = "";
+  $("#unlockPass").value = "";
+  $("#unlockPass").focus();
+}
+$("#unlockForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const payload = await PEC.openBlob($("#unlockPass").value, S.adminKeyfile, AAD_ADMIN);
+    adminSigner = { alg: payload.alg, priv: payload.priv };
+    $("#unlockPass").value = "";
+    show("console"); showTab("org"); renderAll();
+  } catch {
+    $("#unlockErr").textContent = "Wrong passphrase. Decryption is all-or-nothing — nothing leaked.";
+  }
+});
+
+async function eraseAll() {
+  if (!confirm("Erase this demo org — keys, quorum, users, walls, audit chain — from this browser?\n\nThere is no server copy.")) return;
+  store.del(LS.STATE);
+  S = null; adminSigner = null;
+  location.reload();
+}
+$("#btnEraseAll").addEventListener("click", eraseAll);
+$("#btnEraseLocked").addEventListener("click", eraseAll);
+
+/* ============================================================
+   PROVISION — the enrollment ceremony
+   ============================================================ */
+async function provisionUser({ name, dept, role, clearance, region, project }) {
+  // 1 · device keypair — in the product: generated in the EMPLOYEE's device TEE,
+  //     private half never leaves it; only the public key reaches the directory.
+  const dev = await PEC.genSignKeypair();
+  const devFpr = await PEC.fingerprint(dev.pub);
+  const userId = "u-" + PEC.hex(PEC.rand(4));
+  // 2 · enrollment certificate — org signs {user, device pubkey, role, attrs}
+  const certPayload = {
+    v: "postern:enterprise:enroll:v1", userId, name, role,
+    attrs: { dept, clearance, region, project },
+    devicePub: dev.pub, deviceFpr: devFpr,
+    policyVersion: S.policy.payload.policyVersion,
+    notAfter: new Date(Date.now() + 365 * 864e5).toISOString(),
+  };
+  if (!adminSigner) throw new Error("console is locked");
+  const certSig = await PEC.signObj(adminSigner.alg, adminSigner.priv, certPayload);
+  // 3 · escrow ceremony — recovery key, Shamir 2-of-3, shares ECIES-sealed to
+  //     officers, whole key destroyed (it leaves scope right here).
+  const recoveryKey = PEC.rand(32);
+  const shares = PEC.shamirSplit(recoveryKey, 3, 2);
+  const escrow = [];
+  for (let i = 0; i < 3; i++) {
+    const box = await PEC.eciesSeal(S.officers[i].ecdhPub, shares[i].y, AAD_SHARE + ":" + userId);
+    escrow.push({ officerId: S.officers[i].id, x: shares[i].x, box });
+  }
+  const recoveryFpr = (await PEC.sha256Hex(PEC.hex(recoveryKey))).slice(0, 16).toUpperCase();
+  const user = {
+    id: userId, name, dept, role,
+    attrs: { clearance: Number(clearance), region, project },
+    status: "active",
+    devicePub: dev.pub, deviceFpr: devFpr,
+    cert: { payload: certPayload, sig: certSig },
+    escrow: { m: 2, n: 3, shares: escrow, recoveryFpr },
+    accessed: [],
+    created: new Date().toISOString(),
+  };
+  S.users.push(user);
+  await audit(S.org.adminName, "user.provision",
+    `${name} (${userId}) → role ${role}, dept ${dept}, clearance ${clearance}, region ${region}; device ${devFpr}; enrollment cert signed; escrow split 2-of-3 (key fpr ${recoveryFpr}), whole key destroyed`);
+  return user;
+}
+
+$("#btnProvision").addEventListener("click", async () => {
+  const err = $("#pvErr");
+  const name = $("#pvName").value.trim(), dept = $("#pvDept").value.trim() || "General";
+  const role = $("#pvRole").value, clearance = $("#pvClear").value, region = $("#pvRegion").value, project = $("#pvProject").value.trim();
+  if (!name) { err.textContent = "A name is required."; return; }
+  err.textContent = "";
+  $("#btnProvision").disabled = true;
+  try {
+    const u = await provisionUser({ name, dept, role, clearance, region, project });
+    const roleDef = PEC.ROLES.find(r => r.id === role);
+    $("#pvResult").innerHTML =
+      "<div class='warnbox' style='border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); background: color-mix(in srgb, var(--ok) 7%, var(--surface))'>" +
+      "<strong style='color:var(--ok)'>Enrolled.</strong> Device key <span class='fpr'>" + escapeHtml(u.deviceFpr) + "</span> certified by the org. " +
+      "Escrow: recovery key <span class='mono'>" + escapeHtml(u.escrow.recoveryFpr) + "…</span> split 2-of-3 to the officers — the whole key no longer exists anywhere. " +
+      "Machine profile <strong>" + escapeHtml(roleDef.name) + "</strong>: apps [" + escapeHtml(roleDef.apps.join(", ")) + "], egress [" + escapeHtml(roleDef.egress.join(", ")) + "]. " +
+      "The employee's first login shows them the transparency panel.</div>";
+    $("#pvName").value = ""; $("#pvProject").value = "";
+    renderAll();
+  } catch (e) { err.textContent = "Provisioning failed: " + e.message; }
+  finally { $("#btnProvision").disabled = false; }
+});
+
+/* ============================================================
+   OFFICER APPROVAL DIALOG — dual control, for real
+   Resolves with { officer, signPriv, ecdhPriv } or null.
+   ============================================================ */
+function officerApprove(lead, excludeIds = []) {
+  return new Promise((resolve) => {
+    const dlg = $("#dlgOfficer"), sel = $("#offSel"), err = $("#offErr"), pass = $("#offPass");
+    $("#offLead").textContent = lead;
+    sel.innerHTML = S.officers
+      .filter(o => !excludeIds.includes(o.id))
+      .map(o => "<option value='" + escapeHtml(o.id) + "'>" + escapeHtml(o.name) + " — " + escapeHtml(o.title) + " (" + escapeHtml(o.fpr) + ")</option>").join("");
+    err.textContent = ""; pass.value = "";
+    const form = $("#offForm");
+    const onSubmit = async (e) => {
+      e.preventDefault();
+      const officer = S.officers.find(o => o.id === sel.value);
+      try {
+        const payload = await PEC.openBlob(pass.value, officer.keyfile, AAD_OFFICER);
+        cleanup();
+        dlg.close();
+        resolve({ officer, signPriv: payload.signPriv, ecdhPriv: payload.ecdhPriv, alg: payload.alg });
+      } catch {
+        err.textContent = "Wrong passphrase for " + officer.name + " — the officer's key stays sealed. Nothing leaked.";
+      }
+    };
+    const onClose = () => { cleanup(); resolve(null); };
+    function cleanup() {
+      form.removeEventListener("submit", onSubmit);
+      dlg.removeEventListener("close", onClose);
+    }
+    form.addEventListener("submit", onSubmit);
+    dlg.addEventListener("close", onClose);
+    dlg.showModal();
+    pass.focus();
+  });
+}
+
+/* ============================================================
+   OFFBOARDING — the termination ceremony
+   ============================================================ */
+let ob = null; // { userId, successorId, purpose, step, approvals: [officerId], shares: [{x,y}] }
+
+function obStepDefs(user, successor) {
+  return [
+    { t: "Revoke — directory stops vouching", d: "Assertion issuance stops instantly; short-lived assertions bound the offline window to the TTL even if the push is missed." },
+    { t: "Kill sessions on all enrolled devices", d: "Active sessions receive the revocation push; the volume-key broker stops honoring " + user.name + "'s key wrappings." },
+    { t: "Freeze — nobody gains read access", d: "The corporate profile and vault stay sealed. Termination itself grants no one — including IT — any read access." },
+    { t: "Escrow release — dual control (2 of 3 officers)", d: "Stated purpose recorded verbatim; each approval is an officer unlocking their own key and signing; the release is chained into the audit log BEFORE reconstruction. The employee is notified by default." },
+    { t: "Handover to " + (successor ? successor.name : "successor"), d: "Selected company data re-sealed to the successor. The successor inherits the ROLE, not the person — wall bindings do not transfer; conflicts re-surface loudly." },
+    { t: "Rotate shared keys", d: "Every shared volume key the departed user was wrapped to is rotated and re-wrapped to remaining entitled users." },
+    { t: "Wipe / reprovision the device", d: "Cryptographic erase of the corporate profile (destroy TEE-held keys — instant, verifiable). A personal profile, if any, is untouched — its keys were never the org's." },
+    { t: "Retention disposition — LEGAL: DPO/counsel", d: "HR records, audit entries naming them, and their personal data inside handed-over content follow the retention schedule. Postern ships NO default retention period on purpose — every period is counsel's decision." },
+  ];
+}
+
+function renderObSteps() {
+  const ol = $("#obSteps");
+  if (!ob) { ol.innerHTML = ""; return; }
+  const user = S.users.find(u => u.id === ob.userId);
+  const successor = S.users.find(u => u.id === ob.successorId);
+  ol.innerHTML = obStepDefs(user, successor).map((s, i) => {
+    const st = i < ob.step ? "done" : (i === ob.step ? "active" : "");
+    const mark = i < ob.step ? "✓" : String(i + 1);
+    let extra = "";
+    if (i === 3 && i === ob.step) {
+      extra = "<div class='btnrow'><button class='btn-acc' id='btnApprove'>Officer approval " + (ob.approvals.length + 1) + " of 2</button></div>";
+      if (ob.approvals.length) extra = "<p class='ok-line' style='margin:4px 0'>Approved so far: " +
+        escapeHtml(ob.approvals.map(id => S.officers.find(o => o.id === id).name).join(", ")) + "</p>" + extra;
+    } else if (i === ob.step) {
+      extra = "<div class='btnrow'><button class='btn-acc' id='btnObNext'>Execute step</button></div>";
+    }
+    return "<li data-st='" + st + "'><span class='s-mark'>" + mark + "</span><div><h3>" + escapeHtml(s.t) + "</h3><p>" + escapeHtml(s.d) + "</p>" + extra + "</div></li>";
+  }).join("");
+  const bA = $("#btnApprove"); if (bA) bA.addEventListener("click", obApprove);
+  const bN = $("#btnObNext"); if (bN) bN.addEventListener("click", obNext);
+}
+
+$("#btnStartOffboard").addEventListener("click", () => {
+  const err = $("#obErr");
+  const userId = $("#obUser").value, succId = $("#obSuccessor").value, purpose = $("#obPurpose").value.trim();
+  if (!userId) { err.textContent = "Pick a user to offboard."; return; }
+  if (!succId || succId === userId) { err.textContent = "Pick a distinct successor / receiving manager."; return; }
+  if (!purpose) { err.textContent = "A stated purpose is required — it is recorded verbatim in the signed release. (Whether the purpose is a lawful ground is counsel's call.)"; return; }
+  err.textContent = "";
+  ob = { userId, successorId: succId, purpose, step: 0, approvals: [], shares: [] };
+  renderObSteps();
+});
+
+async function obNext() {
+  const user = S.users.find(u => u.id === ob.userId);
+  const successor = S.users.find(u => u.id === ob.successorId);
+  const A = S.org.adminName;
+  switch (ob.step) {
+    case 0:
+      user.status = "revoked";
+      await audit(A, "offboard.revoke", `${user.name} (${user.id}): directory assertions stopped; deprovisioned`);
+      break;
+    case 1:
+      await audit(A, "offboard.sessions", `${user.name}: revocation push sent; sessions killed; key wrappings dishonored`);
+      break;
+    case 2:
+      await audit(A, "offboard.freeze", `${user.name}: profile & vault remain sealed; no read access granted by termination`);
+      break;
+    case 3: return; // handled by approvals
+    case 4: {
+      await audit(A, "offboard.handover", `scope: corporate volumes of ${user.name} → ${successor.name}; successor inherits ROLE entitlements only (wall bindings do not transfer)`);
+      break;
+    }
+    case 5: {
+      const vols = S.volumes.filter(v => (user.accessed || []).includes(v.id)).map(v => v.name);
+      await audit(A, "offboard.rotate", `rotated + re-wrapped shared volume keys reachable by ${user.name}` + (vols.length ? ` (${vols.join("; ")})` : " (none accessed)"));
+      break;
+    }
+    case 6:
+      user.status = "offboarded";
+      user.devicePub = null;
+      await audit(A, "offboard.wipe", `${user.name}: corporate profile cryptographically erased (TEE keys destroyed); device reprovisionable; personal profile (if any) untouched`);
+      break;
+    case 7:
+      await audit(A, "offboard.retention", `${user.name}: disposition PENDING — retention periods & erasure-vs-legal-hold are a DPO/counsel determination; no engineering default applied`);
+      ob = null;
+      saveS(); renderAll();
+      return;
+  }
+  ob.step++;
+  saveS(); renderAll();
+}
+
+async function obApprove() {
+  const user = S.users.find(u => u.id === ob.userId);
+  const res = await officerApprove(
+    "Escrow release for " + user.name + " — purpose: “" + ob.purpose + "”. Approval " + (ob.approvals.length + 1) +
+    " of 2. Your passphrase unlocks YOUR key only; your approval is a signature over the release record.",
+    ob.approvals);
+  if (!res) return;
+  // decrypt this officer's Shamir share (ECIES) + sign the release record
+  try {
+    const rec = user.escrow.shares.find(s => s.officerId === res.officer.id);
+    const y = await PEC.eciesOpen(res.ecdhPriv, rec.box, AAD_SHARE + ":" + user.id);
+    ob.shares.push({ x: rec.x, y });
+    const releaseRecord = { v: "postern:enterprise:release:v1", user: user.id, purpose: ob.purpose, approver: res.officer.fpr, at: new Date().toISOString() };
+    const sig = await PEC.signObj(res.alg, res.signPriv, releaseRecord);
+    ob.approvals.push(res.officer.id);
+    await audit(res.officer.name + " (" + res.officer.title + ")", "escrow.approve",
+      `release for ${user.name}; purpose "${ob.purpose}"; share ${rec.x} decrypted; approval signed (${sig.slice(0, 24)}…); employee notification: ON (default)`);
+    if (ob.approvals.length >= 2) {
+      const key = PEC.shamirJoin(ob.shares);
+      const fpr = (await PEC.sha256Hex(PEC.hex(key))).slice(0, 16).toUpperCase();
+      const match = fpr === user.escrow.recoveryFpr;
+      await audit(S.org.adminName, "escrow.release",
+        `quorum met (2 of 3) for ${user.name}: recovery key reconstructed via Shamir — fingerprint ${fpr} ${match ? "MATCHES" : "DOES NOT MATCH"} the enrollment record` +
+        (match ? "; corporate data root unwrapped for handover" : "; refusing to proceed — reconstruction does NOT match the enrollment record"));
+      if (match) {
+        ob.step++;
+      } else {
+        ob.approvals = []; ob.shares = [];
+        alert("Escrow reconstruction fingerprint mismatch for " + user.name + " — refusing to treat the data root as unwrapped. This indicates corrupted officer shares, not a legitimate release. Approvals cleared; have officers re-approve.");
+      }
+    }
+    saveS(); renderAll();
+  } catch (e) {
+    alert("Share decryption failed: " + e.message);
+  }
+}
+
+/* ============================================================
+   WALLS — COI editor + simulated file view
+   ============================================================ */
+$("#btnAddCoi").addEventListener("click", async () => {
+  const name = $("#coiName").value.trim();
+  if (!name) return;
+  S.coi.push({ id: "coi-" + PEC.hex(PEC.rand(3)), name, groups: [] });
+  $("#coiName").value = "";
+  await audit(S.org.adminName, "wall.class", `COI class "${name}" created`);
+  renderAll();
+});
+
+$("#btnAddVol").addEventListener("click", async () => {
+  const err = $("#volErr");
+  const name = $("#volName").value.trim();
+  if (!name) { err.textContent = "Volume name required."; return; }
+  const family = PEC.ROLES.find(r => r.id === $("#volRole").value).volumes[0] || "engineering";
+  let groupId = null, classId = null;
+  const newGroupName = $("#volGroupName").value.trim();
+  const newGroupClass = $("#volGroupClass").value;
+  if (newGroupName && newGroupClass) {
+    const cls = S.coi.find(c => c.id === newGroupClass);
+    const g = { id: "grp-" + PEC.hex(PEC.rand(3)), name: newGroupName };
+    cls.groups.push(g);
+    groupId = g.id; classId = cls.id;
+  } else if ($("#volGroup").value) {
+    const [cid, gid] = $("#volGroup").value.split("|");
+    classId = cid || null; groupId = gid || null;
+  }
+  err.textContent = "";
+  S.volumes.push({ id: "vol-" + PEC.hex(PEC.rand(3)), name, family, groupId, classId, clearance: Number($("#volClear").value), region: "BR" });
+  $("#volName").value = ""; $("#volGroupName").value = "";
+  await audit(S.org.adminName, "wall.volume", `volume "${name}" registered (family ${family}${classId ? ", COI-classed" : ", general pool"}); per-volume key wrapped to entitled users only`);
+  renderAll();
+});
+
+async function accessVolume(userId, volId) {
+  const user = S.users.find(u => u.id === userId);
+  const vol = S.volumes.find(v => v.id === volId);
+  const rb = PEC.rbacCheck(user, vol, PEC.ROLES);
+  if (!rb.ok) return;
+  const w = PEC.wallCheck(user, vol, S.volumes);
+  if (!w.ok) return; // mandatory: no override path exists
+  if (!(user.accessed || []).includes(volId)) {
+    user.accessed = user.accessed || [];
+    user.accessed.push(volId);
+    if (vol.classId) {
+      const cls = S.coi.find(c => c.id === vol.classId);
+      const grp = cls.groups.find(g => g.id === vol.groupId);
+      await audit(user.name, "wall.bind",
+        `first access to "${vol.name}" BINDS ${user.name} to group "${grp.name}" in COI class "${cls.name}" — conflicting groups now cryptographically unavailable to them`);
+    } else {
+      await audit(user.name, "volume.open", `opened "${vol.name}" (key released: role + clearance + wall all pass)`);
+    }
+    saveS();
+  }
+  renderAll();
+}
+
+function volGroupName(vol) {
+  if (!vol.classId) return "general pool";
+  const cls = S.coi.find(c => c.id === vol.classId);
+  const grp = cls && cls.groups.find(g => g.id === vol.groupId);
+  return (cls ? cls.name : "?") + " · " + (grp ? grp.name : "?");
+}
+
+function renderWallTab() {
+  // COI list
+  $("#coiList").innerHTML = S.coi.length
+    ? S.coi.map(c => "<div class='dept'><div class='dept-name'>COI class · " + escapeHtml(c.name) + "</div><ul>" +
+        (c.groups.length ? c.groups.map(g => {
+          const vols = S.volumes.filter(v => v.groupId === g.id);
+          return "<li><strong>" + escapeHtml(g.name) + "</strong> <span class='u-role'>" +
+            (vols.length ? vols.map(v => escapeHtml(v.name)).join(" · ") : "no volumes yet") + "</span></li>";
+        }).join("") : "<li class='u-role'>no dataset groups yet</li>") + "</ul></div>").join("")
+    : "<p class='fhelp'>No COI classes yet — add one, then create dataset groups by adding volumes into it.</p>";
+  // selectors
+  $("#volGroup").innerHTML = "<option value=''>— general pool (no COI class) —</option>" +
+    S.coi.flatMap(c => c.groups.map(g => "<option value='" + escapeHtml(c.id) + "|" + escapeHtml(g.id) + "'>" + escapeHtml(c.name) + " · " + escapeHtml(g.name) + "</option>")).join("");
+  $("#volGroupClass").innerHTML = "<option value=''>— pick class —</option>" + S.coi.map(c => "<option value='" + escapeHtml(c.id) + "'>" + escapeHtml(c.name) + "</option>").join("");
+  $("#volRole").innerHTML = PEC.ROLES.filter(r => r.volumes.length).map(r => "<option value='" + r.id + "'>" + escapeHtml(r.name) + " (" + r.volumes[0] + ")</option>").join("");
+  // file view
+  const sel = $("#wallUser");
+  const cur = sel.value;
+  sel.innerHTML = S.users.filter(u => u.status === "active").map(u => "<option value='" + escapeHtml(u.id) + "'>" + escapeHtml(u.name) + " — " + escapeHtml(u.role) + "</option>").join("");
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  const user = S.users.find(u => u.id === sel.value);
+  const grid = $("#volGrid");
+  if (!user) { grid.innerHTML = "<p class='fhelp'>No active users yet — provision one in the Organization tab.</p>"; return; }
+  grid.innerHTML = S.volumes.map(v => {
+    const rb = PEC.rbacCheck(user, v, PEC.ROLES);
+    const w = PEC.wallCheck(user, v, S.volumes);
+    const opened = (user.accessed || []).includes(v.id);
+    let st, label, body;
+    if (opened) { st = "bound"; label = "<span class='pill acc'>open · bound</span>"; body = "Accessed. " + (v.classId ? "This binding is what walls conflicting groups." : ""); }
+    else if (!rb.ok) { st = "rbac"; label = "<span class='pill'>locked · rbac/abac</span>"; body = "Key not wrapped to this user: " + escapeHtml(rb.why) + "."; }
+    else if (!w.ok) {
+      st = "walled"; label = "<span class='pill err'>WALLED · Brewer–Nash</span>";
+      const cls = S.coi.find(c => c.id === v.classId);
+      const bg = cls.groups.find(g => g.id === w.boundTo);
+      body = "Mandatory denial: this user already accessed “" + escapeHtml(bg ? bg.name : "?") + "” in class “" + escapeHtml(cls.name) + "”. The key broker will not release this volume's key — no override exists; unbinding is an audited quorum act.";
+    }
+    else { st = "open"; label = "<span class='pill ok'>available</span>"; body = "Role, clearance and wall all pass — the key would be released."; }
+    return "<div class='vol' data-st='" + st + "'><div class='v-name'>" + escapeHtml(v.name) + "</div>" +
+      "<div class='v-meta'>" + escapeHtml(volGroupName(v)) + " · clearance ≥" + v.clearance + " · " + escapeHtml(v.family) + " · " + escapeHtml(v.region) + "</div>" +
+      "<div style='font-size:12.3px;color:var(--text-dim);margin-bottom:8px'>" + body + " " + label + "</div>" +
+      (st === "open" ? "<button class='btn-ghost' style='font-size:12px;padding:4px 10px' data-open-vol='" + escapeHtml(v.id) + "'>Open volume</button>" : "") +
+      "</div>";
+  }).join("");
+  $$("#volGrid [data-open-vol]").forEach(b => b.addEventListener("click", () => accessVolume(sel.value, b.dataset.openVol)));
+}
+$("#wallUser").addEventListener("change", renderWallTab);
+
+/* ============================================================
+   TRANSPARENCY PANEL — what the employee sees
+   ============================================================ */
+async function renderTpTab() {
+  const sel = $("#tpUser");
+  const cur = sel.value;
+  sel.innerHTML = S.users.map(u => "<option value='" + escapeHtml(u.id) + "'>" + escapeHtml(u.name) + " (" + escapeHtml(u.status) + ")</option>").join("");
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  const user = S.users.find(u => u.id === sel.value);
+  const box = $("#tpPanel");
+  if (!user) { box.innerHTML = "<p class='fhelp'>No users yet.</p>"; return; }
+  const p = S.policy.payload;
+  const sigOk = await PEC.verifyObj(S.org.adminAlg, S.org.adminPub, p, S.policy.sig);
+  const role = PEC.ROLES.find(r => r.id === user.role);
+  const bindings = (user.accessed || []).map(id => S.volumes.find(v => v.id === id)).filter(v => v && v.classId)
+    .map(v => volGroupName(v));
+  box.innerHTML =
+    "<div class='tp-panel' data-sig='" + (sigOk ? "ok" : "bad") + "'>" +
+    "<span class='tp-badge'>" + (sigOk ? "policy signature verified" : "SIGNATURE FAILED — do not trust this policy") + "</span>" +
+    "<h3>This device is managed by " + escapeHtml(p.org) + "</h3>" +
+    "<dl class='kv'>" +
+    "<dt>Admin of record</dt><dd>" + escapeHtml(p.adminOfRecord) + " · " + escapeHtml(p.adminFpr) + "</dd>" +
+    "<dt>Governance quorum (no single admin can release your escrow or read company data alone)</dt><dd>" +
+    p.quorum.officers.map(o => escapeHtml(o.name) + " — " + escapeHtml(o.title) + " (" + escapeHtml(o.fpr) + ")").join("<br>") +
+    "<br>threshold: " + p.quorum.m + " of " + p.quorum.n + "</dd>" +
+    "<dt>Signed policy version</dt><dd>v" + p.policyVersion + " · issued " + escapeHtml(p.issued) + "</dd>" +
+    "<dt>Your machine profile (role " + escapeHtml(role ? role.name : user.role) + ")</dt><dd>apps: " + escapeHtml(role ? role.apps.join(", ") : "—") +
+    "<br>network egress: " + escapeHtml(role ? role.egress.join(", ") : "—") + "<br>offline grace: " + p.offlineGraceHours + " h</dd>" +
+    "</dl>" +
+    "<h3>What IS monitored on this device</h3><ul>" +
+    p.monitored.map(m => "<li class='good'><span class='lm'>●</span><span>" + escapeHtml(m) + "</span></li>").join("") + "</ul>" +
+    "<h3>What is NOT monitored — by refusal, not by omission</h3><ul>" +
+    p.notMonitored.map(m => "<li class='good'><span class='lm'>●</span><span>" + escapeHtml(m) + "</span></li>").join("") + "</ul>" +
+    "<h3>Escrow &amp; your data</h3><ul>" +
+    "<li class='good'><span class='lm'>●</span><span>" + escapeHtml(p.escrowNotice) + "</span></li>" +
+    "<li class='good'><span class='lm'>●</span><span>Your personal profile (if enabled) is yours: its keys are never escrowed and the org cannot read it. The org sees only that it exists and its storage size.</span></li>" +
+    "</ul>" +
+    (bindings.length ?
+      "<h3>Your information-barrier bindings</h3><ul>" + bindings.map(b => "<li class='good'><span class='lm'>●</span><span>Bound to " + escapeHtml(b) + " — conflicting datasets in the same class are closed to you (Brewer–Nash).</span></li>").join("") + "</ul>" : "") +
+    "<h3>Your data rights</h3><ul>" +
+    "<li class='good'><span class='lm'>●</span><span>You can request access, correction, deletion and export of your personal data. The scope, deadlines and exceptions of those rights in the employment context are determined by law and by the org's DPO/counsel — this panel states the mechanism exists, not the legal outcome. <span class='legalflag'>LEGAL: DPO/counsel</span></span></li>" +
+    "</ul>" +
+    "<p class='pv-note' style='margin-bottom:0'><strong>Not legal advice.</strong> This panel is the product's transparency mechanism; the employer's actual privacy notice and its legal adequacy are the DPO's and counsel's responsibility.</p>" +
+    "</div>";
+}
+$("#tpUser").addEventListener("change", renderTpTab);
+
+/* ============================================================
+   AUDIT TAB
+   ============================================================ */
+function renderAuditTab() {
+  $("#auditLog").innerHTML = [...S.audit].reverse().map(e =>
+    "<div class='a-row'><div class='a-seq'>#" + e.seq + "</div><div>" +
+    "<span class='a-act'>" + escapeHtml(e.action) + "</span> · " + escapeHtml(e.ts) + " · by " + escapeHtml(e.actor) +
+    "<div class='a-detail'>" + escapeHtml(e.detail) + "</div>" +
+    "<div class='a-hash'>hash " + escapeHtml(e.hash.slice(0, 20)) + "… ← prev " + escapeHtml(String(e.prev).slice(0, 20)) + "…</div>" +
+    "</div></div>").join("") || "<p class='fhelp'>No entries yet.</p>";
+}
+$("#btnVerifyChain").addEventListener("click", async () => {
+  const res = await PEC.auditVerify(S.audit);
+  const elm = $("#chainStatus");
+  if (res.ok) { elm.style.color = "var(--ok)"; elm.textContent = "✓ chain verifies — " + res.count + " entries, each hash links its predecessor"; }
+  else { elm.style.color = "var(--err)"; elm.textContent = "✗ chain BROKEN at entry #" + res.at + " — evidence of tampering"; }
+});
+
+/* ============================================================
+   ORGANIZATION TAB
+   ============================================================ */
+function renderOrgTab() {
+  const o = S.org;
+  $("#orgSummary").innerHTML =
+    "<dl class='kv' style='margin-top:0'>" +
+    "<dt>Organization · data controller <span class='legalflag'>LEGAL: DPO/counsel</span> controller/processor analysis is counsel's</dt><dd>" + escapeHtml(o.name) + " · founded " + escapeHtml(new Date(o.created).toLocaleDateString()) + "</dd>" +
+    "<dt>Admin of record (named — never anonymous, never covert)</dt><dd>" + escapeHtml(o.adminName) + " · <span class='fpr'>" + escapeHtml(o.adminFpr) + "</span></dd>" +
+    "<dt>Governance quorum — 2 of 3 for escrow release &amp; data access</dt><dd>" +
+    S.officers.map(x => escapeHtml(x.name) + " — " + escapeHtml(x.title) + " · " + escapeHtml(x.fpr)).join("<br>") + "</dd>" +
+    "<dt>Directory</dt><dd>self-hosted Postern Directory (demo, in-browser) — the product also federates to an existing IdP via OIDC / SAML; the device key stays in the TEE either way</dd>" +
+    "</dl>";
+  // dept datalist + org tree
+  const depts = [...new Set(S.users.map(u => u.dept))];
+  $("#deptList").innerHTML = depts.map(d => "<option value='" + escapeHtml(d) + "'>").join("");
+  $("#orgTree").innerHTML = depts.length ? depts.map(d =>
+    "<div class='dept'><div class='dept-name'>" + escapeHtml(d) + "</div><ul>" +
+    S.users.filter(u => u.dept === d).map(u =>
+      "<li><strong>" + escapeHtml(u.name) + "</strong> <span class='u-role'>" + escapeHtml(u.role) +
+      " · clearance " + u.attrs.clearance + " · " + escapeHtml(u.attrs.region) + (u.attrs.project ? " · " + escapeHtml(u.attrs.project) : "") + "</span> " +
+      "<span class='pill " + (u.status === "active" ? "ok" : (u.status === "revoked" ? "warn" : "err")) + "'>" + escapeHtml(u.status) + "</span></li>").join("") +
+    "</ul></div>").join("") : "<p class='fhelp'>No users yet — provision the first one above, or load the sample org from a fresh start.</p>";
+  // users table
+  $("#userTable").innerHTML = S.users.length ?
+    "<table class='grid'><tr><th>User</th><th>Device key</th><th>Escrow</th><th>Status</th></tr>" +
+    S.users.map(u => "<tr><td>" + escapeHtml(u.name) + "<br><span class='mono' style='font-size:11px;color:var(--muted)'>" + escapeHtml(u.id) + "</span></td>" +
+      "<td class='mono' style='font-size:11.5px'>" + (u.devicePub ? escapeHtml(u.deviceFpr) + "<br>org-signed enrollment cert" : "<span style='color:var(--muted)'>wiped (crypto-erased)</span>") + "</td>" +
+      "<td class='mono' style='font-size:11.5px'>2-of-3 Shamir · key fpr " + escapeHtml(u.escrow.recoveryFpr) + "…</td>" +
+      "<td><span class='pill " + (u.status === "active" ? "ok" : (u.status === "revoked" ? "warn" : "err")) + "'>" + escapeHtml(u.status) + "</span></td></tr>").join("") +
+    "</table>" : "";
+  // role select + role table
+  $("#pvRole").innerHTML = PEC.ROLES.map(r => "<option value='" + r.id + "'>" + escapeHtml(r.name) + "</option>").join("");
+  $("#roleTable").innerHTML =
+    "<table class='grid'><tr><th>Role</th><th>Apps (machine profile)</th><th>Volume families</th><th>Network egress classes</th></tr>" +
+    PEC.ROLES.map(r => "<tr><td><strong>" + escapeHtml(r.name) + "</strong><br><span class='mono' style='font-size:11px;color:var(--muted)'>" + r.id + "</span></td>" +
+      "<td>" + escapeHtml(r.apps.join(", ")) + "</td>" +
+      "<td>" + (r.volumes.length ? escapeHtml(r.volumes.join(", ")) : "<em>none — admin ≠ access</em>") + "</td>" +
+      "<td>" + escapeHtml(r.egress.join(", ")) + "</td></tr>").join("") +
+    "</table><p class='fhelp'>Separation of duty (declared, enforced at assignment): " +
+    PEC.SOD.map(p => p.join(" ⟂ ")).join("; ") + ".</p>";
+  // offboard selects
+  $("#obUser").innerHTML = "<option value=''>— pick —</option>" + S.users.filter(u => u.status === "active").map(u => "<option value='" + escapeHtml(u.id) + "'>" + escapeHtml(u.name) + "</option>").join("");
+  $("#obSuccessor").innerHTML = "<option value=''>— pick —</option>" + S.users.filter(u => u.status === "active").map(u => "<option value='" + escapeHtml(u.id) + "'>" + escapeHtml(u.name) + "</option>").join("");
+}
+
+/* ---------- policy box (settings) ---------- */
+function renderPolicyBox() {
+  const p = S.policy.payload;
+  $("#policyBox").innerHTML =
+    "<dt>Canonical signed policy (v" + p.policyVersion + ")</dt><dd style='max-height:200px;overflow-y:auto'>" + escapeHtml(PEC.stableStringify(p)) + "</dd>" +
+    "<dt>Signature (" + escapeHtml(S.org.adminAlg) + " — classical stand-in for Falcon-1024 ‖ ML-DSA-65)</dt><dd>" + escapeHtml(S.policy.sig.slice(0, 96)) + "…</dd>";
+}
+
+/* ============================================================
+   POLICY ASSISTANT — optional; the ONLY possible network call
+   ============================================================ */
+const API_URL = "https://api.anthropic.com/v1/messages";
+/* key access is KeySeal-aware: while a lock is set, plaintext never touches disk */
+function getKey() {
+  if (KeySeal.isSealed()) return (KeySeal.key() || "").trim();
+  return (store.get(LS.KEY, "") || "").trim();
+}
+function setKey(v) {
+  if (KeySeal.isSealed()) KeySeal.update(v); // re-seal; never write plaintext while locked mode is on
+  else store.set(LS.KEY, v);
+}
+$("#modelSel").value = store.get(LS.MODEL, "claude-haiku-4-5-20251001");
+$("#apiKey").addEventListener("change", () => setKey($("#apiKey").value.trim()));
+$("#modelSel").addEventListener("change", () => store.set(LS.MODEL, $("#modelSel").value));
+
+/* ---- optional key lock (seal at rest) — same flow as sotto/store/vedetta ---- */
+function keyLockMsg(text, isErr) {
+  const s = $("#keyLockState");
+  s.textContent = text;
+  s.style.color = isErr ? "var(--err)" : "";
+}
+function syncKeyLockUI() {
+  const sealed = KeySeal.isSealed(), locked = KeySeal.isLocked();
+  const k = $("#apiKey");
+  k.disabled = locked;
+  k.value = locked ? "" : getKey();
+  k.placeholder = locked ? "sealed — unlock below" : "sk-ant-…";
+  $("#keyPass").style.display = (sealed && !locked) ? "none" : "";
+  $("#btnKeyLock").textContent = locked ? "unlock" : sealed ? "remove lock" : "lock key";
+  if (locked) keyLockMsg("Sealed. localStorage holds only AES-256-GCM ciphertext — enter your passphrase to unlock for this session.");
+  else if (sealed) keyLockMsg("Sealed and unlocked for this session. Edits re-seal automatically; the readable key lives only in this tab's memory.");
+  else keyLockMsg("Not locked — the key sits readable in this browser's localStorage. Set a passphrase to seal it.");
+}
+$("#btnKeyLock").addEventListener("click", async () => {
+  if (KeySeal.isLocked()) {
+    const ok = await KeySeal.unlock($("#keyPass").value);
+    $("#keyPass").value = "";
+    if (!ok) { syncKeyLockUI(); keyLockMsg("Wrong passphrase. Decryption is all-or-nothing — nothing was revealed.", true); return; }
+    syncKeyLockUI();
+    return;
+  }
+  if (KeySeal.isSealed()) { // currently unlocked → remove the lock
+    if (!confirm("Remove the lock? Your API key will again be stored readable (plaintext) in this browser's localStorage.")) return;
+    KeySeal.removeLock();
+    syncKeyLockUI();
+    return;
+  }
+  const key = $("#apiKey").value.trim();
+  if (!key) { keyLockMsg("Add your API key above first — then lock it.", true); return; }
+  if ($("#keyPass").value.length < 6) { keyLockMsg("Use at least 6 characters — it protects your key.", true); return; }
+  await KeySeal.lock($("#keyPass").value, key);
+  $("#keyPass").value = "";
+  syncKeyLockUI();
+});
+syncKeyLockUI();
+
+$("#btnAsk").addEventListener("click", async () => {
+  const key = getKey(), q = $("#askBox").value.trim(), err = $("#askErr"), out = $("#askOut");
+  if (!key) {
+    err.textContent = KeySeal.isLocked()
+      ? "Your API key is sealed at rest — unlock it above for this session."
+      : "No API key — the assistant is optional; everything else in this console works fully offline.";
+    return;
+  }
+  if (!q) { err.textContent = "Ask something."; return; }
+  err.textContent = ""; out.hidden = false; out.textContent = "…";
+  $("#btnAsk").disabled = true;
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: $("#modelSel").value,
+        max_tokens: 1500,
+        system: "You are the Postern Enterprise policy assistant inside the Consiglio admin console. You help admins reason about the org's transparent device policy, RBAC/ABAC, Brewer-Nash walls, escrow governance and lifecycle ceremonies. You are NOT a lawyer: never claim anything is compliant with LGPD/GDPR/CCPA or any law; always flag legal determinations as requiring the org's DPO and counsel. Be concise and honest about limits. Current signed policy JSON: " + PEC.stableStringify(S.policy.payload),
+        messages: [{ role: "user", content: q }],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error("API " + res.status + (body ? " — " + body.slice(0, 200) : ""));
+    }
+    const data = await res.json();
+    out.textContent = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n") || "(empty response)";
+  } catch (e) {
+    out.hidden = true;
+    err.textContent = e instanceof TypeError
+      ? "Couldn't reach api.anthropic.com — check your connection. (Nothing was sent anywhere else; that is the only endpoint this page can reach.)"
+      : "Assistant failed: " + e.message;
+  } finally { $("#btnAsk").disabled = false; }
+});
+
+/* ============================================================
+   render-all + dialogs + theme + boot
+   ============================================================ */
+function renderAll() {
+  if (!S) return;
+  renderOrgTab();
+  renderWallTab();
+  renderObSteps();
+  renderAuditTab();
+  renderTpTab();
+  renderPolicyBox();
+}
+
+$("#btnHonesty").addEventListener("click", () => $("#dlgHonesty").showModal());
+$$("[data-close]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
+
+function applyTheme(t) {
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+}
+$("#btnTheme").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const next = cur === "light" ? "dark" : "light";
+  store.set(LS.THEME, next);
+  applyTheme(next);
+});
+applyTheme(store.get(LS.THEME));
+
+(function boot() {
+  loadS();
+  if (!S) show("bootstrap");
+  else toLocked();
+  document.body.dataset.booted = "1";
+})();
+</script>
+</body>
+</html>

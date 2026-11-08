@@ -1,0 +1,28 @@
+# Arti (Rust Tor) configuration for Postern for postmarketOS.
+# Community, NON-attestable tier. Key names verified against Arti's
+# arti-example-config.toml (proxy.socks_listen, proxy.dns_listen,
+# storage.state_dir, storage.cache_dir, logging.console). UNBOOTED: not yet
+# loaded by a real `arti` binary on a device.
+
+[proxy]
+# Listen for SOCKS on loopback only. The node and the app suite connect here.
+# Bind address is localhost by Arti default; the port is what we pin.
+socks_listen = 9150
+# No DNS proxy port (0 = disabled). Enable only if an app needs Tor DNS.
+dns_listen = 0
+
+[storage]
+# Dedicated, service-owned paths (0700, user `postern`) -- NOT the default
+# per-user XDG dirs, because Arti runs as a system service here.
+state_dir = "/var/lib/postern/arti"
+cache_dir = "/var/cache/postern/arti"
+
+[storage.permissions]
+# Arti refuses to run if its state/cache dirs are group/world accessible.
+# The service creates them 0700 owned by `postern`, so trust that user only.
+dangerously_trust_everyone = false
+trust_user = "postern"
+
+[logging]
+# Transparent, local logging only. No remote log shipping, no telemetry.
+console = "info"

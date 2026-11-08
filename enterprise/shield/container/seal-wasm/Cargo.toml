@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# postern-shield-seal-wasm — the REAL seal adapter for the SHIELD work-container,
+# compiled to a small WebAssembly module so the container's JS engine
+# (src/real-seal-engine.mjs) can call the seal IN-PROCESS, with NO subprocess and
+# NO key crossing a pipe. It is the in-process sibling of the `../seal/` CLI
+# adapter (which stays as a documented fallback).
+#
+# STATUS: reference prototype — UNAUDITED, pre-production.
+#
+# Like the CLI adapter it defines NO crypto of its own: every op delegates to the
+# ONE canonical Postern seal in `postern-core` (XChaCha20-Poly1305 v2, versioned +
+# key-committing + context-bound, with the 32-byte key from Argon2id at the
+# at-rest tier). It exposes a tiny hand-rolled C-ABI over wasm linear memory
+# (alloc / free / derive_key / seal / open) — NO wasm-bindgen, NO npm build deps,
+# so Node's built-in `WebAssembly` loads it directly.
+#
+# Randomness: on wasm32-unknown-unknown there is no ambient OS RNG, so we register
+# a CUSTOM getrandom backend that imports `sh_host_random` from the host. Node
+# supplies it from `node:crypto` randomFillSync (the OS CSPRNG). The seal's nonce
+# is therefore still OS-random, in-process.
+#
+# DELIBERATELY its OWN workspace root (empty [workspace] below) so it is excluded
+# from the repo's virtual workspace and needs NO edit to the root Cargo.toml.
+
+[package]
+name = "postern-shield-seal-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "In-process (WebAssembly) seal adapter for the Postern SHIELD work-container — wires the container's injected seal interface to the canonical postern-core seal (XChaCha20-Poly1305 + Argon2id) without a subprocess. Unaudited reference prototype."
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Own workspace root: exclude from the parent virtual workspace without touching
+# the root manifest.
+[workspace]
+
+[lib]
+name = "postern_shield_seal_wasm"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+# The canonical Postern seal (AEAD + Argon2id KDF). No crypto is defined here.
+postern-core = { path = "../../../../crates/postern-core" }
+
+# getrandom with the `custom` feature so we can register a host-imported RNG
+# backend on wasm32-unknown-unknown (no wasm-bindgen / no `js` feature). Feature
+# unification pulls the whole dependency tree's getrandom onto this backend.
+getrandom = { version = "0.2", features = ["custom"] }
+
+# Wipe the derived key / subkey material we hold on the wasm side.
+zeroize = "1"
+
+# Argon2id at the at-rest tier (64 MiB, t = 3) is unusably slow unoptimized;
+# optimize it (and everything) even in a debug wasm build.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+# Small module: strip and let LTO shrink it. panic=abort avoids unwinding tables.
+lto = true
+panic = "abort"
+strip = true

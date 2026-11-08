@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# postern-shield-seal — the REAL seal adapter for the SHIELD work-container.
+#
+# STATUS: reference prototype — UNAUDITED, pre-production.
+#
+# This crate implements the container's injected seal interface
+# (seal / open / deriveKey) against the ONE canonical Postern seal in
+# `postern-core` (XChaCha20-Poly1305, versioned + key-committing + context-bound,
+# with the 32-byte key from Argon2id). It re-implements NONE of that crypto — it
+# is a thin, context-pinned adapter exposed as a tiny stdin/stdout CLI that the
+# container's JS integration adapter (src/real-seal-engine.mjs) spawns.
+#
+# It is DELIBERATELY its OWN workspace root (the empty [workspace] table below),
+# so it is excluded from the repo's virtual workspace and needs NO edit to the
+# root Cargo.toml. Its only dependency is the path crate `postern-core`.
+
+[package]
+name = "postern-shield-seal"
+version = "0.1.0"
+edition = "2021"
+description = "Real seal adapter for the Postern SHIELD work-container — wires the container's injected seal interface to the canonical postern-core seal (XChaCha20-Poly1305 + Argon2id). Unaudited reference prototype."
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Own workspace root: exclude this crate from the parent virtual workspace
+# without touching the root manifest.
+[workspace]
+
+[[bin]]
+name = "postern-shield-seal"
+path = "src/main.rs"
+
+[dependencies]
+# The canonical Postern seal (AEAD + Argon2id KDF). No crypto is defined here.
+postern-core = { path = "../../../../crates/postern-core" }
+
+# Argon2id at the at-rest tier (64 MiB, t = 3) is unusably slow unoptimized;
+# mirror the root workspace's dev override so the CLI stays fast in a debug
+# build (this table is inert unless THIS crate is the workspace root, which it
+# is — see the [workspace] note above).
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.release]
+opt-level = 3

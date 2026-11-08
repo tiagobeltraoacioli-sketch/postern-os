@@ -1,0 +1,30 @@
+# postern-policy — the ONE shared consent kernel for the Postern products.
+#
+# Extracted from yagabona ("glowing skull") and ezekiel1 ("rims full of eyes"),
+# which each reimplemented the SAME consent primitives in parallel: a
+# fail-closed decision type, an RFC-3339 grant-expiry check, revocation =
+# never-given, and a prose caveat about the honest enforcement boundary. Those
+# had begun to drift (two expiry parsers; two hand-written "userland, not a
+# sandbox" sentences). This crate owns the ONE authoritative form so the two
+# consent surfaces can never diverge again.
+#
+# Honesty: this is the userland *consent kernel*, not an OS/kernel security
+# boundary. The [`EnforcementMode`] type exists precisely to keep that caveat a
+# TYPE the whole workspace shares, rather than prose each crate rounds up.
+# UNAUDITED draft.
+[package]
+name = "postern-policy"
+version = "0.1.0"
+edition = "2021"
+description = "The one shared consent kernel for the Postern products (yagabona, ezekiel1): a fail-closed Decision, a required RFC-3339 grant Expiry, revocation-as-never-given, and a typed EnforcementMode carrying the honest userland-vs-kernel caveat. UNAUDITED draft."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_policy"
+
+[dependencies]
+time = { version = "0.3", features = ["parsing", "formatting"] } # RFC 3339 grant expiry
+thiserror = "2"                                                  # typed errors (matches sibling crates)
+
+[dev-dependencies]
+time = { version = "0.3", features = ["macros"] }                # datetime! literals for deterministic tests

@@ -1,0 +1,28 @@
+Postern Business/Enterprise edition — features layer
+Copyright 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+This product is dual-licensed under MIT OR Apache-2.0. See LICENSE-MIT and
+LICENSE-APACHE-2.0. SPDX-License-Identifier: MIT OR Apache-2.0
+
+HONEST STATUS
+-------------
+Design / reference prototype. Unaudited. Pre-production. Not a certified
+security product. Nothing here ships as-is.
+
+WHAT THIS IS / IS NOT
+---------------------
+- ADDITIVE to the free personal app suite. The personal apps are free and
+  unrestricted, forever. Nothing in this layer disables a personal app or
+  locks a person out of their own device or data.
+- Business edition: free 6-month evaluation for a corporate master; free
+  freemium (up to 3 desktops, 2 years) otherwise. A paid license is required
+  after the evaluation — for the enterprise features only.
+- Payment is FIAT (invoice / card); pricing is still being structured. Never a
+  coin. The Bloch-SIS-PoW coin is not a security, not an asset, and buys no
+  software.
+- This layer implements NO cryptography and does NOT depend on the licensing
+  library's code. The real, offline Ed25519 verify()/mintSub() functions plug
+  in through documented interfaces. The token generator lives on posternlabs.com.
+
+The community/free personal suite is never "Postern OS"; Postern OS is the
+separate reproducible operating system product.

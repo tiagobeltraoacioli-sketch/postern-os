@@ -1,0 +1,12 @@
+SYNTHETIC TEST FIXTURE — NOT A REAL DOCUMENT.
+This is the published ICAO Doc 9303 worked example Machine-Readable Zone
+(the canonical illustrative reference vector used across MRZ-parser test
+suites — e.g. Doc 9303 Part 4). It is not derived from, and does not
+represent, any real person or real government-issued document. It exists
+here purely so ocr-engine.test.mjs can prove the structured-text adapter
+reads REAL file bytes and the MRZ checksum parser validates a REAL,
+externally-known-correct reference vector — not a value invented by the
+code under test.
+
+P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
+L898902C36UTO7408122F1204159ZE184226B<<<<<10

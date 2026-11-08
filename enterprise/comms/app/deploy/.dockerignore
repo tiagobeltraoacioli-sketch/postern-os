@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Applies when building enterprise/comms/app/deploy/Dockerfile with the repo
+# root as context (`docker build -f enterprise/comms/app/deploy/Dockerfile .`).
+# Keep the build context to what the image actually COPYs — everything else
+# (the whole rest of the monorepo: crates/, os/, apps/, other enterprise/
+# subtrees, .git, target/, node_modules/) is irrelevant to this image and
+# would only slow the build / bloat the context.
+*
+
+!enterprise/features/**
+!enterprise/comms/app/**
+!enterprise/comms/compliance/**
+
+# Never let build artifacts, secrets, or compiled crate output from sibling
+# submodules ride along even though they're nested under the paths above.
+enterprise/comms/app/core-rs/target/
+enterprise/comms/app/verification/verify-rs/target/
+enterprise/comms/app/persistence/seal-rs/target/
+enterprise/comms/app/persistence/seal-wasm/target/
+**/*.env
+**/secrets/

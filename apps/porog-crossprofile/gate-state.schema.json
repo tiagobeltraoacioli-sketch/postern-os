@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://posternlabs.com/schema/porog-gate.state.v1.json",
+  "title": "Porog Cross-Profile Gate — managed-profile crossing consent state (v1)",
+  "description": "The single local state file the Porog reconcile kernel (apps/porog-crossprofile/reconcile-kernel.mjs) reads to decide which cross-profile crossings the DPC-owned work (managed) profile opens to the personal profile, and in which direction. EVERY crossing defaults to 'none' (closed) — a missing, malformed, or partial/true-ish crossing blob never rounds up to open. The kernel MUST treat a missing file, an unparseable file, or an unrecognised schema/version (not EXACTLY schema=='postern.porog-gate.state' and version==1) as full-deny: defaultState(), nothing from a foreign blob survives. 'tier' is pinned 'key-attested-device': Porog attests the PHONE (a key-attested Android device), NOT the workspace — this is not a measured-boot workspace and NEVER a Postern Seal; no code path can relabel it. Two capability classes exist: USER-MEDIATED crossings (intents, files, clipboard) open on per-crossing direction + base consent.accepted alone; STANDING/AMBIENT crossings (contacts, calendar, connectedApp) grant background, un-mediated access once open and so are HARD-DENY unless consent.standing is ALSO true, on top of base consent and a non-'none' direction. The kill-switch (killSwitch.engaged) clears ALL directives and re-imposes DISALLOW_CROSS_PROFILE_COPY_PASTE regardless of any crossing's stored direction. sealedWallet.preserved is pinned true and can never be unpinned by input. This kernel governs ONLY the managed (work) profile the DPC owns — it has no authority over the personal profile, and closing a crossing stops FUTURE crossings only; it cannot recall bytes that have ALREADY crossed. The Kotlin DPC that actually APPLIES these directives (addCrossProfileIntentFilter, setCrossProfilePackages, the DISALLOW_CROSS_PROFILE_COPY_PASTE user restriction) is later/VM work and does NOT exist yet — this schema and the pure decision kernel that consumes it are provable today with no Android in the loop. Canonical path (documented, not enforced by this schema): /var/lib/postern/porog-gate/state.json. Reference/prototype, UNAUDITED — no security guarantee until an audit gate. The coin is not a security. Not legal advice.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "tier", "consent", "crossings", "killSwitch", "sealedWallet"],
+  "properties": {
+    "schema": {
+      "const": "postern.porog-gate.state",
+      "description": "Discriminator so the kernel can refuse a foreign file outright. Must match SCHEMA_ID exactly; anything else is unrecognised and drives full-deny (defaultState())."
+    },
+    "version": {
+      "const": 1,
+      "description": "State schema version. Must match SCHEMA_VERSION exactly. Any other value (including a stringified '1') is unrecognised and drives full-deny."
+    },
+    "tier": {
+      "const": "key-attested-device",
+      "description": "Honesty rail: Porog ALWAYS attests the PHONE — a key-attested Android device — NOT the workspace. This is not a measured-boot workspace and is NEVER a Postern Seal. The value is pinned so no code path can silently relabel it as workspace-attested or Seal-covered; it is never taken from input."
+    },
+    "lang": {
+      "type": "string",
+      "enum": ["pt-BR", "en"],
+      "default": "en",
+      "description": "Last UI language the operator selected. Cosmetic; the kernel may ignore it."
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "scope"],
+      "description": "Base consent to open ANY cross-profile crossing, plus the separate, STRONGER 'standing' consent that standing/ambient caps additionally require. Default DENY: no crossing opens unless consent.accepted is true, and standing caps (contacts, calendar, connectedApp) stay hard-denied even with a non-'none' direction unless consent.standing is ALSO true.",
+      "properties": {
+        "accepted": {
+          "type": "boolean",
+          "default": false,
+          "description": "True only after the operator accepted crossing the boundary at all. Default DENY — a fresh/malformed state file grants nothing."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["session", "persistent"],
+          "default": "session",
+          "description": "'session' = consent valid for this boot only (re-ask next boot); 'persistent' = remembered across boots until revoked. Default is the safer 'session'."
+        },
+        "acceptedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp of acceptance, or null. Local record only."
+        },
+        "standing": {
+          "type": "boolean",
+          "default": false,
+          "description": "The STRONGER consent that standing/ambient crossings (contacts, calendar, connectedApp) additionally require on top of consent.accepted and a non-'none' direction. Without it those three crossings stay hard-denied even if their stored direction is not 'none'. Default false."
+        }
+      }
+    },
+    "crossings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intents", "files", "clipboard", "contacts", "calendar", "connectedApp"],
+      "description": "Per-capability crossings between the DPC-owned work (managed) profile and the personal profile. Each defaults to direction 'none' (closed) — DEFAULT-DENY, and a partial or true-ish blob never rounds up to open; only an exact, recognised value in the crossing.direction enum is honoured. USER-MEDIATED crossings (intents, files, clipboard) need only base consent.accepted; STANDING/AMBIENT crossings (contacts, calendar, connectedApp) additionally hard-require consent.standing.",
+      "properties": {
+        "intents": {
+          "$ref": "#/definitions/crossing",
+          "description": "Cross-profile intent resolution (e.g. share sheets, app-to-app hand-offs). Class: user-mediated — the user mediates each crossing at use time. Mechanism: intentFilter — the DPC installs addCrossProfileIntentFilter(admin, filter, flags) per direction. Default DENY."
+        },
+        "files": {
+          "$ref": "#/definitions/crossing",
+          "description": "Cross-profile file/document access (e.g. a file picker reaching across profiles). Class: user-mediated. Mechanism: intentFilter — addCrossProfileIntentFilter flags gate which profile's file picker/provider the other can resolve. Default DENY."
+        },
+        "clipboard": {
+          "$ref": "#/definitions/crossing",
+          "description": "Copy/paste across profiles. Class: user-mediated. Mechanism: copyPasteRestriction — governed by the DISALLOW_CROSS_PROFILE_COPY_PASTE user restriction, which the DPC lifts only when this crossing is non-'none'. NOTE: this OS restriction is DIRECTIONLESS — any non-'none' clipboard direction lifts copy/paste in BOTH directions regardless of the stored value, so clipboard.direction is advisory (a record of user intent), not an OS-enforced direction. Default DENY."
+        },
+        "contacts": {
+          "$ref": "#/definitions/crossing",
+          "description": "Cross-profile contacts access. Class: standing/ambient — once open this grants background, un-mediated access, so it is HARD-DENY unless consent.standing is true in addition to base consent and a non-'none' direction. Mechanism: crossProfilePackages — the DPC allowlists the capability via setCrossProfilePackages. Default DENY."
+        },
+        "calendar": {
+          "$ref": "#/definitions/packagedCrossing",
+          "description": "Cross-profile calendar access. Class: standing/ambient — HARD-DENY unless consent.standing is true in addition to base consent and a non-'none' direction. Mechanism: packageAllowlist (setCrossProfileCalendarPackages) — allowlists EXACTLY ONE named package; a missing/null/malformed package leaves the crossing CLOSED (an empty allowlist never rounds up to an open one). Default DENY."
+        },
+        "connectedApp": {
+          "$ref": "#/definitions/packagedCrossing",
+          "description": "Cross-profile connected-app access (a nominated app allowed to talk across the boundary). Class: standing/ambient — HARD-DENY unless consent.standing is true in addition to base consent and a non-'none' direction. Mechanism: packageAllowlist (setCrossProfilePackages) — allowlists EXACTLY ONE named package; a missing/null/malformed package leaves the crossing CLOSED. Default DENY."
+        }
+      }
+    },
+    "killSwitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engaged"],
+      "description": "Operator kill-switch. When engaged, the DPC MUST clear ALL cross-profile directives (empty intent filters, empty cross-profile package allowlists) and re-impose DISALLOW_CROSS_PROFILE_COPY_PASTE, regardless of any crossing's stored direction or consent state. Engaging never touches sealedWallet.preserved.",
+      "properties": {
+        "engaged": {
+          "type": "boolean",
+          "default": false,
+          "description": "True = all cross-profile bridges cleared, copy/paste re-disallowed, nothing crosses. Default not-engaged so a fresh file does not itself wedge a legitimately-consented posture; crossings still only open if consent.accepted (and, for standing caps, consent.standing) is also true."
+        },
+        "engagedAtIso": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "ISO-8601 timestamp the kill-switch was last engaged, or null."
+        }
+      }
+    },
+    "sealedWallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved"],
+      "description": "Invariant rail: cutting or clearing cross-profile crossings must never destroy the sealed wallet/keys. 'preserved' is fixed true (never taken from input, like 'tier'); no state file and no kill-switch path can clear it.",
+      "properties": {
+        "preserved": {
+          "const": true,
+          "description": "Fixed true. The sealed wallet is never destroyed by cross-profile crossings, consent changes, or the kill-switch. Pinned — input can never unpin it."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction"],
+      "description": "One per-capability crossing between the work (managed) and personal profiles. DEFAULT-DENY: direction defaults to 'none', and a partial or true-ish input value that is not an exact, recognised direction never rounds up to open — it collapses to 'none'.",
+      "properties": {
+        "open": {
+          "type": "boolean",
+          "default": false,
+          "description": "The PRIMARY deny gate (design porog-03 §3.3): the crossing installs ONLY when open == true exactly. BACKWARD COMPAT: when this field is OMITTED the kernel infers open-ness from a real (non-'none') direction; an EXPLICIT false always forces the crossing closed even if a stale direction lingers — fail-closed against a writer that clears open but not direction."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["none", "p2w", "w2p", "both"],
+          "default": "none",
+          "description": "'none' = closed (default). 'p2w' = personal profile can reach into the work profile (FLAG_PARENT_CAN_ACCESS_MANAGED). 'w2p' = work profile can reach into the personal profile (FLAG_MANAGED_CAN_ACCESS_PARENT). 'both' = both directions open. Any value outside this enum is treated as 'none'."
+        }
+      }
+    },
+    "packagedCrossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction"],
+      "description": "A package-backed standing crossing (calendar / connectedApp): identical to 'crossing' plus the ONE named package the DPC allowlists (setCrossProfileCalendarPackages / setCrossProfilePackages). A crossing here that names no valid package has NOTHING to allowlist, so it stays CLOSED regardless of open/direction — an empty or malformed allowlist never rounds up to an open one.",
+      "properties": {
+        "open": {
+          "type": "boolean",
+          "default": false,
+          "description": "The PRIMARY deny gate — same semantics as 'crossing.open': installs ONLY when open == true exactly; omitted infers from a real direction; explicit false always forces closed."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["none", "p2w", "w2p", "both"],
+          "default": "none",
+          "description": "Same enum and default-deny semantics as 'crossing.direction'."
+        },
+        "package": {
+          "type": ["string", "null"],
+          "default": null,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+          "description": "The EXACTLY-ONE Android package to allowlist for this crossing (dotted identifier, conservative charset — the kernel's PKG_RE). null (default) or a malformed value normalises to null in the kernel and keeps the crossing CLOSED: nothing to allowlist, nothing opens."
+        }
+      }
+    }
+  }
+}

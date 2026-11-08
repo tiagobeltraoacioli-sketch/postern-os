@@ -1,0 +1,28 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────
+#  sloboda-gated — stable CLI entrypoint (thin shim over the ESM writer)
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  NON-ATTESTABLE escape-hatch tier — "Postern for postmarketOS — community
+#     edition". NOT "Porog", NEVER "Postern OS". Reference/prototype, UNAUDITED.
+#     This is the consent-gate WRITER: it atomically writes the canonical JSON
+#     and re-derives the line-file projection the wrapper reads. It NEVER opens a
+#     bridge on its own; every grant is an explicit operator intent. No network.
+#
+#  Just execs `node sloboda-gated.mjs "$@"` from this same directory, so
+#  the design's `sloboda-gated <cmd>` name works without a global npm
+#  install. All logic + honesty rails live in the .mjs (node-tested).
+# ─────────────────────────────────────────────────────────────────────────────
+set -eu
+
+_gated_self="$0"
+case "$_gated_self" in
+    */*) _gated_dir="$(unset CDPATH; cd -- "$(dirname -- "$_gated_self")" && pwd)" ;;
+    *)   _gated_dir="$(unset CDPATH; cd -- "$(dirname -- "$(command -v -- "$_gated_self")")" && pwd)" ;;
+esac
+
+if ! command -v node >/dev/null 2>&1; then
+    printf '%s\n' "sloboda-gated: ERROR: node not found on PATH (the writer is a node ESM module)." >&2
+    exit 1
+fi
+
+exec node "$_gated_dir/sloboda-gated.mjs" "$@"

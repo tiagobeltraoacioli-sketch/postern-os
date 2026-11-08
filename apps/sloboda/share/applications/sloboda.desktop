@@ -1,0 +1,18 @@
+[Desktop Entry]
+# ── SLOBODA gateway launcher ─────────────────────────────────────────────────
+# HONESTY: opens the NON-ATTESTABLE Android tier — "Postern for postmarketOS —
+# community edition". This is NOT "Porog" (the stock-Android container) and NOT
+# "Postern OS". Entering Android = data leaves the sealed base; Play Integrity
+# STRONG fails (banking/Wallet/DRM refuse); not covered by the Postern Seal;
+# UNTESTED scaffold. Personal use free; not legal advice. Adjust Exec= to the
+# installed path of the `sloboda` wrapper.
+Type=Application
+Version=1.0
+Name=Sloboda — community edition (Waydroid)
+GenericName=Android compatibility (Waydroid)
+Comment=Non-attestable Waydroid tier — NOT Porog, NOT Postern OS. Lands on the app store.
+Exec=sloboda start
+Terminal=true
+Categories=System;X-Sloboda;
+Keywords=android;waydroid;apps;store;
+X-Postern-Tier=sloboda-compat-non-attestable

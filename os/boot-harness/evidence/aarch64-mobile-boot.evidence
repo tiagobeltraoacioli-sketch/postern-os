@@ -1,0 +1,226 @@
+# Postern OS Mobile — QEMU-aarch64 boot evidence (Rung 1) — FIRST ATTEMPT, FAILED AT RUNG 0
+# UNAUDITED. built≠booted; QEMU≠hardware; reproducible-by-design≠reproduced.
+# No image was produced and QEMU was NEVER LAUNCHED — this sidecar records an
+# honest rung-0 (build/eval) failure, not a boot. See evidence/README.md.
+variant     : mobile (.#mobile-image / .#packages.aarch64-linux.mobile-image, pine64-pinephone)
+timestamp   : 2026-07-14T22:52:43Z
+host        : Linux 6.12.91-fly x86_64 (Fly builder `postern-os-build` — same host as the x86 evidence run)
+git_rev     : b366c4a93052394d9b546672003fd3d36c218b08 (branch: roadmap/consolidate-all; dirty: flake.lock — the committed lock has NO mobile-nixos node; the host lock pins github:mobile-nixos/mobile-nixos/2c132754323fc1915e8d21dcfc0ef68ab084c6fb)
+qemu        : QEMU emulator version 10.0.8 (Debian 1:10.0.8+ds-0+deb13u1+b2) — qemu-system-aarch64 installed for this attempt; NEVER LAUNCHED (rung 0 failed first)
+machine     : -M virt -cpu cortex-a53 -m 2048 -smp 2 (TCG, no KVM) [harness defaults; would-have-been — QEMU never ran]
+image_path  : none — rung 0 failed; `nix build` produced no artifact
+image_nixhash: n/a — no artifact produced, nothing to `nix hash path`
+image_sha256: n/a — no artifact produced, nothing to sha256sum
+build_1     : ./os/boot-harness/boot-qemu-aarch64.sh (verbatim) → `nix build .#mobile-image` cannot resolve on an x86_64 host (attr is packages.aarch64-linux-only); harness_rc=4
+build_2     : nix build .#packages.aarch64-linux.mobile-image --no-link --print-out-paths (harness-equivalent cross attempt, extra-platforms=aarch64-linux + binfmt qemu-user) → flake EVAL error: "The option `services.bloch' does not exist" (os/mobile.nix sets services.bloch.enable but the mobile eval never imports os/bloch-node.nix); crossbuild_rc=1
+markers     : os/boot-harness/success-markers.txt (unmodified)
+grader      : os/boot-harness/check-boot-log.sh (unmodified, read-only)
+log         : evidence/aarch64-mobile-boot.log (truncated attempt log — build output only; NO serial console output exists)
+boot_rc     : n/a — QEMU never launched (harness exited 4 at rung 0)
+check_rc    : 1
+
+# ── SECOND ATTEMPT — 2026-07-14 — fixes applied on macOS dev host; rebuild NOT re-attempted (no Nix here) ──
+# UNAUDITED. built≠booted; QEMU≠hardware; reproducible-by-design≠reproduced.
+# This entry records two minimal source fixes for the rung-0 failures above.
+# It does NOT record a rebuild: the host applying the fixes is macOS with NO
+# Nix installed (verified: `command -v nix` → nothing), so the real
+# `nix build .#packages.aarch64-linux.mobile-image` CANNOT be re-run from here.
+# Rung 0 therefore REMAINS FAIL (status: unverified-fix-applied) until a Nix
+# host re-runs os/boot-harness/verify-mobile-eval-fix.sh. No artifact was
+# produced, no hashes exist, nothing below claims a pass.
+attempt     : 2 (fix-application only — NOT a rebuild, NOT a boot)
+timestamp   : 2026-07-14T23:59:00Z
+host        : Darwin 23.6.0 arm64 (macOS dev workstation — no Nix, no KVM, no qemu-system)
+error_1_verbatim: flake 'git+file:///root/blochchk?shallow=1' does not provide attribute 'packages.x86_64-linux.mobile-image', 'defaultPackage.x86_64-linux.mobile-image', 'legacyPackages.x86_64-linux.mobile-image' or 'mobile-image'
+fix_1       : os/boot-harness/boot-qemu-aarch64.sh now builds the system-qualified `.#packages.aarch64-linux.mobile-image` (the bare `.#mobile-image` alias only resolves ON an aarch64-linux host, so the harness died at rung 0 on the x86_64 cross builder for the wrong reason)
+error_2_verbatim: error: The option `services.bloch' does not exist. Definition values: - In `/nix/store/yw68smd5vsrfs47z2ycy3q5cqm5hz2hb-source/os/mobile.nix'
+fix_2       : os/mobile.nix now imports ./bloch-node.nix (which DEFINES options.services.bloch) alongside ./telephony.nix, so its `services.bloch.enable = lib.mkForce false` is a valid assignment; the node service stays OFF on the phone (no mining node on a phone) and flake.nix was NOT touched
+rebuild     : NOT ATTEMPTED — no Nix on this host; cannot honestly claim the eval/build now succeeds
+image_path  : none — no rebuild ran
+image_nixhash: n/a — no artifact, nothing to hash; no hashes invented
+image_sha256: n/a — no artifact, nothing to hash; no hashes invented
+boot_rc     : n/a — QEMU never launched (fixes are source-only)
+check_rc    : n/a — no new log to grade
+rung_0_status: FAIL / unverified-fix-applied — flip ONLY after `bash os/boot-harness/verify-mobile-eval-fix.sh` exits 0 on a Linux host with Nix (it re-runs the REAL build); on nix-less hosts that script fail-closes to static grading and cannot upgrade this status
+
+# ── THIRD ATTEMPT — 2026-07-14 (later) — EVAL VERIFIED on a real Nix host ──
+# UNAUDITED. built≠booted; QEMU≠hardware; reproducible-by-design≠reproduced.
+# Ran on the Fly Nix builder `postern-os-build` (Linux, Nix present): fetched
+# roadmap/consolidate-all, checked out fabd102 (the commit carrying fix_2), and
+# ran the flake EVAL via `nix build .#packages.aarch64-linux.mobile-image
+# --dry-run`. This VERIFIES fix_2 against a REAL Nix evaluation — but the image
+# still does not evaluate to completion: a DIFFERENT, deeper error now blocks it.
+attempt     : 3 (eval verification — dry-run only; NO build artifact, NO boot)
+timestamp   : 2026-07-14 (Fly builder postern-os-build; Nix present)
+git_rev     : fabd102 (checked out on the host from origin/roadmap/consolidate-all)
+fix_2_status: VERIFIED — the "The option `services.bloch' does not exist" eval
+              error is GONE. os/mobile.nix now imports ./bloch-node.nix (defining
+              options.services.bloch), so the mkForce-false assignment is valid
+              and the eval proceeds past that point. The original rung-0 error is
+              resolved on a real Nix host, not just "fix applied on a Mac".
+next_blocker: eval now aborts DEEPER, in the mobile-nixos overlay GUI assets —
+              verbatim: `lib.customisation.callPackageWith: Function called
+              without required argument "svgo" at .../overlay/mobile-nixos/
+              gui-assets/default.nix:6`. The gui-assets derivation needs an
+              `svgo` package the current package set does not provide. This is a
+              mobile-nixos-overlay / nixpkgs-pin issue, NOT the services.bloch bug.
+rebuild     : NOT run to completion — dry-run eval only; it aborted at next_blocker
+              before any build. No artifact, no hashes, nothing claims a pass.
+rung_0_status: STILL FAIL overall — but fix_2 is now VERIFIED and rung-0 has
+              advanced from the services.bloch error to the svgo/gui-assets error.
+              Full rung-0 clears only when the svgo blocker is fixed AND a real
+              `nix build` produces the image. No pass is claimed here.
+
+# ── FOURTH ATTEMPT — 2026-07-14 — svgo overlay fix applied on macOS dev host; rebuild NOT re-attempted (no Nix here) ──
+# UNAUDITED. built≠booted; QEMU≠hardware; reproducible-by-design≠reproduced.
+# This entry records ONE minimal source fix for the THIRD ATTEMPT's
+# next_blocker. It is an unverified fix — pending a Nix host: the host applying
+# it is macOS with NO Nix installed (verified: `command -v nix` → nothing), so
+# neither the eval nor the real `nix build .#packages.aarch64-linux.mobile-image`
+# was re-run. Nothing below claims the eval now succeeds. Rung 0 REMAINS FAIL
+# until os/boot-harness/verify-mobile-eval-fix.sh Path A (the REAL build) exits
+# 0 on a Linux host with Nix.
+attempt     : 4 (fix-application only — NOT an eval, NOT a rebuild, NOT a boot)
+timestamp   : 2026-07-15T01:23:15Z (macOS dev workstation clock)
+host        : Darwin 23.6.0 arm64 (macOS dev workstation — no Nix, no KVM, no qemu-system)
+error_3_verbatim: lib.customisation.callPackageWith: Function called without required argument "svgo" at .../overlay/mobile-nixos/gui-assets/default.nix:6
+fix_3       : new os/overlays/svgo.nix nixpkgs overlay wired via `nixpkgs.overlays` in os/mobile.nix — the pinned nixos-25.05 has `nodePackages.svgo` but no top-level `pkgs.svgo`, while mobile-nixos gui-assets (rev 2c132754323fc1915e8d21dcfc0ef68ab084c6fb) is instantiated with `final.callPackage ./gui-assets { }` and needs a top-level `svgo`; the overlay maps `svgo = prev.svgo or final.nodePackages.svgo` (no-op on nixpkgs >= 25.11 which ships pkgs.svgo, throw with instructions if neither exists). mobile-nixos composes its own overlay through the same `nixpkgs.overlays` option (modules/nixpkgs.nix at the pinned rev) and the flake's mobile eval uses stock eval-config.nix, so both land in the SAME pkgs fixed point — root cause verified by READING the pinned sources only, NOT by evaluating. flake.nix was NOT touched.
+rebuild     : NOT ATTEMPTED — no Nix on this host; cannot honestly claim the eval/build now succeeds
+image_path  : none — no rebuild ran
+image_nixhash: n/a — no artifact, nothing to hash; no hashes invented
+image_sha256: n/a — no artifact, nothing to hash; no hashes invented
+boot_rc     : n/a — QEMU never launched (fix is source-only)
+check_rc    : n/a — no new log to grade
+rung_0_status: FAIL / unverified-fix-applied — unverified fix — pending a Nix host. Flip ONLY after `bash os/boot-harness/verify-mobile-eval-fix.sh` exits 0 on a Linux host with Nix (Path A re-runs the REAL build); on nix-less hosts that script fail-closes to static grading and cannot upgrade this status.
+
+# ── FIFTH ATTEMPT — 2026-07-15 — EVAL VERIFIED on a real Nix host; svgo fix works, cascade mapped, TRUE WALL found ──
+# UNAUDITED. built≠booted; QEMU≠hardware; reproducible-by-design≠reproduced.
+# Ran on the Fly Nix builder `postern-os-build` (Linux, Nix present): fetched
+# roadmap/consolidate-all @ 5cc2f7c (carrying fix_3, the svgo overlay), and ran
+# `nix build .#packages.aarch64-linux.mobile-image --dry-run` repeatedly, adding
+# one verified rename-alias at a time to os/overlays/svgo.nix and re-evaluating.
+attempt     : 5 (eval verification + iterative rename discovery — dry-run only; NO build artifact, NO boot)
+timestamp   : 2026-07-15 (Fly builder postern-os-build; Nix present)
+git_rev     : 5cc2f7c base (svgo overlay) + xkeyboard-config/libx11 aliases added and eval-verified on the host, then committed to os/overlays/svgo.nix
+fix_3_status: VERIFIED — the svgo eval error is GONE. The overlay resolves the
+              top-level `svgo` and the eval advances past gui-assets. fix_3 works
+              on a real Nix host, not just "applied on a Mac".
+cascade_verified: after svgo, the eval hit two MORE nixos-25.05 renames in
+              mobile-nixos initrd-boot-gui.nix, each fixed + re-verified by adding
+              an alias to the overlay and re-evaluating:
+                (a) `attribute 'xkeyboard-config' missing` → alias to xkeyboard_config → advanced
+                (b) `attribute 'libx11' missing`           → alias to xorg.libX11     → advanced
+              All three (svgo, xkeyboard-config, libx11) are now in os/overlays/svgo.nix.
+true_wall   : after the three renames the eval reaches a DEEPER error an overlay
+              CANNOT fix — API drift, not a rename:
+                error: function 'anonymous lambda' called with unexpected argument 'luaSupport'
+                at «github:NixOS/nixpkgs/…»/pkgs/development/libraries/libinput/default.nix
+              mobile-nixos (rev 2c13275) overrides libinput with a `luaSupport`
+              arg that nixos-25.05's libinput no longer accepts. Root cause,
+              now proven on a Nix host: the pinned mobile-nixos is INCOMPATIBLE
+              with the pinned nixos-25.05 nixpkgs — a version mismatch, not a set
+              of typos. The real next step is a flake-INPUT alignment (bump
+              mobile-nixos to a nixos-25.05-compatible rev, or pin nixpkgs to
+              mobile-nixos's expected base), a deliberate decision — NOT more
+              overlay aliases.
+rebuild     : NOT run to completion — dry-run eval only; aborted at true_wall
+              before any build. No artifact, no hashes, nothing claims a pass.
+rung_0_status: STILL FAIL overall — but three eval blockers are now VERIFIED-fixed
+              on a real Nix host and the TRUE root cause (mobile-nixos ⇄ nixpkgs
+              version mismatch) is identified. Full rung-0 clears only after the
+              input-version alignment AND a real `nix build` produces the image.
+              No pass is claimed here.
+
+# ── SIXTH ATTEMPT — 2026-07-15 — DEFINITIVE VERDICT on a real Nix host: does-not-converge ──
+# UNAUDITED. All on the Fly Nix builder `postern-os-build` (dry-run evals only).
+# Pursued both alignment options to a definitive conclusion. NO artifact, NO boot.
+attempt     : 6 (exhaustive eval-path investigation — dry-run only)
+timestamp   : 2026-07-15 (Fly builder postern-os-build; Nix present)
+option_1_dead: BUMP mobile-nixos — DEAD END. `git ls-remote github:mobile-nixos/
+              mobile-nixos` shows its default branch is `development` and its HEAD
+              IS 2c132754323fc1915e8d21dcfc0ef68ab084c6fb — the exact rev already
+              pinned. There is NO newer mobile-nixos to bump to; it is effectively
+              unmaintained relative to current nixpkgs.
+option_2_tried: PIN nixpkgs older (mobile-only) — tried nixos-24.11 (rev 50ab793)
+              wired as a contained `nixpkgs-mobile` input used only by evalMobile.
+              It does NOT clear the wall: 24.11's libinput ALSO rejects
+              mobile-nixos's `luaSupport`/`wacomSupport`/… override args (the
+              earlier appearance of "clearing" on 24.11 was a LAZY-EVAL artifact —
+              the modemmanager error in os/telephony.nix surfaced first and masked
+              the still-present libinput failure). REVERTED the 24.11 pin; the
+              mobile image stays on the unified 25.05 nixpkgs.
+full_cascade_mapped: with the 25.05 nixpkgs + a compat overlay, the eval was
+              hand-walked forward and hit, in order:
+                services.bloch (fixed: import bloch-node.nix)
+                svgo            (fixed: overlay -> nodePackages.svgo)
+                xkeyboard-config(fixed: overlay -> xkeyboard_config)
+                libx11          (fixed: overlay -> xorg.libX11)
+                libinput        (fixed FIVE removed override args stripped:
+                                 luaSupport, wacomSupport, eventGUISupport,
+                                 documentationSupport, testsSupport)
+                net-tools       (NEXT: mobile-nixos kernel/builder.nix wants
+                                 pkgs.net-tools; 25.05 has `nettools`)
+              …and the PinePhone KERNEL/DTB/FIRMWARE build lies entirely beyond
+              net-tools, unexplored, with its own version-sensitive derivations.
+verdict     : DOES NOT CONVERGE as a bounded fix. mobile-nixos 2c13275 is
+              incompatible with every recent nixpkgs across MANY packages (renames
+              + removed override args) spanning initrd -> libinput -> kernel
+              builder and beyond. Making the image build requires either (a) a
+              large, fragile compat overlay maintained against every nixpkgs bump,
+              or (b) forking/updating mobile-nixos itself — an open-ended project,
+              NOT the "one more fix" this whack-a-mole kept implying. The only
+              overlay change KEPT in-tree is os/overlays/svgo.nix (the three
+              verified renames, guarded no-ops) as documentation; the telephony
+              systemd-ModemManager fix is kept (correct regardless).
+rung_0_status: FAIL — and now KNOWN to be out of reach without a mobile-nixos
+              fork/update or a sustained compat-overlay effort. The hosted mobile
+              image remains "built + signed" but NOT reproducible-from-source on a
+              current nixpkgs and NOT booted. No pass is claimed, ever, here.
+
+# ── SEVENTH ATTEMPT — 2026-07-15 — BREAKTHROUGH: EVAL PASSES on nixos-unstable ──
+# UNAUDITED. The attempt-6 verdict was WRONG — corrected here, on the Nix host.
+# The wrong assumption was "mobile-nixos is abandoned / needs a stable release".
+attempt     : 7 (eval PASS on a real Nix host; full build kicked off, boot pending)
+timestamp   : 2026-07-15 (Fly builder postern-os-build; Nix present)
+correction  : mobile-nixos is ACTIVELY MAINTAINED — rev 2c13275 is dated
+              2026-07-12 and its CI (.github/workflows/ci.yml) tracks
+              `nixpkgs=channel:nixos-unstable`, NOT a stable release. That is
+              exactly why 25.05/24.11/24.05 all failed: none is the unstable
+              snapshot mobile-nixos targets (24.05 has libinput's luaSupport but
+              lacks services.eg25-manager; 24.11 has eg25-manager but dropped the
+              libinput args — no stable release satisfies both).
+fix         : point the mobile image at nixos-unstable. flake.nix now declares a
+              `nixpkgs-mobile` input pinned to an explicit unstable rev
+              (18b9261cb3294b6d2a06d03f96872827b8fe2698) and `evalMobile` imports
+              it (only the mobile eval; node/desktop stay on 25.05). Plus one
+              trivial OUR-config fix: os/mobile.nix set services.getty.greetingLine
+              /helpLine with lib.mkDefault, which collided with the getty module's
+              own default on unstable — changed to lib.mkForce.
+eval_result : PASS. `nix build .#packages.aarch64-linux.mobile-image --dry-run
+              --override-input nixpkgs-mobile github:NixOS/nixpkgs/18b9261 …`
+              prints "these 777 derivations will be built" and exits rc=0. The
+              ENTIRE mobile-nixos cascade (svgo/xkeyboard-config/libx11/net-tools/
+              libinput/eg25-manager/kernel) resolves natively on unstable — the
+              overlay renames in os/overlays/svgo.nix become guarded no-ops.
+build       : the REAL `nix build` (777 derivations, aarch64 via emulation on the
+              x86_64 builder) was STARTED in the background (log /root/mobile-
+              build.log). It is LONG and NOT yet complete — no artifact, no hash,
+              no boot claimed here yet.
+rung_0_status: EVAL now PASSES (rc=0, 777-derivation plan) on a real Nix host —
+              the attempt-6 "does not converge / blocked-on-upstream" verdict is
+              RETRACTED. Rung-0 (a real build producing the image) is IN PROGRESS;
+              rung-1 (QEMU boot) still pending. Still no pass claimed until the
+              build finishes and the artifact exists.
+build_result: FAILED on the x86_64 Fly builder — but NOT a code defect. The build
+              got through ~770 of 777 derivations and died building `bloch-0.1.0`
+              (our node/wallet Rust package) for aarch64: the qemu-user emulation
+              of the aarch64 Rust toolchain crashes (107 emulation-crash signals
+              in the log — qemu:/SIGILL/SIGSEGV; rustc-hash/rustc-hex retried many
+              times). This is the WRONG BUILDER, exactly as the flake header warns
+              ("the mobile image … is cross-built or built natively on an aarch64
+              Linux host — never [emulated]"). The rest of the image (kernel, DTB,
+              rootfs, all mobile-nixos pkgs) built fine; only the emulated Rust
+              leg failed. NEXT: run the same `nix build` on a NATIVE aarch64 host
+              (e.g. an AWS Graviton) — no emulation, the Rust build is native —
+              which should produce the artifact; THEN attempt the QEMU boot.
+              No artifact, no hash, no boot claimed here.

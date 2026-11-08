@@ -1,0 +1,133 @@
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Postern — Phone-as-Signer (reference driver)</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Honest standing banner -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">▟</span>
+          <div>
+            <div class="brand-title">Phone-as-Signer</div>
+            <div class="brand-sub">reference driver · <span id="mode-badge" class="mode mode-unknown">detecting…</span></div>
+          </div>
+        </div>
+      </header>
+
+      <div class="rails" id="rails">
+        <strong>This is a reference driver, not a shipped phone app.</strong>
+        The mobile OS image is <strong>UNBOOTED</strong>. The signing key never leaves the device, but this
+        is a <strong>software keystore — not a hardware wallet</strong>; a rooted / malware phone can steal the
+        key and forge this screen. Every signature needs <strong>per-sign user presence</strong> — there is no
+        blanket auto-approve. Unaudited scaffold. This is <em>not</em> "Postern OS"; the community edition is
+        "Postern for postmarketOS — community edition". The coin is <strong>not a security</strong>. Nothing here
+        is "100% private/secure". <strong>v1 is LOGIN-ONLY</strong> — the only shipped flow is a wallet-login
+        signature; the value-transfer flow below is a <strong>reference demo</strong>, not a shipped v1 path.
+      </div>
+
+      <!-- The phone canvas -->
+      <main class="phone">
+        <div class="phone-notch"></div>
+
+        <!-- STEP 1 — Pairing (QR + SAS) -->
+        <section class="screen" id="s-pair">
+          <h2 class="step">1 · Pair with the desktop</h2>
+          <p class="hint">
+            The phone is the trust root. Scan (or paste) the desktop's QR payload, then compare the
+            <strong>6-digit SAS</strong> on both screens. If they differ, someone may be intercepting you —
+            <strong>abort</strong>. <span class="dim">(Reference pairing: the real ceremony is the PQ-hybrid
+            <code>postern-pairing</code> handshake; here the SAS is derived deterministically from the payload
+            so the compare step is faithful.)</span>
+          </p>
+          <label class="field">
+            <span>Desktop QR payload</span>
+            <textarea id="qr-input" rows="3" placeholder="postern-pair://… (paste the desktop's QR text)"></textarea>
+          </label>
+          <div class="row">
+            <label class="field small">
+              <span>Name this desktop</span>
+              <input id="peer-name" value="Tiago's ThinkPad" />
+            </label>
+            <label class="field small">
+              <span>Network</span>
+              <select id="network">
+                <option value="testnet" selected>testnet</option>
+                <option value="mainnet">mainnet</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn primary" id="btn-pair">Scan &amp; derive channel</button>
+
+          <div class="sas-box" id="sas-box" hidden>
+            <div class="sas-label">Compare this SAS on BOTH screens</div>
+            <div class="sas-digits" id="sas-digits">— — —</div>
+            <div class="row">
+              <button class="btn ok" id="btn-sas-ok">They match — pair</button>
+              <button class="btn danger" id="btn-sas-abort">Differ — abort</button>
+            </div>
+          </div>
+
+          <div class="paired-card" id="paired-card" hidden>
+            <div class="kv"><span>Paired to</span><b id="p-peer"></b></div>
+            <div class="kv"><span>This wallet's address</span><b class="mono" id="p-addr"></b></div>
+            <div class="kv"><span>Session</span><b class="mono dim" id="p-session"></b></div>
+          </div>
+        </section>
+
+        <!-- STEP 2 — Incoming request (desktop simulator drives a REAL frame) -->
+        <section class="screen" id="s-request" hidden>
+          <h2 class="step">2 · Incoming sign request</h2>
+          <p class="hint">
+            The desktop holds <strong>no key</strong>. It sends a request; the phone parses the
+            <strong>actual bytes it would sign</strong> and shows what they mean (WYSIWYS) — never desktop prose.
+            Use the panel below (a stand-in for the desktop terminal) to send one.
+          </p>
+          <div class="sim">
+            <div class="sim-head">Desktop simulator <span class="dim">(sends a genuine request frame)</span></div>
+            <div class="tabs">
+              <button class="tab active" data-kind="login">Wallet-login</button>
+              <button class="tab" data-kind="transfer">Value transfer <span class="dim">(demo · not v1)</span></button>
+            </div>
+            <div class="sim-body" id="sim-login">
+              <div class="row">
+                <label class="field small"><span>Organisation</span><input id="r-org" value="acme" /></label>
+                <label class="field small"><span>User</span><input id="r-user" value="alice" /></label>
+              </div>
+            </div>
+            <div class="sim-body" id="sim-transfer" hidden>
+              <label class="field"><span>To address</span><input id="t-to" value="bloch1t…recipient" /></label>
+              <div class="row">
+                <label class="field small"><span>Amount (sats)</span><input id="t-amt" type="number" value="25000" /></label>
+                <label class="field small"><span>Fee (declared)</span><input id="t-fee" type="number" value="120" /></label>
+              </div>
+            </div>
+            <button class="btn primary" id="btn-send">Send request to phone</button>
+          </div>
+        </section>
+
+        <!-- STEP 3 — Approval card (WYSIWYS + tier + presence) -->
+        <section class="screen" id="s-approve" hidden>
+          <div class="approve-card" id="approve-card"></div>
+        </section>
+
+        <!-- Result -->
+        <section class="screen" id="s-result" hidden>
+          <div class="result-card" id="result-card"></div>
+          <button class="btn" id="btn-again">Back to requests</button>
+        </section>
+      </main>
+
+      <footer class="foot">
+        <span>postern-mobile-signer · reference UI</span>
+        <span class="dim" id="foot-mode"></span>
+      </footer>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>

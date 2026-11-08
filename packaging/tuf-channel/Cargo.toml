@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-tuf — DEV/TESTING-ONLY scaffold of the Postern TUF update channel.
+#
+# STANDALONE crate: like integration/pairing, this crate carries its OWN empty
+# [workspace] table so it is intentionally NOT a member of the ancestor
+# bloch-protocol workspace — it builds and tests in isolation and stays
+# re-homeable. The root Cargo.toml is deliberately untouched.
+#
+# What this is: the earliest vertical slice of the "TUF update channel (tough)"
+# roadmap line (docs/POSTERN-ROADMAP.md, in-progress). It can `init` a local
+# TUF repository with freshly generated ed25519 dev keys, `add-target` an
+# artifact (hash + length, re-sign targets/snapshot/timestamp), and `verify` a
+# target through tough's fail-closed client (expired or tampered metadata is a
+# hard error).
+#
+# What this is NOT: there is NO live update endpoint, the keys are DEV keys
+# generated into a directory literally named dev-keys-DO-NOT-SHIP, nothing here
+# is audited, and the desktop Tauri config keeps createUpdaterArtifacts=false
+# (enforced by desktop tests) until this channel is real.
+#
+# License note (docs/POSTERN-APPS-ROADMAP.md line 146): `tough` is AWS,
+# MIT/Apache — fine. F-Droid is GPL/AGPL, so it is a MODEL only; no F-Droid
+# code is (or may be) used here. Permissive-only dependency tree.
+
+[workspace]
+
+[package]
+name = "postern-tuf"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "DEV-ONLY TUF update-channel scaffold for Postern, built on tough (AWS, MIT/Apache). Unaudited; no live update endpoint."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "postern-tuf"
+path = "src/bin/postern-tuf.rs"
+
+[dependencies]
+# The Update Framework repository client/editor — AWS Labs, MIT OR Apache-2.0.
+tough = "0.24"
+# ed25519 dev-key generation (pkcs8 v2) — this is tough's OWN crypto backend
+# (aws-lc-rs, ISC/Apache-2.0 — permissive), so it adds nothing new to the tree
+# and the generated keys parse with tough::sign::parse_keypair byte-for-byte.
+aws-lc-rs = "1"
+# tough's metadata expiries are jiff::Timestamp (jiff: Unlicense OR MIT).
+jiff = "0.2"
+# Canonical JSON for signing root.json + computing TUF key IDs — the same
+# formatter tough itself uses (olpc-cjson, MIT OR Apache-2.0).
+olpc-cjson = "0.1"
+serde = "1"
+serde_json = "1"
+# file:// URLs for tough's filesystem transport.
+url = "2"
+# SHA-256 of fetched targets for the `verify` printout.
+sha2 = "0.10"
+hex = "0.4"
+# tough's API is async; a small current-thread runtime is enough.
+tokio = { version = "1", features = ["rt", "macros", "fs"] }
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+# tests/rotation.rs surgically strips the old-key signature from a rotated
+# root to prove the client rejects it (already a runtime dep — nothing new).
+serde_json = "1"
+# tests/rotation.rs re-signs a timestamp with a PAST expiry (legit keys,
+# lapsed metadata) to prove refresh cannot rescue an expired repo. Both are
+# already runtime deps — nothing new enters the tree.
+tough = "0.24"
+jiff = "0.2"
+# tests/recovery.rs re-signs 1.root.json with a PAST expiry (legit root key,
+# lapsed trust) to prove recover fails closed and directs to re-init. All
+# four are already runtime deps — nothing new enters the tree.
+aws-lc-rs = "1"
+olpc-cjson = "0.1"
+serde = "1"

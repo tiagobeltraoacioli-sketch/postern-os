@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0b0e13" />
+    <meta
+      name="description"
+      content="Postern Mobile — touch-first PWA shell for the ownerless Bloch base. Reference prototype, UNAUDITED, software keystore, moves no real funds."
+    />
+    <title>Postern Mobile — reference prototype</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- Single external, same-origin module entry. No inline script anywhere in
+         this document, so the app path can ship a strict script-src 'self' CSP. -->
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

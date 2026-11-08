@@ -1,0 +1,61 @@
+[package]
+name = "postern-tor"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs in-process Tor layer — a thin arti-client wrapper so products route traffic through Tor with no external Tor daemon."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_tor"
+
+[dependencies]
+# Arti — the Tor Project's Rust implementation. Apache-2.0 OR MIT (permissive;
+# passes the project license policy). In-process => no Orbot / system tor needed.
+# 0.44: kept current (0.28 → 0.44 in July 2026) — newer Tor protocol support
+# and advisory fixes, and its rusqlite range unifies with matrix-rust-sdk's
+# (one `links = "sqlite3"` package per lockfile; see postern-messenger's
+# `matrix` feature).
+arti-client = { version = "0.44", default-features = false, features = ["tokio", "rustls", "onion-service-client"] }
+tor-rtcompat = { version = "0.44", features = ["tokio", "rustls"] }
+tokio = { version = "1", features = ["io-util", "net", "rt", "time"] }
+serde_json = "1"
+thiserror = "2"
+
+# --- onion-service HOSTING (optional) ---------------------------------------
+# Only compiled with the `onion-service` feature. `tor-hsservice` is arti's
+# onion-service *provider* (publishing a .onion, not just connecting to one);
+# `futures` is needed for the incoming-request `Stream` the provider yields.
+# Both are optional so client-only callers (wallet RPC, messenger) never pull
+# the HS-server stack.
+tor-hsservice = { version = "0.44", optional = true }
+# tor-cell: the `Connected` relay cell we answer an accepted introduction with.
+# tor-proto: `IncomingStreamRequest`, so the host accepts BEGIN streams and
+# rejects anything else (e.g. BEGIN_DIR). Both are already in the tree via arti;
+# named explicitly only under this feature.
+tor-cell = { version = "0.44", optional = true }
+tor-proto = { version = "0.44", optional = true }
+# safelog: HsId hides its full `.onion` behind redaction by default (so it
+# never lands in logs); `display_unredacted()` (the `DisplayRedacted` trait) is
+# how we deliberately render the address we hand to the user.
+safelog = { version = "0.9", optional = true }
+futures = { version = "0.3", optional = true, default-features = false, features = ["std"] }
+
+[features]
+# Off by default. Enables the additive onion-service HOSTING path
+# ([`onion_host`]) on top of arti's `onion-service-service` backend, so a
+# product can PUBLISH an ephemeral `.onion` drop — not merely connect to one.
+# postern-courier's `onion-transport` feature turns this on. Leaving it off
+# keeps the crate a lean onion-service *client* (the historical scope).
+onion-service = [
+    "arti-client/onion-service-service",
+    "dep:tor-hsservice",
+    "dep:tor-cell",
+    "dep:tor-proto",
+    "dep:safelog",
+    "dep:futures",
+]
+
+[dev-dependencies]
+# `test-util` powers the paused-clock (`start_paused`) deadline test in
+# onion_host — feature-only addition on an existing dep, lockfile untouched.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }

@@ -1,0 +1,668 @@
+# Postern Labs — products monorepo GitLab CI
+#
+# This repo is a VIRTUAL Cargo workspace (no root package): the Postern product
+# crates (`crates/postern-*`), the wallet core (`mobile/core`), and the desktop
+# shell (`desktop/src-tauri`). The Bloch-SIS-PoW protocol is NOT here — it is
+# consumed as a rev-pinned git dependency (`bloch`, `bloch-crypto`,
+# `pqcrypto-internals`) from gitlab.com/blochsispow-group/BlochSISPoW-project.
+#
+# Runs on a self-hosted shell runner (tag: bloch-mac) using the host's Rust
+# toolchain. GitLab.com shared runners require identity verification, so this
+# project uses its own runner instead.
+
+stages:
+  - check
+  - test
+  - deploy
+
+variables:
+  CARGO_TERM_COLOR: "always"
+  RUST_BACKTRACE: "1"
+
+default:
+  tags:
+    - bloch-mac
+  before_script:
+    # Non-login shell: make the user's toolchain + Homebrew tools visible.
+    - export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+    - rustc --version && cargo --version
+    # Private protocol dependency: the runner must be able to fetch
+    # gitlab.com/blochsispow-group/BlochSISPoW-project. Provide a READ-ONLY
+    # project/group access token as the masked, protected CI/CD variable
+    # BLOCH_DEP_TOKEN (Settings → CI/CD → Variables). NEVER hardcode a token in
+    # this file. (If the protocol project's job-token allowlist admits this
+    # project, CI_JOB_TOKEN works here instead of a stored token.)
+    - export CARGO_NET_GIT_FETCH_WITH_CLI=true
+    - |
+      if [ -n "${BLOCH_DEP_TOKEN:-}" ]; then
+        git config --global url."https://oauth2:${BLOCH_DEP_TOKEN}@gitlab.com/blochsispow-group/".insteadOf "https://gitlab.com/blochsispow-group/"
+      fi
+
+# Lint — informational (visibility without blocking product iteration).
+clippy:
+  stage: check
+  script:
+    - rustup component add clippy || true
+    - cargo clippy --workspace --all-targets
+  allow_failure: true
+
+# Supply-chain — RUSTSEC advisories, license policy, and the pinned-sources
+# policy (the ONE allowed git source is the protocol repo; see deny.toml).
+# BLOCKING: a real vulnerability or policy violation must fail the pipeline.
+supply-chain:
+  stage: check
+  script:
+    - command -v cargo-deny >/dev/null || cargo install cargo-deny --locked
+    - cargo deny check advisories bans licenses sources
+
+# Secret scanning — catch committed credentials (e.g. a leaked token) before
+# they reach history.
+secret-scan:
+  stage: check
+  before_script: []
+  script:
+    - command -v gitleaks >/dev/null || brew install gitleaks
+    - gitleaks detect --source . --no-banner --redact
+  allow_failure: true
+
+# Trust-label bleed guard (R1) — BLOCKING. Honest labeling IS the value
+# proposition, so this is a real gate, not advisory: scripts/check-trust-labels.sh
+# hard-fails on the registered 'Baba Yaga' string in any shipping surface AND on
+# attestation/audit-grade words bleeding onto the NON-attestable tiers (pmOS
+# overlay, Sloboda) — the latter promoted WARN->fail here. It is a heuristic
+# tripwire (human review still required), not a proof or an audit. Pure shell/grep/
+# awk: no Rust toolchain and no protocol-dep token needed, so before_script is empty.
+trust-labels:
+  stage: check
+  before_script: []
+  script:
+    - bash scripts/check-trust-labels.sh
+
+# ─────────────────────────────────────────────────────────────────────────────
+# On-device (Android/TEE tier) WEB APPS gate — BLOCKING, t0.
+#
+# The four ready on-device tier apps (noporis-gate, sloboda-gate, gramota,
+# gramota-kyc) each ship as ONE self-contained index.html that assemble-public.sh
+# copies VERBATIM into public/apps/<name>/. The behaviour that ships in that
+# single file is a condensed inline hand-port of the modular sources of truth
+# (gramota-kyc/kyc-loa.mjs, the gate-store.mjs stores, …), and its CSP pins every
+# inline <script> by sha256 hash. Until now that inlined-vs-source parity and the
+# CSP hash pinning were only checked by ad-hoc LOCAL scripts — nothing stopped a
+# STALE single-file bundle (source edited, inline copy not re-generated) or a CSP
+# regression (a new/edited inline script whose hash was never recomputed, or an
+# 'unsafe-inline'/third-party origin creeping into script-src) from shipping.
+#
+# This job promotes those scripts to a REAL blocking gate. Pure Node (no Rust
+# toolchain, no Android SDK, no emulator, no network), so before_script is empty
+# and it runs on the existing bloch-mac runner. It is a GENUINE green gate for
+# exactly what it checks: the shipped single file is self-contained, byte-parity
+# in behaviour with its .mjs source, and CSP-hash-honest. It proves NOTHING about
+# a device, a TEE quote, or the (UNAUDITED) on-device wrapper — those stay
+# UNTESTED-until-hardware in the Android t1/t2 jobs below. built ≠ booted.
+t0:web-apps-inline-csp-gate:
+  stage: check
+  before_script: []
+  script:
+    - node --version
+    # Gramota — inlined KYC/LoA ladder parity vs kyc-loa.mjs + CSP hash pinning +
+    # the core.js↔registrar.js walker parity.
+    - node apps/gramota/inline-parity-check.mjs
+    - node apps/gramota/test-csp.mjs
+    - node apps/gramota/test-core.mjs
+    # Gramota-KYC — inline verifier/ladder parity + the 3-script CSP hash gate +
+    # the Ed25519 licensing self-check and the XSS/CSP escaping suite.
+    - node apps/gramota-kyc/inline-parity-check.mjs
+    - node apps/gramota-kyc/test-csp.mjs
+    - node apps/gramota-kyc/self-check.mjs
+    - node --test apps/gramota-kyc/xss-escape.test.mjs
+    # NoporIS Gate + Sloboda Gate — store honesty rails + inline UI↔store parity
+    # (the inline copy in index.html must stay behaviourally identical to
+    # gate-store.mjs) + Sloboda's consent-writer tests.
+    - node apps/noporis-gate/test-store.mjs
+    - node apps/noporis-gate/test-ui-parity.mjs
+    - node apps/sloboda-gate/test-store.mjs
+    - node apps/sloboda-gate/test-ui-parity.mjs
+    - node apps/sloboda-gate/test-gated.mjs
+    # Ship-time backstop: assemble the public bundle and assert the four tier apps
+    # land as self-contained, reachable single files (the guard is inside the
+    # script; a leaky/missing bundle hard-fails here too).
+    - bash assemble-public.sh
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - apps/gramota/**/*
+        - apps/gramota-kyc/**/*
+        - apps/noporis-gate/**/*
+        - apps/sloboda-gate/**/*
+        - assemble-public.sh
+        - .gitlab-ci.yml
+
+# Build + full test suite across every workspace member (the gate).
+build-and-test:
+  stage: test
+  script:
+    - cargo build --workspace
+    - cargo test --workspace
+  after_script:
+    # Free the ~40GB workspace target so the self-hosted bloch-mac runner disk
+    # does not fill between pipeline runs (runs even on failure). Trades the
+    # incremental-compile cache for disk safety on the shared Mac.
+    - rm -rf target
+  timeout: 60m
+
+# ─────────────────────────────────────────────────────────────────────────────
+# L2 (Bloch EVM) + data (bloch-data / "Kalinov" user-backup) crates — the SAME
+# t0/t1 honesty tiering as the Android jobs below, mapped onto Rust.
+#
+# These are STANDALONE Cargo workspaces (each carries its own empty `[workspace]`
+# table, like crates/bloch-tokens), so they are NOT members of the root virtual
+# workspace and `build-and-test`'s `cargo test --workspace` NEVER touches them.
+# Until now they had NO CI gate at all — built-but-UNTESTED in the pipeline sense.
+#   t0: — host-testable Rust that MUST pass. Offline unit + vector tests on the
+#         existing bloch-mac runner. A REAL blocking gate, but it only proves the
+#         OFF-consensus codecs / pure ordering+fee logic / MOCK proving pipeline /
+#         backup-manifest skeleton COMPILE and their vectors hold. It proves
+#         NOTHING about a live L2, a real zk proof, or a real backup upload.
+#   t1: — the live/hardware Rust: a real SP1 proof (not the MockProver), a live
+#         sequencer -> anchor -> Bloch-L1 submission, a revm eth_* node, a
+#         WBLCH/Uniswap deploy, or a real Filecoin/Storacha upload + PQ seal.
+#         Needs a prover host / GPU / funded L1 endpoint / operator secrets that
+#         DO NOT exist in this pipeline, so it is `when: manual` on a runner tag
+#         that is NOT provisioned ⇒ surfaces as UNTESTED-until-infra, never faked
+#         green, never auto-passed on a runner that cannot execute it.
+# Every crate here is SCAFFOLD, UNAUDITED, not a working L2/backup — see each
+# crate header and the built-but-UNTESTED ledger docs/untested-inventory.yml.
+# Scope note: l2/bloch-l2-anchor, l2/bloch-l2-bridge, l2/bloch-l2-sequencer are
+# owned by a concurrent fleet; their offline vectors pass too, but their CI gate
+# lands with the fleet's slice — this job stays in its own lane (evm/prover/data).
+
+# t0 — offline host tests for the in-lane standalone crates. No network at
+# RUNTIME, no hardware, no operator secrets: a genuine blocking check.
+t0:l2-data-offline:
+  stage: test
+  script:
+    - cargo --version
+    - for c in l2/bloch-l2-evm l2/bloch-l2-prover data/postern-data; do echo "== offline host tests -- $c =="; ( cd "$c" && cargo test --locked ); done
+  after_script:
+    # Keep the shared bloch-mac disk clean: revm (evm) and the prover deps pull a
+    # heavy tree. Drop each standalone target after the run (even on failure).
+    - for c in l2/bloch-l2-evm l2/bloch-l2-prover data/postern-data; do rm -rf "$c/target"; done
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - l2/bloch-l2-evm/**/*
+        - l2/bloch-l2-prover/**/*
+        - data/**/*
+  timeout: 45m
+
+# t1 — the live/hardware path. Runner tag bloch-l2-live does NOT exist yet (no
+# prover host / GPU / funded Bloch-L1 endpoint / backup operator secrets), so this
+# job can never auto-run: manual + allow_failure ⇒ UNTESTED-until-infra. The
+# `--ignored` step is the closest runnable proxy for the `// SCAFFOLD:`-gated live
+# paths; the real SP1 proof, live anchoring, eth_* node and Filecoin upload are
+# NOT implemented here (they live in the later prover-service / postern-backup-net
+# crates). built != booted; a MockProver proof is not a zk proof.
+t1:l2-data-live:
+  stage: test
+  tags:
+    - bloch-l2-live   # prover host / GPU / funded L1 endpoint + operator secrets; NOT provisioned (honest gap).
+  needs:
+    - t0:l2-data-offline
+  script:
+    - 'echo "UNTESTED-until-infra: a real SP1 proof / live L1 anchoring / eth_* node / Filecoin upload needs a prover host, a funded Bloch-L1 endpoint, and operator secrets that do not exist in this pipeline."'
+    - for c in l2/bloch-l2-prover data/postern-data; do echo "== gated live-path proxy -- $c =="; ( cd "$c" && cargo test --locked -- --ignored ); done
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - l2/bloch-l2-evm/**/*
+        - l2/bloch-l2-prover/**/*
+        - data/**/*
+      when: manual
+      allow_failure: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Wallet + backup (Kalinov Bridge) offline test suites — BLOCKING, t0.
+#
+# The mobile-wallet PWA (apps/mobile-wallet) ships REAL trust-bearing test
+# suites that, until now, NOTHING in CI ran — they were built-but-UNGATED:
+#   • test-core.mjs  — pure-core: SHA3-256 against NIST vectors, the JSON-RPC
+#                      request byte-seam, WYSIWYS tiering, and the fail-closed
+#                      transfer decoder (DOM-free, no network).
+#   • test-wasm.mjs  — the REAL bloch-crypto core (ML-DSA-65 ‖ Falcon-1024) built
+#                      to wasm32-wasip1, exercised through the browser-identical
+#                      WASI shim: the keygen GOLDEN VECTOR (WASM keygen ==
+#                      node keygen, byte-pinned), deterministic address
+#                      derivation, the Argon2id/XChaCha20-Poly1305 keystore
+#                      round-trip, a real hybrid PQ signature, and import
+#                      round-trips against real bloch-cli keystore fixtures.
+# And the data/postern-data (Kalinov backup) crate's `t0:l2-data-offline` job
+# only ever ran the DEFAULT (zero-dep, MockHasher) build — the `live`
+# (LiveBackend) and `hash` (real SHAKE-256/256 XOF + SHA3-256 `signer_commit`,
+# KAT-tested in tests/hash_kat.rs) features were compiled by NOBODY in the
+# pipeline. This job runs `cargo test --features live,hash` so the REAL PQ
+# integrity primitive and the live-backend compile path are gated too.
+#
+# This is a GENUINE blocking green gate for exactly what it checks: the offline,
+# host-runnable wallet-core KATs / codec vectors / crypto round-trips hold. Any
+# assertion failure (a regressed SHA3/keygen KAT, a drifted JSON-RPC byte-seam,
+# a codec-vector regression) makes `node`/`cargo test` exit non-zero and FAILS
+# the pipeline. It proves NOTHING about a device, a live node, a real Filecoin
+# upload, or the (UNAUDITED) on-device wrapper — built ≠ booted. The live upload
+# path stays UNTESTED-until-infra in `t1:l2-data-live` above.
+#
+# Node is on the bloch-mac runner (see t0:web-apps-inline-csp-gate); the cargo
+# step is offline at RUNTIME. `hash` pulls one crates.io dep (`sha3`, already in
+# data/postern-data/Cargo.lock), fetched at dependency-resolution time like any
+# other crate — no network is touched while the tests execute.
+t0:wallet-backup-tests:
+  stage: test
+  script:
+    - node --version && cargo --version
+    # Mobile-wallet — pure-core KATs (SHA3/NIST, JSON-RPC seam, WYSIWYS, decoder).
+    - ( cd apps/mobile-wallet && node test-core.mjs )
+    # Mobile-wallet — REAL wasm crypto core (keygen golden vector, keystore, PQ sig).
+    - ( cd apps/mobile-wallet && node test-wasm.mjs )
+    # Kalinov backup — codec vectors + REAL SHAKE-256 KAT (hash) + LiveBackend (live).
+    - ( cd data/postern-data && cargo test --locked --features live,hash )
+  after_script:
+    # Keep the shared bloch-mac disk clean: drop the standalone crate target.
+    - rm -rf data/postern-data/target
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - apps/mobile-wallet/**/*
+        - data/postern-data/**/*
+        - .gitlab-ci.yml
+  timeout: 30m
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mobile wallet — REBUILD the WASM crypto core FROM SOURCE, then run the
+# golden-KAT + sign + import regression harness against THAT freshly-built module.
+#
+# t0:wallet-backup-tests (above) runs test-wasm.mjs against the COMMITTED
+# bloch_wallet_wasm.wasm — it proves "the blob we ship passes". This job closes
+# the other half of the trust gap: it installs the wasm32-wasip1 target, runs
+# apps/mobile-wallet/wasm/build-wasm.sh to compile the REAL crates/bloch-crypto
+# (ML-DSA-65 ‖ Falcon-1024, PQClean C via wasi-sdk) to wasm, and only THEN runs
+# the harness — so a regression in the node's crypto crate, the wasm C-ABI glue,
+# or the toolchain is caught at BUILD time, not just against a stale artifact.
+#
+# The load-bearing assertion is test #2: SHA3-256 of the ML-DSA-65 public-key
+# half for seed=0x11*32 must equal the value the NODE pins in
+# crates/bloch-crypto/src/crypto/mod.rs (bb34618a…de37, KAT tests/kat_mldsa65.rs).
+# If WASM keygen ever diverges from node keygen — the exact divergence that would
+# make a wallet derive a DIFFERENT address than bloch-cli shows — the golden
+# vector drifts, node exits non-zero, and this job goes RED. Verified locally:
+# flipping one nibble of the pinned hash fails the harness (rc=1). We require the
+# exact '9 passed' contract so a harness that silently stops early also fails.
+#
+# Reproducibility gate (optional per the item, kept because it's cheap and real):
+# build-wasm.sh is run twice and the two .wasm SHA-256s must match byte-for-byte
+# (opt-level "s" + lto + codegen-units=1 + panic=abort make the module
+# deterministic) — a non-reproducible build fails the job.
+#
+# Genuine blocking gate on bloch-mac: cargo + the wasm32-wasip1 std + node are on
+# the runner, and wasi-sdk is installed at the path build-wasm.sh expects (it
+# errors loudly if not). It proves the shippable wasm crypto matches the node's
+# pinned KAT and rebuilds reproducibly — NOTHING about a device, a live node, or
+# an audit. built ≠ booted · self-checked ≠ audited.
+t0:wallet-wasm-build-kat:
+  stage: test
+  script:
+    - node --version && cargo --version && rustc --version
+    # The ONLY wasm target the real pqcrypto PQClean C compiles on (see
+    # apps/mobile-wallet/wasm/.cargo/config.toml for why wasip1, not unknown).
+    - rustup target add wasm32-wasip1
+    # Rebuild the crypto core from source (crates/bloch-crypto, unchanged) via the
+    # wasi-sdk toolchain. build-wasm.sh exits non-zero with a clear message if
+    # $WASI_SDK is not an installed wasi-sdk.
+    - ( cd apps/mobile-wallet/wasm && ./build-wasm.sh )
+    # Optional reproducibility gate: a second build must be byte-identical.
+    - |
+      H1=$(shasum -a 256 apps/mobile-wallet/bloch_wallet_wasm.wasm | cut -d' ' -f1)
+      ( cd apps/mobile-wallet/wasm && ./build-wasm.sh >/dev/null )
+      H2=$(shasum -a 256 apps/mobile-wallet/bloch_wallet_wasm.wasm | cut -d' ' -f1)
+      [ "$H1" = "$H2" ] || { echo "FAIL: wasm build is not byte-reproducible ($H1 != $H2)"; exit 1; }
+      echo "reproducible wasm sha256: $H1"
+    # Golden-KAT + sign + import regression harness on the REBUILT module. Test #2
+    # pins WASM keygen == node keygen; any drift makes node exit non-zero. Require
+    # the exact '9 passed' contract so an early-aborting harness also fails RED.
+    - |
+      out=$(cd apps/mobile-wallet && node test-wasm.mjs); echo "$out"
+      echo "$out" | grep -q '9 passed' || { echo "FAIL: regression harness did not report '9 passed'"; exit 1; }
+  after_script:
+    # Keep the shared bloch-mac disk clean: drop the standalone wasm crate target.
+    - rm -rf apps/mobile-wallet/wasm/target
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - apps/mobile-wallet/wasm/**/*
+        - apps/mobile-wallet/test-wasm.mjs
+        - apps/mobile-wallet/testdata/**/*
+        - .gitlab-ci.yml
+  timeout: 45m
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Porog (Postern Container) — Android DPC build + T1 functional harness.
+#
+# HONESTY TIERS (bridge-build-test-infra §CI). Every Android job is tiered, and a
+# green pipeline must NEVER imply "device-proven":
+#   t0: — static, no SDK/emulator. Runs on the existing bloch-mac runner. A REAL
+#         green gate: it proves the config parses / the scripts lint, nothing more.
+#   t1: — build + emulator functional. Needs the pinned Nix devshell
+#         (android-container/profile/toolchain/flake.nix) + a KVM Linux runner
+#         tagged `bloch-android-vm`. That runner does NOT exist yet, so these jobs
+#         are `when: manual` and surface as UNTESTED-until-hardware — never faked
+#         green, never auto-passed on a runner that cannot execute them.
+#   t2: — on-hardware (real phone). No CI job exists; UNTESTED-until-hardware by
+#         construction. built ≠ booted · emulator ≠ hardware · self-checked ≠ audited.
+
+# t0 — Android static gate. No Android SDK required, so it runs on bloch-mac and
+# is a genuine blocking check: lint the T1 adb drivers, parse the version catalogs,
+# sanity-check the toolchain flakes + the wrapper scripts, for BOTH bridge apps
+# (Porog + NoporIS). Previously this job's `changes:` only watched
+# android-container/**/android-common/** — NoporIS (android-bridge/**) was ungated
+# (PMO-flagged, bucketA/PARTITION.md + READINESS.md, Dev B) — fixed below.
+t0:android-static:
+  stage: check
+  before_script: []
+  script:
+    - command -v shellcheck >/dev/null || brew install shellcheck
+    # Porog
+    - shellcheck android-container/profile/test/e2e/provision-lifecycle.sh
+    - sh -n android-container/profile/gradlew
+    - python3 -c "import tomllib,sys; tomllib.load(open('android-container/profile/gradle/libs.versions.toml','rb')); print('version catalog OK (Porog)')"
+    - >
+      python3 -c "s=open('android-container/profile/toolchain/flake.nix').read();
+      assert s.count('{')==s.count('}'), 'flake.nix brace imbalance';
+      assert s.count('(')==s.count(')'), 'flake.nix paren imbalance';
+      print('flake.nix balanced (Porog)')"
+    # NoporIS
+    - shellcheck android-bridge/persona/test/e2e/persona-lifecycle.sh
+    - sh -n android-bridge/persona/gradlew
+    - python3 -c "import tomllib,sys; tomllib.load(open('android-bridge/persona/gradle/libs.versions.toml','rb')); print('version catalog OK (NoporIS)')"
+    - >
+      python3 -c "s=open('android-bridge/persona/toolchain/flake.nix').read();
+      assert s.count('{')==s.count('}'), 'flake.nix brace imbalance';
+      assert s.count('(')==s.count(')'), 'flake.nix paren imbalance';
+      print('flake.nix balanced (NoporIS)')"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - android-container/**/*
+        - android-bridge/**/*
+        - android-common/**/*
+
+# t1 — the FIRST real builds: ./gradlew :app:assembleDebug in each app's pinned Nix
+# devshell, Porog then NoporIS (NoporIS's toolchain/flake.nix is new, forked from
+# Porog's per bucketA/PARTITION.md). Manual + a runner tag that does not exist yet ⇒
+# UNTESTED-until-hardware.
+t1:android-assemble-debug:
+  stage: test
+  tags:
+    - bloch-android-vm   # KVM Linux runner with Nix; NOT provisioned yet (honest gap).
+  before_script: []
+  script:
+    - echo "UNTESTED-until-hardware until a bloch-android-vm (Nix+KVM) runner exists."
+    - cd android-container/profile/toolchain
+    - nix develop --command bash -c "cd .. && gradle wrapper --gradle-version 8.9 --distribution-type bin && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest"
+    - cd ../../../android-bridge/persona/toolchain
+    - nix develop --command bash -c "cd .. && gradle wrapper --gradle-version 8.9 --distribution-type bin && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest"
+  artifacts:
+    paths:
+      - android-container/profile/app/build/outputs/apk/**/*.apk
+      - android-bridge/persona/app/build/outputs/apk/**/*.apk
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - android-container/**/*
+        - android-bridge/**/*
+        - android-common/**/*
+      when: manual
+      allow_failure: true
+
+# t1 — the managed-profile / persona lifecycle harnesses on the google_apis
+# (NON-playstore) API-34 KVM emulators — Porog's AVD ("porog-api34-gapis") then
+# NoporIS's distinctly-named AVD ("noporis-api34-gapis") so the two don't collide on
+# the same runner. Manual + bloch-android-vm ⇒ UNTESTED-until-hardware. NoporIS's
+# instrumented step honestly SKIPs (no androidTest source yet, see
+# android-bridge/persona/toolchain/README.md) — the shell-level assertions still run.
+t1:profile-lifecycle-e2e:
+  stage: test
+  tags:
+    - bloch-android-vm
+  needs:
+    - t1:android-assemble-debug
+  before_script: []
+  script:
+    - 'echo "UNTESTED-until-hardware: needs /dev/kvm + the google_apis AVDs."'
+    - cd android-container/profile/toolchain
+    - nix run .#avd &
+    - nix develop --command bash -c "adb wait-for-device && cd .. && ./test/e2e/provision-lifecycle.sh --apk app/build/outputs/apk/debug/app-debug.apk --test-apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+    - wait || true
+    - cd ../../../android-bridge/persona/toolchain
+    - nix run .#avd &
+    - nix develop --command bash -c "adb wait-for-device && cd .. && ./test/e2e/persona-lifecycle.sh --apk app/build/outputs/apk/debug/app-debug.apk --test-apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - android-container/**/*
+        - android-bridge/**/*
+        - android-common/**/*
+      when: manual
+      allow_failure: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Postern Desktop (Tauri) — Windows / Linux / macOS installer CI.
+#
+# HONESTY TIERS (mirrors the Android block above; the same t0/t1 discipline the
+# l2 crates use). A green pipeline must NEVER imply "installer proven on that OS":
+#   t0: — compile-only, no bundler. Runs on the existing bloch-mac runner and is a
+#         REAL blocking gate: it proves the `bloch-desktop` binary actually builds
+#         (default features; matrix/keychain stay OFF). It produces and tests NO
+#         .deb/.rpm/.AppImage/.msi/.nsis installer — only that the code compiles.
+#   t1: — the real per-OS Tauri bundlers. Tauri does NOT cross-bundle: each format
+#         is only emitted on its own OS (deb/rpm/appimage on Linux, msi/nsis on
+#         Windows, app/dmg on macOS), so one host can never produce all five. The
+#         Linux and Windows runners (tags bloch-desktop-linux / bloch-desktop-win)
+#         are NOT provisioned yet, so those jobs are `when: manual` + a runner tag no
+#         runner carries ⇒ UNTESTED-until-runner. They never auto-run and never fake
+#         green; clicking one on the current fleet just leaves it pending (no matching
+#         runner), and allow_failure keeps the pipeline honest either way. macOS
+#         .app/.dmg, by contrast, DOES run: it is wired below as t1:desktop-bundle-
+#         macos on the EXISTING bloch-mac runner — a genuine, non-allow_failure green
+#         gate (the runner + tauri-cli + minisign are all present), the one of the
+#         three real bundlers this fleet can actually execute today. A green run
+#         there still proves only that the bundle BUILDS + passes the dev-key TUF
+#         verify: it is UNAUDITED, unsigned (signingIdentity stays null), NOT
+#         notarized.
+#         designed ≠ built ≠ installed · one host cannot emit all five formats.
+
+# t0 — Desktop compile gate. Uses the host Rust toolchain already on bloch-mac (no
+# Tauri bundler, no cross-compile) — the compile step every bundler runs first,
+# i.e. the `cargo tauri build --no-bundle` equivalent. A genuine blocking check:
+# the desktop binary compiles or the pipeline is red. Shares the incremental
+# ./target with build-and-test (which owns the disk cleanup), and only fires on a
+# desktop-relevant change so it stays a fast, focused signal.
+desktop:build:
+  stage: check
+  script:
+    - cargo build -p bloch-desktop
+  timeout: 45m
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - desktop/**/*
+        - crates/postern-*/**/*
+        - integration/**/*
+        - Cargo.toml
+        - Cargo.lock
+        - .gitlab-ci.yml
+
+# t1 — the REAL Linux installers: deb/rpm/appimage. Runs the repo's existing
+# host-gated driver desktop/src-tauri/package-signed.sh --build, which itself runs
+# `cargo tauri build` (host targets only = Linux formats here), stages the bundle
+# output, computes SHA256SUMS, and feeds the two reused signing pipelines
+# (packaging/build-signed-bundle.sh dev-key TUF + scripts/sign-release.sh minisign
+# /PQ). DEV KEYS ONLY, no update server — the script enforces both. Manual + the
+# unprovisioned bloch-desktop-linux tag ⇒ UNTESTED-until-runner.
+t1:desktop-bundle-linux:
+  stage: test
+  tags:
+    - bloch-desktop-linux   # WebKitGTK Linux runner + Tauri CLI + minisign; NOT provisioned yet (honest gap).
+  before_script:
+    - echo "UNTESTED-until-runner: no bloch-desktop-linux runner exists yet; this job cannot run green until one is provisioned."
+    # On a real runner, install the Tauri Linux prereqs + toolchain first, e.g.:
+    #   apt-get update && apt-get install -y build-essential curl file pkg-config \
+    #     libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev minisign
+    #   cargo install tauri-cli --version '^2' --locked
+    - export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
+  script:
+    - POSTERN_PACKAGING_E2E=1 bash desktop/src-tauri/package-signed.sh --build -o "$CI_PROJECT_DIR/desktop-bundle-linux"
+  artifacts:
+    paths:
+      - desktop-bundle-linux/artifacts/*.deb
+      - desktop-bundle-linux/artifacts/*.rpm
+      - desktop-bundle-linux/artifacts/*.AppImage
+      - desktop-bundle-linux/SHA256SUMS
+      - desktop-bundle-linux/tuf-out/**
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - desktop/**/*
+        - packaging/**/*
+        - crates/postern-*/**/*
+        - integration/**/*
+      when: manual
+      allow_failure: true
+
+# t1 — the REAL Windows installers: msi + NSIS. Same host-gated package-signed.sh
+# driver (host targets only = Windows formats here). NEEDS a bash environment on
+# the runner (Git-Bash / MSYS2) for the shell driver. Manual + the unprovisioned
+# bloch-desktop-win tag ⇒ UNTESTED-until-runner.
+t1:desktop-bundle-win:
+  stage: test
+  tags:
+    - bloch-desktop-win   # Windows runner + MSVC + WebView2 + Tauri CLI + minisign + Git-Bash; NOT provisioned yet (honest gap).
+  before_script:
+    - echo "UNTESTED-until-runner: no bloch-desktop-win runner exists yet; this job cannot run green until one is provisioned."
+    # On a real Windows runner (Git-Bash / MSYS2 shell): install the MSVC C++ Build
+    # Tools + WebView2 runtime, then:
+    #   cargo install tauri-cli --version '^2' --locked
+    #   and provide minisign on PATH (scoop install minisign).
+    - export PATH="$HOME/.cargo/bin:$PATH"
+  script:
+    - POSTERN_PACKAGING_E2E=1 bash desktop/src-tauri/package-signed.sh --build -o "$CI_PROJECT_DIR/desktop-bundle-win"
+  artifacts:
+    paths:
+      - desktop-bundle-win/artifacts/*.msi
+      - desktop-bundle-win/artifacts/*.exe
+      - desktop-bundle-win/SHA256SUMS
+      - desktop-bundle-win/tuf-out/**
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - desktop/**/*
+        - packaging/**/*
+        - crates/postern-*/**/*
+        - integration/**/*
+      when: manual
+      allow_failure: true
+
+# t1 — the REAL macOS installers: .app + .dmg. UNLIKE the Linux/Windows siblings
+# above, this one is NOT gated on a missing runner: the EXISTING bloch-mac shell
+# runner (the same host build-and-test and desktop:build already use) carries the
+# Rust toolchain, the Tauri CLI, and minisign, so this job actually runs GREEN —
+# it is a genuine BLOCKING gate, not `when: manual` + allow_failure + an
+# UNTESTED-until-runner echo. It inherits the default before_script (host PATH +
+# the read-only protocol-dep token) rather than overriding it to a stub. Same
+# host-gated desktop/src-tauri/package-signed.sh --build driver as the siblings
+# (host targets ONLY = app/dmg here; NO cross-compile — `cargo tauri build` emits
+# only the current host's formats and the deb/rpm/msi/nsis entries in
+# tauri.conf.json are simply skipped on macOS). DEV KEYS ONLY, no update server —
+# the script enforces both. Honest scope: a green run proves the .app/.dmg BUNDLE
+# builds and clears the reused dev-key TUF verify; it is UNAUDITED, unsigned
+# (bundle.macOS.signingIdentity stays null by design) and NOT notarized.
+# built ≠ installed ≠ notarized.
+t1:desktop-bundle-macos:
+  stage: test
+  tags:
+    - bloch-mac   # the EXISTING self-hosted runner (Rust + Tauri CLI + minisign already present).
+  script:
+    # tauri-cli + minisign are provisioned on bloch-mac; self-heal if a reprovision
+    # ever dropped them so the gate stays honestly green (a no-op when present).
+    - command -v minisign >/dev/null 2>&1 || brew install minisign
+    - cargo tauri --help >/dev/null 2>&1 || cargo install tauri-cli --version '^2' --locked
+    - POSTERN_PACKAGING_E2E=1 bash desktop/src-tauri/package-signed.sh --build -o "$CI_PROJECT_DIR/desktop-bundle-macos"
+    # package-signed.sh stages only the .dmg *file* (the .app is a directory bundle
+    # it deliberately leaves in target/); copy the .app out so it ships as an
+    # artifact too and survives the after_script target cleanup below.
+    - mkdir -p "$CI_PROJECT_DIR/desktop-bundle-macos/app"
+    - cp -R target/release/bundle/macos/*.app "$CI_PROJECT_DIR/desktop-bundle-macos/app/"
+  after_script:
+    # Free the release target so the shared bloch-mac disk does not fill between runs
+    # (mirrors build-and-test / t0:l2-data-offline). The published artifacts live
+    # under desktop-bundle-macos/, not target/, so this cleanup never touches them.
+    - rm -rf target
+  artifacts:
+    paths:
+      - desktop-bundle-macos/artifacts/*.dmg
+      - desktop-bundle-macos/app/*.app
+      - desktop-bundle-macos/SHA256SUMS
+      - desktop-bundle-macos/tuf-out/**
+    expire_in: 1 week
+  timeout: 60m
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+      changes:
+        - desktop/**/*
+        - packaging/**/*
+        - crates/postern-*/**/*
+        - integration/**/*
+        - .gitlab-ci.yml
+
+# GitLab Pages — publish the static Postern Labs site (site/ → public/).
+# The site is self-contained HTML (no build step, no network calls); it must
+# publish even when the Rust jobs are slow or red, so it depends on nothing.
+# Kept as a no-cost backup mirror alongside the primary Cloudflare deploy below.
+pages:
+  stage: deploy
+  needs: []
+  dependencies: []
+  before_script: []
+  script:
+    - bash assemble-public.sh   # site at / + self-contained apps at /apps/<name>/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Cloudflare Pages — PRIMARY host for the Postern Labs site + the self-contained
+# apps (published together at / and /apps/<name>/ by assemble-public.sh).
+# All self-contained, CSP-strict HTML → ideal for static hosting.
+# Requires these MASKED, PROTECTED CI/CD variables (Settings → CI/CD → Variables):
+#   CLOUDFLARE_API_TOKEN   — a scoped "Cloudflare Pages: Edit" API token
+#   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id
+#   CF_PAGES_PROJECT       — the Cloudflare Pages project name (create it once)
+# wrangler reads CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID from the env.
+# NEVER hardcode a token here. Manual trigger: publishing is an intentional act,
+# not an automatic side effect of every push (one click in the GitLab UI).
+deploy-cloudflare:
+  stage: deploy
+  needs: []
+  dependencies: []
+  before_script: []
+  script:
+    - export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+    - bash assemble-public.sh   # site at / + self-contained apps at /apps/<name>/
+    - npx --yes wrangler@3 pages deploy public --project-name "$CF_PAGES_PROJECT" --branch main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CLOUDFLARE_API_TOKEN'
+      when: manual

@@ -1,0 +1,69 @@
+# Maintainer: Tiago Beltrao Acioli <tiagobeltraoacioli@gmail.com>
+#
+# ==========================================================================
+# STATUS: UNBUILT / UNBOOTED. "Postern for postmarketOS" — community edition.
+# This APKBUILD has NEVER been run through abuild/pmbootstrap on a real
+# Alpine/pmOS host. Lint-reviewed only. Non-reproducible, non-attestable
+# (see ../HONESTY.md). This is NOT "Postern OS". No build result exists yet.
+# ==========================================================================
+#
+# Meta package for "Postern for postmarketOS". Installs the Postern app suite +
+# wallet + system Tor and pulls in the default UI flavor (Phosh). The
+# post-install enables the (Alpine-provided) Tor OpenRC service and prints the
+# honesty notice.
+#
+# Meta-package pattern per APKBUILD(5): no source, no build(), and package()
+# must create $pkgdir itself ("if this package installs no files (for example,
+# a metapackage), you must use mkdir -p "$pkgdir"").
+#
+# SERVICE / USER NOTE (task item 2): this overlay ships no Postern daemon, so
+# no dedicated Postern system user or OpenRC init script is created — inventing
+# one would be cruft. The wallet (postern-wallet) is a per-user CLI that keeps
+# its software keystore under the invoking user's $HOME. The one real long-
+# running service in the stack is Tor, which the `tor` apk installs with its
+# own `tor` user and `/etc/init.d/tor`; we only ENABLE it at boot (OpenRC,
+# not systemd — pmOS uses OpenRC) from the post-install.
+pkgname=postern
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="Postern for postmarketOS - app suite, wallet and Tor integration (community edition, non-attestable)"
+url="https://posternlabs.com"  # TODO: confirm canonical project URL before first publish
+# Constrained to the arches we actually build/test the app packages for.
+# ("all" would be legal per APKBUILD(5) but overclaims — we only ship these two.)
+arch="aarch64 x86_64"
+license="MIT"
+# Runtime deps: the two app packages, system Tor, and the default UI.
+# - postern-wallet / postern-apps are our own apks (this overlay).
+# - "tor" is a real Alpine community-repo package (ships its own user+initd).
+# - postmarketos-ui-phosh is the real pmaports UI meta package for Phosh.
+#   TODO(flavor): decide whether the meta should HARD-depend on a UI (forces
+#   Phosh onto Plasma-Mobile/Sxmo users) or only recommend it via the flavor
+#   doc. Hard dep kept for now so `apk add postern` yields a usable phone out
+#   of the box; revisit per flavor/README.md.
+depends="
+	postern-wallet
+	postern-apps
+	tor
+	postmarketos-ui-phosh
+	"
+# No test suite: meta package contains no code.
+options="!check"
+# Post-install script: enables the Tor service + prints the honesty notice
+# (full first-run note ships in postern-apps at
+# /usr/share/doc/postern-apps/first-run.md).
+install="$pkgname.post-install"
+source=""
+# NOTE: install scripts do NOT go in source=; abuild picks up
+# $pkgname.post-install from the APKBUILD directory automatically and
+# checksums it via `abuild checksum`.
+
+# No build() — nothing to compile (allowed per APKBUILD(5)).
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+# TODO(build-host): run `pmbootstrap checksum postern` (or `abuild checksum`)
+# on a real Alpine/pmOS host to populate this — empty-source meta packages
+# still get sha512sums regenerated for the install script.
+sha512sums=""

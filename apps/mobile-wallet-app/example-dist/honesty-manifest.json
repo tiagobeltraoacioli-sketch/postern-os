@@ -1,0 +1,11 @@
+{
+  "note": "Contract example. The real app build must emit this file into its own dist/. Each screen maps to the built file(s) that render it; the honesty gate checks the concatenation of those files for the mandatory copy.",
+  "screens": [
+    { "id": "onboarding", "file": "assets/onboarding.js" },
+    { "id": "unlock",     "file": "assets/unlock.js" },
+    { "id": "home",       "file": "assets/home.js" },
+    { "id": "receive",    "file": "assets/receive.js" },
+    { "id": "send",       "glob": "assets/send-*.js" },
+    { "id": "settings",   "files": ["assets/settings.js"] }
+  ]
+}

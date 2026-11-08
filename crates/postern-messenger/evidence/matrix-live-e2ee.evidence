@@ -1,0 +1,129 @@
+# Postern Messenger — LIVE Matrix login / sync / E2EE round-trip evidence — FIRST LIVE RUN
+# UNAUDITED Phase-1 reference slice, run end to end against a throwaway local
+# Synapse. A passing round-trip is a PLUMBING + E2EE-path proof ONLY. It is NOT
+# a security claim and NOT a metadata-privacy claim. The Megolm/Olm crypto is
+# CLASSICAL Curve25519 (NOT post-quantum; harvest-now-decrypt-later applies to
+# intercepted ciphertext). No Tor is wired on this path — login/sync/send went
+# over plain localhost HTTP, so the homeserver saw existence/online-ness, the
+# social graph, timing, and the device list (see HOMESERVER_METADATA_LIMITS in
+# src/matrix.rs). No cross-signing / SAS verification exists yet (Phase 2). This
+# is the first time both #[ignore]d live tests were actually EXECUTED against a
+# real homeserver and transcribed — previously the file header's "HONEST STATUS"
+# said the restore round-trip was UNPROVEN until someone ran it. It has now run.
+#
+# GATE (unchanged, never weakened): both tests stay #[ignore]d and require the
+# POSTERN_MATRIX_TEST_* env vars to be set to a reachable homeserver. Neither is
+# ever a CI gate. The offline `cargo test -p postern-messenger --features matrix`
+# suite still lists them as `ignored` and proves nothing beyond compilation.
+# The only diff to the test file is the addition of `eprintln!` EVIDENCE lines
+# (visible under --nocapture) so the transcript below is self-demonstrating
+# rather than "trust the asserts"; no assertion or gate was changed.
+
+host          : Darwin 23.6.0 x86_64 (macOS 14.8.7, BuildVersion 23J520 — dev workstation, NOT CI)
+git_rev       : 3bf161faed4e892d27eb8330bf1062f577c410ff (branch base) + this branch's matrix_live evidence prints
+toolchain     : rustc 1.94.1 (e408947bf 2026-03-25) / cargo 1.94.1
+homeserver    : matrixdotorg/synapse 1.156.0, image digest
+                matrixdotorg/synapse@sha256:6882d26594b87171e0fe807ac6bd7f0000665cd70e73fb88c58ec9bff14c19ce
+docker        : Docker Desktop server 29.4.0 (local, throwaway container `synapse-live`, volume `synapse-data`)
+server_name   : localhost, listening http://localhost:8008 (SYNAPSE_REPORT_STATS=no)
+accounts      : alice / test-pass-a and bob / test-pass-b, registered via
+                `register_new_matrix_user --no-admin -c /data/homeserver.yaml`
+env_vars      : POSTERN_MATRIX_TEST_HOMESERVER=http://localhost:8008
+                POSTERN_MATRIX_TEST_USER_A=alice  POSTERN_MATRIX_TEST_PASS_A=test-pass-a
+                POSTERN_MATRIX_TEST_USER_B=bob    POSTERN_MATRIX_TEST_PASS_B=test-pass-b
+gate          : #[ignore]d AND POSTERN_MATRIX_TEST_* required; never runs in CI. Diff weakens no gate.
+
+# ── UNBLOCK RUNBOOK (exactly what was done on this host) ──
+#   1. Started the local Docker daemon (Docker Desktop).
+#   2. docker volume create synapse-data
+#   3. docker run --rm -v synapse-data:/data -e SYNAPSE_SERVER_NAME=localhost \
+#        -e SYNAPSE_REPORT_STATS=no matrixdotorg/synapse:latest generate
+#   4. docker run -d --name synapse-live -v synapse-data:/data -p 8008:8008 \
+#        matrixdotorg/synapse:latest
+#   5. docker exec synapse-live register_new_matrix_user -u alice -p test-pass-a \
+#        --no-admin -c /data/homeserver.yaml http://localhost:8008
+#      docker exec synapse-live register_new_matrix_user -u bob   -p test-pass-b \
+#        --no-admin -c /data/homeserver.yaml http://localhost:8008
+#   6. export the POSTERN_MATRIX_TEST_* env vars above, then:
+#      cargo test -p postern-messenger --features matrix --test matrix_live \
+#        -- --ignored --test-threads=1 --nocapture
+#   (Synapse is AGPL — fine to RUN as a throwaway test service; this crate never
+#    links or forks it. Any homeserver works: continuwuity, conduwuit, …)
+
+# ── HONEST NOTE ON A FLAKE FOUND (kept, not hidden) ──
+# A SECOND run against the SAME already-used Synapse accounts (without wiping
+# the volume) degraded badly — the restore test ran > 13 minutes and had to be
+# aborted. Cause: every prior in-memory `login_password` left a stale Matrix
+# device on the alice/bob accounts whose one-time keys were exhausted, so the
+# sender's Megolm key-sharing (Olm to every listed device) stalled repeatedly
+# trying to claim OTKs from those dead devices. It is a TEST-HARNESS state issue
+# (accumulated devices on a reused homeserver), NOT a defect in the crate: the
+# clean-volume run below finished in 37.56s. Reproducible remedy: run against a
+# FRESH homeserver (wipe the `synapse-data` volume + re-register) as this run
+# did, or log devices out. Recorded here because the honest record includes the
+# footgun, not only the green run.
+
+# ══════════════════════════════════════════════════════════════════════════
+# RUN (2026-07-18T02:20:53Z → 02:21:33Z) — clean fresh-volume Synapse, live PASS
+#   POSTERN_MATRIX_TEST_HOMESERVER=http://localhost:8008 \
+#   POSTERN_MATRIX_TEST_USER_A=alice POSTERN_MATRIX_TEST_PASS_A=test-pass-a \
+#   POSTERN_MATRIX_TEST_USER_B=bob   POSTERN_MATRIX_TEST_PASS_B=test-pass-b \
+#   cargo test -p postern-messenger --features matrix --test matrix_live \
+#     -- --ignored --test-threads=1 --nocapture
+# ══════════════════════════════════════════════════════════════════════════
+# VERBATIM:
+#
+#     RUN_START_UTC=2026-07-18T02:20:53Z
+#         Finished `test` profile [unoptimized + debuginfo] target(s) in 1.62s
+#          Running tests/matrix_live.rs (target/debug/deps/matrix_live-ca77f38f0f489781)
+#
+#     running 2 tests
+#     test e2ee_text_roundtrip_between_two_accounts ... EVIDENCE[e2ee_roundtrip]: alice_device=Some("YBIABEXLRT") bob_device=Some("PHXUWTIWVA") room=!YiEABJPgbEBvFYrfav:localhost event=$ToFF7sVAlSBFiyMDlFQ2uCm8N0kRY69hx7tQ_g2Y698 was_encrypted=true tier=InternalE2ee
+#     ok
+#     test session_restore_resumes_same_device_and_megolm_state ... EVIDENCE[pre-restart A->B]: delivered event $dOx6gL8lanUhoZ-MFok9Eyi2UJSpE5t_ewUhFfgFpZ4 was_encrypted=true tier=InternalE2ee body="persist test: A->B before restart"
+#     EVIDENCE[pre-restart B->A]: delivered event $xgGLiG-DLPgwL0F6W0KPpuF9faPaKCioEpXgWCKZn6o was_encrypted=true tier=InternalE2ee body="persist test: B->A before restart"
+#     EVIDENCE[session_restore]: original_device=DHYJYXYAXV post_restore_device=Some("DHYJYXYAXV") same=true
+#     EVIDENCE[post-restart B->A]: delivered event $l92qK3qZlNwC2vWQI5MVRc4j3-7i5n7pPFw4UwDX8XE was_encrypted=true tier=InternalE2ee body="persist test: B->A after restart (pre-restart Megolm session)"
+#     EVIDENCE[post-restart A->B]: delivered event $2y57olhT44b-XSUxO8HkQznApr3ueQZq8dDz0wrwTnA was_encrypted=true tier=InternalE2ee body="persist test: A->B after restart"
+#     ok
+#
+#     test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.56s
+#     RUN_END_UTC=2026-07-18T02:21:33Z
+#
+# ── What PASSED (the real proof) ──
+# TEST 1  e2ee_text_roundtrip_between_two_accounts = ok.
+#   Alice and Bob each did a real password login (fresh in-memory device:
+#   alice YBIABEXLRT, bob PHXUWTIWVA), synced to upload device/one-time keys.
+#   Alice created a PRIVATE + is_direct + m.room.encryption room through the
+#   crate's only room-creation path (create_encrypted_dm), Bob joined, both
+#   sides classified it SecurityTier::InternalE2ee. Alice sent through the
+#   tier-gated send_text; the SDK queried Bob's device keys, claimed a one-time
+#   key, Olm-encrypted the Megolm room key to Bob's device (m.room_key), and
+#   Megolm-encrypted the event. Bob synced, decrypted it, and the delivered
+#   ReceivedText carried was_encrypted=true, tier=InternalE2ee, body intact.
+#   That is a genuine end-to-end live Matrix E2EE round-trip: login → sync →
+#   encrypted room → Olm key share → Megolm send → sync → decrypted receive.
+#
+# TEST 2  session_restore_resumes_same_device_and_megolm_state = ok.
+#   Alice logged in via login_password_persistent into a sqlite store
+#   (device DHYJYXYAXV), snapshotted the session, and did one E2EE round-trip
+#   each way (both was_encrypted=true). The client was then DROPPED ("process
+#   restart") and rebuilt with MatrixMessenger::restore from the SavedSession +
+#   the same sqlite store path. The core assertion held live:
+#     original_device=DHYJYXYAXV  post_restore_device=DHYJYXYAXV  same=true
+#   — restore resumed the SAME Matrix device (no fresh device keys). The sharp
+#   edge then decrypted: a post-restart B->A message sent on Bob's PRE-restart
+#   outbound Megolm session (same device_id, key already shared, so Bob did NOT
+#   re-send it) arrived was_encrypted=true — which is only possible if Alice's
+#   INBOUND Megolm session genuinely survived on disk across the restart, not a
+#   fresh key share papering over a wiped store. A->B after restart also still
+#   went out tier-gated and encrypted. This is the first live execution of the
+#   persistence slice; the file header's "HONEST STATUS: restore path UNPROVEN
+#   until someone runs this" is now discharged.
+#
+# ── Scope of this proof (the honest ceiling) ──
+# Plumbing + the classical Megolm/Olm E2EE path + sqlite persistence/restore
+# are proven live. Nothing more. No Tor (metadata exposed as documented), no
+# post-quantum transport crypto, no device verification/cross-signing, and the
+# whole crate remains a pre-release, UNAUDITED library slice — not a functional
+# messenger product. The honest-limits header above holds verbatim.

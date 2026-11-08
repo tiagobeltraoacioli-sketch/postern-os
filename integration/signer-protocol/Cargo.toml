@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-signer-protocol — the PHONE-AS-SIGNER request/approve protocol (v1).
+#
+# The DESKTOP requests a signature; the PHONE (which holds the hybrid
+# Falcon‖ML-DSA wallet key) parses the ACTUAL bytes to be signed, renders a
+# human "what you see is what you sign" sentence, and approves + signs. The
+# private key NEVER crosses the channel — only signatures and approvals do,
+# and that guarantee is STRUCTURAL (the type system + a build-failing golden
+# test), not a convention.
+#
+# STANDALONE by design: this crate owns its `[workspace]` and pulls no
+# in-tree path/git deps, so `cargo build` / `cargo test` run without the rest
+# of the monorepo (and without `bloch-crypto`, whose rev is an unresolved
+# placeholder). It composes AGAINST frozen interfaces via local traits:
+#   * `Channel`      — Dev1's PMO transport (this crate defines the trait;
+#                      a real transport implements it).
+#   * `WalletSigner` — the mobile `WalletCore` hybrid signer surface
+#                      (`sign_hex`/`sign_tx_hex` shape).
+# The design + counsel memos this implements:
+#   Postern-Mobile-Desktop-Integration-Design.md §3 (phone-as-signer),
+#   Postern-MD-Integration-Security.md §4 (companion-signing), §5.1 (denylist).
+#
+# Honesty rails (see lib.rs): software signing in RAM is NOT a hardware wallet;
+# this is an unaudited scaffold; the coin (BLCH) is not a security.
+
+[package]
+name = "postern-signer-protocol"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Postern phone-as-signer protocol (v1): desktop requests, phone approves + signs a wallet-login challenge. Fresh-nonce + monotonic-counter + session-binding replay resistance; WYSIWYS parsed from the actual signed bytes; a STRUCTURAL key-material denylist proven by a build-failing golden test. Keys never cross the wire. Unaudited scaffold; software signing in RAM is not a hardware wallet; BLCH is not a security."
+publish = false
+
+# Detach from the parent monorepo workspace: this crate builds/tests on its own.
+[workspace]
+
+[lib]
+name = "postern_signer_protocol"
+
+[dependencies]
+# Wire types + the golden-test serializer that scans for leaked key material.
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+# Domain-separated transcripts (SHA3-256), byte-identical to the discipline in
+# crates/postern-consiglio-auth (`consiglio:wallet-login:v1`).
+sha3        = "0.10"
+# Typed, fail-closed errors (matches the sibling crates' house style).
+thiserror   = "2"
+# Scrub the scaffold signer's in-RAM secret on drop (the WalletCore hygiene).
+zeroize     = "1"
+# Hex for signatures/pubkeys/digests on the wire (all PUBLIC material).
+hex         = "0.4"
+# OS CSPRNG for fresh per-request nonces (no rand facade churn).
+getrandom   = "0.2"

@@ -1,0 +1,611 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT OR Apache-2.0
+  SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+  Postern Business edition — org policy + licensing console (reference prototype).
+  Self-contained, offline-first. No telemetry, no phone-home. The ONLY network call
+  this console can make is an OPTIONAL, user-initiated same-origin fetch of the
+  PUBLIC license revocation list (GET /license/status) so a leaked master/sub can be
+  refused — that CRL is public data, carries no secret, and the fetch reveals only
+  that you checked. Air-gapped installs paste the CRL instead; master/sub tokens
+  always verify OFFLINE against the bundled vendor public key. CSP connect-src 'self'
+  scopes the fetch to the same origin (posternlabs.com) and nowhere else.
+
+  CRL enforcement (D4): the console fetches/pastes the VENDOR-SIGNED, versioned CRL,
+  verifies it against the SAME vendor public key it already trusts (no new authority),
+  prefers the higher `version` (anti-rollback), honours the soft-offline freshness
+  window, and REFUSES a revoked master_pub/jti. The CRL only ever revokes, never
+  grants; the personal-free base is never gated.
+
+  De-demoed: master import + sub minting now run REAL offline Ed25519 over the
+  licensing chain (vendor -> master -> sub), not a "PSTN-MASTER-" stand-in. The
+  verifier is a byte-compatible inline copy of apps/gramota-kyc/postern-license.mjs
+  (canonicalJson + WebCrypto Ed25519), the same primitive functions/license/*.js
+  use. No crypto is rolled here. Reference prototype, unaudited, pre-production.
+  Demonstrates controls that ENABLE compliance; is NOT compliance, not legal advice.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Postern Business — policy &amp; licensing console · Postern Labs</title>
+<style>
+/* ============================================================
+   SHARED TOKEN CONTRACT — postern-enterprise design system
+   index.html and console.html define the IDENTICAL token set
+   (same names, same values). If you change one file, mirror
+   the other.
+   Neutral ramp (graphite/ink):
+     --bg --bg-glow --surface --surface-2 --surface-3
+     --border --border-hi --text --text-dim --muted
+   Cobalt accent set (Consiglio wears cobalt):
+     --acc --acc-hi --acc-dim --acc-ink
+     dark: #5f87d6 / #7ea2e6 / #44619e / #0d1322
+     light: #35569e / #2a4680 / #6c83b8 / #f6f8ff
+   Status: --ok --warn --err   Chrome: --shadow --radius
+   Fonts: --font-ui --font-mono
+   Theming: dark is the :root default; light overrides live in
+   :root[data-theme="light"] and, when no data-theme is set, in
+   @media (prefers-color-scheme: light) :root:not([data-theme]).
+   ============================================================ */
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --bg:#0d1014;--bg-glow:#10141d;--surface:#14181f;--surface-2:#1a2029;--surface-3:#212934;
+  --border:#29323e;--border-hi:#3a4552;--text:#e7e9ee;--text-dim:#a8adb5;--muted:#79818c;
+  --acc:#5f87d6;--acc-hi:#7ea2e6;--acc-dim:#44619e;--acc-ink:#0d1322;
+  --ok:#63ab7c;--warn:#d08c2e;--err:#d96a63;--radius:14px;--shadow:0 18px 50px rgba(0,0,0,.45);
+}
+@media (prefers-color-scheme: light){:root:not([data-theme]){
+  --bg:#eff0f4;--bg-glow:#f4f6fa;--surface:#fbfbfd;--surface-2:#eaecf2;--surface-3:#dfe3ec;
+  --border:#d0d5e0;--border-hi:#b5bccd;--text:#22242b;--text-dim:#4f555e;--muted:#767d87;
+  --acc:#35569e;--acc-hi:#2a4680;--acc-dim:#6c83b8;--acc-ink:#f6f8ff;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(44,54,80,.14);
+}}
+:root[data-theme="light"]{
+  --bg:#eff0f4;--bg-glow:#f4f6fa;--surface:#fbfbfd;--surface-2:#eaecf2;--surface-3:#dfe3ec;
+  --border:#d0d5e0;--border-hi:#b5bccd;--text:#22242b;--text-dim:#4f555e;--muted:#767d87;
+  --acc:#35569e;--acc-hi:#2a4680;--acc-dim:#6c83b8;--acc-ink:#f6f8ff;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(44,54,80,.14);
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:var(--font-ui);background:radial-gradient(1100px 520px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--text);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+a{color:var(--acc-hi)}
+header.site{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
+.site-inner{display:flex;align-items:center;gap:12px;padding:12px 0}
+.wordmark{font-family:var(--font-mono);font-size:16px;font-weight:700;letter-spacing:.22em;color:var(--text)}
+.wordmark .tick{color:var(--acc)}
+.byline{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);padding-left:12px}
+.site-actions{margin-left:auto;display:flex;gap:8px}
+.hbtn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;color:var(--text-dim)}
+.hbtn:hover{border-color:var(--border-hi);color:var(--text);background:var(--surface-2)}
+.notice-strip{border-bottom:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));background:color-mix(in srgb,var(--warn) 10%,var(--surface));font-size:12.5px;color:var(--text-dim)}
+.notice-strip .wrap{padding:8px 20px}.notice-strip strong{color:var(--warn)}
+main.wrap{padding-top:20px;padding-bottom:40px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin:14px 0;box-shadow:var(--shadow)}
+h1{font-size:22px;margin:.2em 0}h2{font-size:16px;margin:.1em 0 .6em;letter-spacing:.01em}
+.lead{color:var(--text-dim);font-size:13.5px}
+.mono{font-family:var(--font-mono)}
+.banner{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border-hi);border-radius:10px;padding:12px 14px;background:var(--surface-2);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:0 0 auto;background:var(--muted)}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.err{background:var(--err)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:5px;margin:6px 0}
+.field label{font-size:12px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.03em}
+.field input,.field select,.field textarea{background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+.field textarea{min-height:120px;resize:vertical;font-family:var(--font-mono);font-size:11.5px;line-height:1.5}
+.btn-acc{background:var(--acc);color:var(--acc-ink);border:1px solid var(--acc);border-radius:10px;padding:9px 16px;font-weight:600}
+.btn-acc:hover{background:var(--acc-hi)}
+.btn-acc:disabled{opacity:.55;cursor:progress}
+.btn-ghost{background:transparent;border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text-dim)}
+.btn-ghost:hover{border-color:var(--border-hi);color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.err-line{color:var(--err);font-size:12.5px;min-height:1.1em;margin:6px 0}
+.ok-line{color:var(--ok);font-size:12.5px;min-height:1.1em;margin:6px 0}
+.kv{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px;margin:6px 0}
+.kv b{color:var(--text)}.kv span{color:var(--text-dim)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.pill{display:inline-block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.05em;padding:2px 8px;border-radius:999px;border:1px solid var(--border-hi);color:var(--text-dim)}
+.pill.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,var(--border))}
+.pill.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,var(--border))}
+.pill.err{color:var(--err);border-color:color-mix(in srgb,var(--err) 50%,var(--border))}
+.pill.free{color:var(--acc-hi);border-color:var(--acc-dim)}
+.matrix td:first-child{font-weight:600}
+.tag{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.toggle{appearance:none;width:38px;height:22px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border);position:relative;cursor:pointer}
+.toggle:checked{background:var(--acc-dim);border-color:var(--acc)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text-dim);transition:transform .15s}
+.toggle:checked::after{transform:translateX(16px);background:var(--acc-ink)}
+.mini{font-size:11.5px;color:var(--muted)}
+.hidden{display:none}
+.tokenbox{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:8px;word-break:break-all;color:var(--text-dim);max-height:120px;overflow:auto}
+footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:12px;padding:16px 20px;text-align:center}
+.linkish{background:none;border:none;color:var(--acc-hi);text-decoration:underline;padding:0}
+.privacy li{margin:3px 0;font-size:13px;color:var(--text-dim)}
+.realflag{font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,var(--border));border-radius:6px;padding:1px 6px}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap site-inner">
+  <div class="wordmark">POSTERN<span class="tick">·</span>BUSINESS</div>
+  <div class="byline">policy &amp; licensing console</div>
+  <div class="site-actions"><button class="hbtn" id="themeBtn">theme</button></div>
+</div></header>
+
+<div class="notice-strip"><div class="wrap">
+  <strong>Reference prototype — unaudited, pre-production. Demonstrates controls that ENABLE compliance; is NOT compliance, not legal advice.</strong>
+  Business edition: <strong>free 6-month evaluation</strong>, pricing still being structured; a license will be required after.
+  <strong>Personal editions stay free and unrestricted.</strong> Payment is fiat, never a coin — the coin is not a security.
+</div></div>
+
+<main class="wrap">
+  <div class="card">
+    <h1>Org policy &amp; licensing</h1>
+    <p class="lead">This console governs only the <b>Business edition</b> — additive, org-managed capabilities layered on top of the free personal suite. It never disables a personal app or reaches a person's personal-app data. Verification is <b>offline</b> (real Ed25519, no network); there is no per-user account and no per-user login.</p>
+    <div class="banner" id="banner"><span class="dot" id="bannerDot"></span><div id="bannerText">…</div></div>
+  </div>
+
+  <!-- ===== Onboarding: import master bundle ===== -->
+  <div class="card">
+    <h2>Corporate master <span class="realflag">offline · real Ed25519 · no server</span></h2>
+    <p class="lead">A company with a DUNS number mints one vendor-signed <b>master bundle</b> on posternlabs.com (<span class="mono">/license/master</span>). Paste that bundle below. This console verifies the <b>vendor&nbsp;→&nbsp;master</b> Ed25519 chain <b>offline</b> against the licensing lib's pinned public key, then unlocks the Business edition for <b>unlimited users</b> for the evaluation window. Leaving it blank runs the <b>free freemium</b> tier (up to 3 desktops, 2 years).</p>
+    <div class="field"><label for="mBundle">Master bundle JSON (from posternlabs.com — includes the org master private key; keep it on this device)</label><textarea id="mBundle" placeholder='{ "master_token": { ... }, "master_sig": "…", "master_private_key_pkcs8": "…" }'></textarea></div>
+    <p class="mini">The bundle carries <span class="mono">master_private_key_pkcs8</span> — the org's own signing key. It stays on this device; it is used only to mint sub-accesses locally and is never sent anywhere. The only network call this console can make is the optional, same-origin public CRL fetch below (<span class="mono">connect-src 'self'</span>); the vendor's private key never leaves posternlabs.com.</p>
+    <p class="err-line" id="mErr"></p>
+    <p class="ok-line" id="mOk"></p>
+    <div class="btnrow">
+      <button class="btn-acc" id="btnImport">Verify &amp; import master (offline)</button>
+      <button class="btn-ghost" id="btnFreemium">Use free freemium instead</button>
+      <button class="btn-ghost" id="btnReset">Reset console</button>
+    </div>
+  </div>
+
+  <!-- ===== Sub-access management (master only) ===== -->
+  <div class="card hidden" id="subCard">
+    <h2>Sub-access — delegate to users &amp; teams</h2>
+    <p class="lead">The master holder mints <b>signed sub tokens</b> (Ed25519, signed by the org's master key) for individual users or teams — unlimited subs, each with <b>sub.exp&nbsp;≤&nbsp;master.exp</b>. A sub-user installs their token; their app verifies the offline chain <span class="mono">vendor&nbsp;→&nbsp;master&nbsp;→&nbsp;sub</span>. No per-user account, no server login, no telemetry.</p>
+    <div class="grid2">
+      <div class="field"><label for="sLabel">Label (user or team)</label><input type="text" id="sLabel" placeholder="Ana — Engineering"></div>
+      <div class="field"><label for="sExp">Expiry (optional; capped at master expiry)</label><input type="date" id="sExp"></div>
+    </div>
+    <p class="err-line" id="sErr"></p>
+    <div class="btnrow"><button class="btn-acc" id="btnMint">Create sub-access</button></div>
+    <div id="subExport"></div>
+    <div style="overflow-x:auto;margin-top:12px"><table id="subTable"><thead><tr><th>Label</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <!-- ===== License revocation (CRL) enforcement ===== -->
+  <div class="card" id="crlCard">
+    <h2>License revocation (CRL) <span class="realflag">vendor-signed · anti-rollback · offline-verified</span></h2>
+    <p class="lead">A leaked master or sub can be revoked by posternlabs.com without breaking offline verification. This console fetches the <b>vendor-signed</b>, versioned CRL from <span class="mono">/license/status</span> (same-origin, public — the fetch reveals only that you checked), verifies it against the <b>same vendor public key</b> it already trusts, prefers the higher <span class="mono">version</span> (anti-rollback), honours the soft-offline freshness window, and <b>refuses</b> a revoked master or sub. The CRL only ever <b>revokes</b>, never grants; the personal-free base is never affected. Air-gapped? Paste a CRL below — no network needed.</p>
+    <div class="btnrow">
+      <button class="btn-ghost" id="btnFetchCrl">Fetch latest CRL (/license/status)</button>
+    </div>
+    <div class="field"><label for="crlPaste">…or paste a vendor-signed CRL JSON (offline / air-gapped)</label><textarea id="crlPaste" placeholder='{ "payload": { "typ":"crl", "version": 3, "revoked_jti": [], "revoked_master_pub": [], ... }, "sig": "…" }'></textarea></div>
+    <div class="btnrow"><button class="btn-ghost" id="btnApplyCrl">Verify &amp; apply pasted CRL</button></div>
+    <p class="err-line" id="crlErr"></p>
+    <p class="ok-line" id="crlOk"></p>
+    <div class="banner" id="crlBanner" style="margin-top:10px"><span class="dot" id="crlDot"></span><div id="crlText">No CRL loaded — offline, best-effort. A valid license stays valid until a newer, fresher CRL revokes it.</div></div>
+  </div>
+
+  <!-- ===== Org policy matrix ===== -->
+  <div class="card" id="policyCard">
+    <h2>App &amp; feature policy — the additive matrix</h2>
+    <p class="lead">Every app below is <b>personal-free</b>: free, unrestricted, needs no license. The toggles enable <b>additive</b> org-managed features only — they never gate the base app. Enterprise features require a license after the evaluation.</p>
+    <div style="overflow-x:auto"><table class="matrix" id="matrix"><thead><tr><th>App</th><th>Base</th><th>Org-managed features (additive)</th></tr></thead><tbody></tbody></table></div>
+    <p class="mini" id="policyNote"></p>
+  </div>
+
+  <!-- ===== Privacy ===== -->
+  <div class="card">
+    <h2>Privacy — honest panel</h2>
+    <ul class="privacy" id="privacyList"></ul>
+    <p class="mini">Design/reference prototype. We do not claim "100% private" or "unhackable" — no honest software can. No telemetry, no phone-home. Offline verification. Fiat, not coin.</p>
+  </div>
+</main>
+
+<footer class="site">Postern Business console · additive to the free personal suite · offline · no telemetry · <button class="linkish" id="privacyText">plain-text privacy</button> · canonical logic: enterprise/features/ · verifier: apps/gramota-kyc/postern-license.mjs · admin console: <a href="./index.html">Consiglio</a></footer>
+
+<script>
+"use strict";
+/* ============================================================================
+   Inline byte-compatible copy of apps/gramota-kyc/postern-license.mjs — the
+   REAL offline Ed25519 verifier + device sub-minter. Rolls no crypto: every
+   signature op is WebCrypto Ed25519, the same primitive functions/license/*.js
+   use. Keep in sync with the .mjs source of truth.
+   ============================================================================ */
+var VENDOR_PUB_RAW_B64 = "iW52PuhJm0+JE+g5UhfrArJ7ONfuUjrm0C38NSwQGm0=";
+function makePosternLicense(subtle){
+  subtle = subtle || (globalThis.crypto && globalThis.crypto.subtle);
+  var b64d = function(s){ return Uint8Array.from(atob(s), function(c){ return c.charCodeAt(0); }); };
+  var b64 = function(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))); };
+  var enc = function(s){ return new TextEncoder().encode(s); };
+  function canonicalJson(v){
+    if (v === null) return "null";
+    if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+    if (typeof v === "object") {
+      var keys = Object.keys(v).filter(function(k){ return v[k] !== undefined; }).sort();
+      return "{" + keys.map(function(k){ return JSON.stringify(k) + ":" + canonicalJson(v[k]); }).join(",") + "}";
+    }
+    return JSON.stringify(v);
+  }
+  async function verifySig(pubRawB64, payloadObj, sigB64){
+    try {
+      var key = await subtle.importKey("raw", b64d(pubRawB64), {name:"Ed25519"}, false, ["verify"]);
+      return await subtle.verify({name:"Ed25519"}, key, b64d(sigB64), enc(canonicalJson(payloadObj)));
+    } catch (_e) { return false; }
+  }
+  async function signPayload(pkcs8B64, payloadObj){
+    var key = await subtle.importKey("pkcs8", b64d(pkcs8B64), {name:"Ed25519"}, false, ["sign"]);
+    var sig = await subtle.sign({name:"Ed25519"}, key, enc(canonicalJson(payloadObj)));
+    return b64(sig);
+  }
+  function randHex(bytes){
+    var b = new Uint8Array(bytes);
+    (globalThis.crypto || crypto).getRandomValues(b);
+    return Array.from(b).map(function(x){ return x.toString(16).padStart(2,"0"); }).join("");
+  }
+  async function verifyChain(vendorPubB64, masterToken, masterSig, sub, now){
+    now = now || new Date();
+    var m = masterToken;
+    if (!m || m.v !== 1 || m.typ !== "master") return {ok:false, reason:"malformed-master"};
+    if (!(await verifySig(vendorPubB64, m, masterSig))) return {ok:false, reason:"bad-master-signature"};
+    if (m.tier === "corporate-master" && !/^\d{9}$/.test(String(m.duns == null ? "" : m.duns))) return {ok:false, reason:"bad-duns"};
+    var nowSec = Math.floor(now.getTime()/1000);
+    var masterExpired = m.exp <= nowSec;
+    if (!sub) return {ok:true, level:"master", tier:m.tier, seats:m.seats, duns:m.duns, exp:m.exp, expired:masterExpired, master_pub:m.master_pub, masterJti:m.jti};
+    var s = sub.payload || sub, ssig = sub.sig;
+    if (!s || s.v !== 1 || s.typ !== "sub") return {ok:false, reason:"malformed-sub"};
+    if (s.master_pub !== m.master_pub) return {ok:false, reason:"sub-master-mismatch"};
+    if (s.exp > m.exp) return {ok:false, reason:"sub-outlives-master"};
+    if (!(await verifySig(m.master_pub, s, ssig))) return {ok:false, reason:"bad-sub-signature"};
+    var exp = Math.min(s.exp, m.exp);
+    return {ok:true, level:"sub", tier:m.tier, seats:m.seats, duns:m.duns, exp:exp, expired:exp<=nowSec, master_pub:m.master_pub, masterJti:m.jti, subJti:s.jti, sub:s.sub};
+  }
+  async function mintSub(pkcs8B64, masterToken, opts){
+    var now = Math.floor((opts.now ? opts.now.getTime() : Date.now())/1000);
+    var cappedExp = Math.min(opts.exp || masterToken.exp, masterToken.exp);
+    var payload = {v:1, typ:"sub", master_pub:masterToken.master_pub, sub:opts.sub, iat:now, exp:cappedExp, jti:randHex(16), iss:masterToken.iss};
+    if (opts.clearance != null) payload.clearance = opts.clearance;
+    if (opts.device) payload.device = opts.device;
+    var sig = await signPayload(pkcs8B64, payload);
+    return {payload:payload, sig:sig};
+  }
+  /* ==========================================================================
+     CRL enforcement — byte-compatible mirror of enterprise/licensing/src/crl.ts.
+     Same signed bytes (canonicalJson over the CRL payload), same vendor PUBLIC
+     key, same predicates. Rolls no crypto: verifyCrl is WebCrypto Ed25519 verify.
+     The CRL only ever REVOKES, never grants; a missing/invalid CRL is treated as
+     "no revocation info" so a valid license is never bricked (fail-safe).
+     ========================================================================== */
+  var CRL_STATUS_PATH = "/license/status";
+  function isSerialRevoked(crl, jti){ return !!jti && crl.payload.revoked_jti.indexOf(jti) !== -1; }
+  function isMasterKeyRevoked(crl, mpub){ return !!mpub && crl.payload.revoked_master_pub.indexOf(mpub) !== -1; }
+  async function verifyCrl(vendorPubB64, crl){
+    var p = crl && crl.payload;
+    if (!p || p.v !== 1 || p.typ !== "crl") return {ok:false, reason:"malformed-crl"};
+    if (!Array.isArray(p.revoked_jti) || !Array.isArray(p.revoked_master_pub)) return {ok:false, reason:"malformed-crl-lists"};
+    if (typeof p.version !== "number" || p.version < 0) return {ok:false, reason:"bad-crl-version"};
+    if (!(await verifySig(vendorPubB64, p, crl.sig))) return {ok:false, reason:"bad-crl-signature"};
+    return {ok:true};
+  }
+  function crlFreshness(crl, now){
+    var t = Math.floor((now ? now.getTime() : Date.now())/1000), p = crl.payload;
+    var hard = p.next_update + p.max_stale_secs;
+    var ageDays = Math.max(0, Math.floor((t - p.issued_at)/86400));
+    if (t <= p.next_update) return {fresh:true, ageing:false, stale:false, ageDays:ageDays, note:"CRL is within its update window"};
+    if (t <= hard) return {fresh:false, ageing:true, stale:false, ageDays:ageDays, note:"CRL past its update window but inside the soft-offline grace; fetch a fresher CRL soon"};
+    return {fresh:false, ageing:false, stale:true, ageDays:ageDays, note:"CRL is older than the freshness window; revocation can no longer be trusted — enterprise features degrade until refreshed"};
+  }
+  /* Anti-rollback: keep whichever CRL has the higher version (ties -> fetched). */
+  function pickNewerCrl(cached, fetched){
+    if (!cached) return fetched;
+    if (!fetched) return cached;
+    return fetched.payload.version >= cached.payload.version ? fetched : cached;
+  }
+  function checkRevocation(crl, master, sub){
+    if (isMasterKeyRevoked(crl, master && master.master_pub)) return {revoked:true, reason:"org master key is revoked (whole-org revocation)"};
+    if (isSerialRevoked(crl, master && master.jti)) return {revoked:true, reason:"master token serial is revoked"};
+    if (sub && isSerialRevoked(crl, sub.jti)) return {revoked:true, reason:"sub token serial is revoked"};
+    return {revoked:false};
+  }
+  /* The pure decision the console's gate/render consult. Async (verifyCrl is
+     async). An unverifiable/absent CRL yields applies=false -> never revokes. */
+  async function evaluateRevocation(vendorPubB64, crl, master, subJtis, now){
+    if (!crl) return {applies:false, valid:false, reason:"no-crl", masterRevoked:false, revokedSubs:[], freshness:null, version:null};
+    var v = await verifyCrl(vendorPubB64, crl);
+    if (!v.ok) return {applies:false, valid:false, reason:v.reason, masterRevoked:false, revokedSubs:[], freshness:null, version:(crl.payload && crl.payload.version)};
+    var fresh = crlFreshness(crl, now);
+    var masterRevoked = !!master && checkRevocation(crl, master, null).revoked;
+    var revokedSubs = (subJtis || []).filter(function(j){ return isSerialRevoked(crl, j); });
+    return {applies:true, valid:true, reason:null, masterRevoked:masterRevoked, revokedSubs:revokedSubs, freshness:fresh, version:crl.payload.version};
+  }
+  return {canonicalJson:canonicalJson, verifyChain:verifyChain, mintSub:mintSub, VENDOR_PUB_RAW_B64:VENDOR_PUB_RAW_B64,
+    verifyCrl:verifyCrl, crlFreshness:crlFreshness, pickNewerCrl:pickNewerCrl, checkRevocation:checkRevocation,
+    isSerialRevoked:isSerialRevoked, isMasterKeyRevoked:isMasterKeyRevoked, evaluateRevocation:evaluateRevocation,
+    CRL_STATUS_PATH:CRL_STATUS_PATH};
+}
+/* Allow an operator to inject an alternate verifier, but default to the REAL one. */
+var PL = (typeof window !== "undefined" && window.PosternLicense) || makePosternLicense();
+
+/* ---- Inlined app catalog (mirror of enterprise/features/app-catalog.json) ---- */
+var CATALOG = {
+  apps: [
+    {id:"izbushka",name:"Izbushka",tagline:"scoped, expiring capability grants",tier:"personal-free",
+      enterpriseFeatures:[{id:"fleet-grant-policy",name:"Org default grant policy (fleet)",default:false},{id:"grant-audit-export",name:"Export grant history to org audit chain",default:false}]},
+    {id:"sotto",name:"Sotto",tagline:"a quiet voice assistant",tier:"personal-free",
+      enterpriseFeatures:[{id:"managed-model-endpoint",name:"Org-managed model endpoint / key",default:false},{id:"retention-policy",name:"Org transcript retention default",default:false}]},
+    {id:"vedetta",name:"Vedetta",tagline:"a quiet lookout on the markets",tier:"personal-free",
+      enterpriseFeatures:[{id:"shared-watchlists",name:"Org shared watchlists (read-only push)",default:false}]},
+    {id:"tolmach",name:"Tolmach",tagline:"interpreter & minutes",tier:"personal-free",
+      enterpriseFeatures:[{id:"minutes-retention",name:"Org minutes retention default",default:false},{id:"glossary-push",name:"Org glossary / terminology push",default:false}]},
+    {id:"store",name:"Postern Store",tagline:"curated app store",tier:"personal-free",
+      enterpriseFeatures:[{id:"org-allowlist",name:"Org app allow/deny list (advisory)",default:false},{id:"private-channel",name:"Private org distribution channel",default:false}]},
+    {id:"chiave",name:"Chiave",tagline:"sign in with your wallet",tier:"personal-free",
+      enterpriseFeatures:[{id:"sso-bridge",name:"Org SSO / directory bridge",default:false}]},
+    {id:"sarto",name:"Sarto",tagline:"onboarding",tier:"personal-free",
+      enterpriseFeatures:[{id:"zero-touch",name:"Zero-touch org enrollment profile",default:false}]},
+    {id:"ezekiel1",name:"Ezekiel 1",tagline:"access-layer governance",tier:"personal-free",
+      enterpriseFeatures:[{id:"fleet-policy",name:"Fleet-wide access-layer policy",default:false}]}
+  ]
+};
+
+var FREEMIUM_SEATS=3, FREEMIUM_DAYS=730, MS_DAY=86400000;
+
+/* ---- State ---- */
+var STATE = { master:null, subs:[], seq:0, policy:{}, crl:null, crlInfo:null };
+
+function gate(){
+  if (STATE.master){
+    // CRL enforcement: a verified CRL that revokes this org master (whole-org, by
+    // master_pub, or by the master token's own jti) LOCKS the enterprise features.
+    // Staleness never UN-revokes (fail-safe): a known revocation stays enforced.
+    if (STATE.crlInfo && STATE.crlInfo.masterRevoked){
+      var mr = STATE.master;
+      return {state:"revoked-crl",tier:"corporate",seats:"unlimited",days:0,org:mr.orgName,exp:mr.exp};
+    }
+    var m = STATE.master, expMs = m.exp*1000, days = Math.max(0, Math.floor((expMs-Date.now())/MS_DAY));
+    if (days<=0) return {state:"expired",tier:"corporate",seats:"unlimited",days:0,org:m.orgName,exp:m.exp};
+    return {state:"corporate-master",tier:"corporate",seats:"unlimited",days:days,org:m.orgName,exp:m.exp};
+  }
+  return {state:"business-freemium",tier:"freemium",seats:FREEMIUM_SEATS,days:FREEMIUM_DAYS};
+}
+function bannerText(g){
+  if (g.state==="revoked-crl") return ["err","Business edition — this corporate master has been REVOKED by posternlabs.com (leaked or terminated). Enterprise features are locked. Personal apps and your data are unaffected; offline verification of the base is untouched."];
+  if (g.state==="corporate-master") return ["ok", "Business edition — corporate master"+(g.org?" for DUNS "+g.org:"")+": unlimited seats, offline-verified (real Ed25519), "+g.days+" days of evaluation remaining. A license will be required after."];
+  if (g.state==="business-freemium") return ["warn","Business edition — free freemium (up to "+FREEMIUM_SEATS+" desktops), no account, no login. Import a corporate master bundle to lift the seat cap."];
+  if (g.state==="expired") return ["err","Business edition — evaluation ended. A paid license is required for the enterprise features. Personal apps and your data are unaffected."];
+  return ["err","Business edition — unverified."];
+}
+
+/* ---- Render ---- */
+function $(id){return document.getElementById(id);}
+function render(){
+  var g = gate();
+  var bt = bannerText(g);
+  $("bannerDot").className = "dot "+bt[0];
+  $("bannerText").textContent = bt[1];
+  $("subCard").classList.toggle("hidden", g.tier!=="corporate" || g.state==="expired" || g.state==="revoked-crl");
+  renderMatrix();
+  renderSubs();
+  renderPrivacy();
+}
+function renderMatrix(){
+  var tb = $("matrix").querySelector("tbody"); tb.innerHTML="";
+  var gs = gate().state;
+  var licensed = gs!=="expired" && gs!=="revoked-crl";
+  CATALOG.apps.forEach(function(app){
+    var tr = document.createElement("tr");
+    var td1 = document.createElement("td");
+    td1.innerHTML = esc(app.name) + '<div class="tag">'+esc(app.tagline)+'</div>';
+    var td2 = document.createElement("td");
+    td2.innerHTML = '<span class="pill free">personal · free</span>';
+    var td3 = document.createElement("td");
+    app.enterpriseFeatures.forEach(function(f){
+      var key = app.id+":"+f.id;
+      var row = document.createElement("label");
+      row.style.cssText="display:flex;align-items:center;gap:8px;margin:3px 0";
+      var cb = document.createElement("input");
+      cb.type="checkbox"; cb.className="toggle"; cb.checked=!!STATE.policy[key];
+      cb.disabled = !licensed;
+      cb.addEventListener("change", function(){ STATE.policy[key]=cb.checked; updatePolicyNote(); });
+      var span = document.createElement("span");
+      span.style.fontSize="13px";
+      span.textContent = f.name;
+      row.appendChild(cb); row.appendChild(span);
+      td3.appendChild(row);
+    });
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    tb.appendChild(tr);
+  });
+  updatePolicyNote();
+}
+function updatePolicyNote(){
+  var on = Object.keys(STATE.policy).filter(function(k){return STATE.policy[k];}).length;
+  $("policyNote").textContent = on+" additive feature"+(on===1?"":"s")+" enabled. The base apps stay available regardless — enterprise policy can only ADD, never subtract.";
+}
+function renderSubs(){
+  var tb = $("subTable").querySelector("tbody"); tb.innerHTML="";
+  var vendorRevoked = (STATE.crlInfo && STATE.crlInfo.revokedSubs) || [];
+  STATE.subs.slice().reverse().forEach(function(s){
+    // A sub is revoked either by the vendor CRL (s.jti listed) or by a local admin
+    // revoke. The vendor CRL is authoritative and cannot be undone from this device.
+    var byCrl = !!s.jti && vendorRevoked.indexOf(s.jti) !== -1;
+    var status = (s.revoked || byCrl) ? "revoked" : (new Date(s.expires) < new Date() ? "expired" : "active");
+    var cls = status==="revoked"||status==="expired" ? "err" : "ok";
+    var src = byCrl ? ' <span class="tag">vendor CRL</span>' : (s.revoked ? ' <span class="tag">local</span>' : '');
+    var tr = document.createElement("tr");
+    tr.innerHTML = '<td>'+esc(s.label)+'</td><td class="mono">'+esc(s.expires)+'</td><td><span class="pill '+cls+'">'+status+'</span>'+src+'</td>';
+    var td = document.createElement("td"); td.style.textAlign="right";
+    var exp = document.createElement("button"); exp.className="btn-ghost"; exp.textContent="export"; exp.style.padding="4px 10px";
+    exp.addEventListener("click", function(){ showToken(s); });
+    var rev = document.createElement("button"); rev.className="btn-ghost"; rev.textContent="revoke"; rev.style.cssText="padding:4px 10px;margin-left:6px";
+    rev.disabled = s.revoked;
+    rev.addEventListener("click", function(){ s.revoked=true; s.expires=new Date().toISOString().slice(0,10); render(); });
+    td.appendChild(exp); td.appendChild(rev); tr.appendChild(td); tb.appendChild(tr);
+  });
+}
+function showToken(s){
+  var box = $("subExport");
+  box.innerHTML = '<p class="mini">Signed sub token for <b>'+esc(s.label)+'</b> — deliver out-of-band. <span class="realflag">Ed25519-signed by the org master key</span></p><div class="tokenbox">'+esc(s.token)+'</div>';
+}
+function renderPrivacy(){
+  var items = [
+    "Offline-first (connect-src 'self'): master/sub tokens verify OFFLINE against the bundled vendor public key. The ONLY network call this console can make is an optional, user-initiated same-origin fetch of the PUBLIC revocation list (/license/status) to refuse a leaked master/sub — that CRL carries no secret and reveals only that you checked. Air-gapped installs paste the CRL instead; nothing else leaves the device.",
+    "No telemetry, no analytics, no phone-home. The org master private key stays on this device and is used only to sign sub-tokens locally.",
+    "No per-user account and no per-user login. Access = a valid signed token is present; users under a master are not tracked.",
+    "The honest wrinkle: an org admin console keeps an audit trail of ADMIN actions (policy changes, sub minting/revocation). Admin ≠ access to personal-app data.",
+    "Enterprise policy is additive: it can add org-managed config; it cannot read a person's personal-app data or lock them out of their own device."
+  ];
+  var ul = $("privacyList"); ul.innerHTML="";
+  items.forEach(function(t){ var li=document.createElement("li"); li.textContent=t; ul.appendChild(li); });
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+/* ---- Actions ---- */
+$("btnImport").addEventListener("click", async function(){
+  $("mErr").textContent=""; $("mOk").textContent="";
+  var raw = $("mBundle").value.trim();
+  if(!raw){ $("mErr").textContent="Paste the master bundle JSON (or use freemium)."; return; }
+  var bundle;
+  try { bundle = JSON.parse(raw); }
+  catch(e){ $("mErr").textContent="That is not valid JSON. Paste the whole bundle from /license/master."; return; }
+  if(!bundle.master_token || !bundle.master_sig || !bundle.master_private_key_pkcs8){
+    $("mErr").textContent="Bundle is missing master_token / master_sig / master_private_key_pkcs8.";
+    return;
+  }
+  var btn = $("btnImport"); btn.disabled = true; var prev = btn.textContent; btn.textContent = "Verifying…";
+  try {
+    var r = await PL.verifyChain(VENDOR_PUB_RAW_B64, bundle.master_token, bundle.master_sig, null);
+    if(!r.ok){
+      $("mErr").textContent = "Offline verification FAILED ("+r.reason+"). This bundle is not a valid vendor-signed master.";
+      return;
+    }
+    if(r.tier!=="corporate-master"){
+      $("mErr").textContent = "This is a "+r.tier+" token, not a corporate master. Freemium needs no import.";
+      return;
+    }
+    if(r.expired){
+      $("mErr").textContent = "This master's evaluation window has already expired ("+new Date(r.exp*1000).toISOString().slice(0,10)+").";
+      return;
+    }
+    STATE.master = { token: bundle.master_token, sig: bundle.master_sig, pkcs8: bundle.master_private_key_pkcs8, orgName: r.duns, seats: r.seats, exp: r.exp };
+    await recomputeCrl();
+    if (STATE.crlInfo && STATE.crlInfo.masterRevoked){
+      $("mOk").textContent = "Verified offline — but a cached vendor CRL REVOKES this master; enterprise features stay locked.";
+    } else {
+      $("mOk").textContent = "Verified offline — vendor→master Ed25519 chain intact. Corporate master imported.";
+    }
+    render();
+  } finally { btn.disabled = false; btn.textContent = prev; }
+});
+$("btnFreemium").addEventListener("click", async function(){ STATE.master=null; STATE.subs=[]; await recomputeCrl(); render(); });
+$("btnReset").addEventListener("click", async function(){ STATE={master:null,subs:[],seq:0,policy:{},crl:null,crlInfo:null}; $("mBundle").value=""; $("mErr").textContent=""; $("mOk").textContent=""; $("subExport").innerHTML=""; if($("crlPaste"))$("crlPaste").value=""; if($("crlErr"))$("crlErr").textContent=""; if($("crlOk"))$("crlOk").textContent=""; await recomputeCrl(); render(); });
+
+$("btnMint").addEventListener("click", async function(){
+  $("sErr").textContent="";
+  if(!STATE.master){ $("sErr").textContent="Import a corporate master first."; return; }
+  var label=$("sLabel").value.trim();
+  if(!label){ $("sErr").textContent="A label is required."; return; }
+  var masterExpSec = STATE.master.exp;
+  var expSec = $("sExp").value ? Math.floor(new Date($("sExp").value+"T00:00:00Z").getTime()/1000) : masterExpSec;
+  if(expSec > masterExpSec){ $("sErr").textContent="Sub expiry cannot exceed master expiry ("+new Date(masterExpSec*1000).toISOString().slice(0,10)+")."; return; }
+  var btn = $("btnMint"); btn.disabled = true; var prev = btn.textContent; btn.textContent = "Signing…";
+  try {
+    var subTok = await PL.mintSub(STATE.master.pkcs8, STATE.master.token, { sub: label, exp: expSec });
+    // Belt-and-braces: verify the freshly minted sub chains before showing it.
+    var chk = await PL.verifyChain(VENDOR_PUB_RAW_B64, STATE.master.token, STATE.master.sig, subTok);
+    if(!chk.ok){ $("sErr").textContent="Internal: minted sub failed self-verification ("+chk.reason+")."; return; }
+    var rec = {id:"sub-"+(++STATE.seq), label:label, jti:subTok.payload.jti, expires:new Date(subTok.payload.exp*1000).toISOString().slice(0,10), token:JSON.stringify(subTok), revoked:false};
+    STATE.subs.push(rec);
+    $("sLabel").value=""; $("sExp").value="";
+    await recomputeCrl(); render(); showToken(rec);
+  } finally { btn.disabled = false; btn.textContent = prev; }
+});
+
+/* privacy plain text */
+$("privacyText").addEventListener("click", function(){
+  var txt = Array.prototype.map.call($("privacyList").children, function(li){return "• "+li.textContent;}).join("\n");
+  var box = $("subExport");
+  box.innerHTML = '<div class="tokenbox" style="white-space:pre-wrap">PRIVACY — Postern Business (reference prototype)\n\n'+esc(txt)+'\n\nStatus: design/reference prototype, unaudited, pre-production.</div>';
+  box.scrollIntoView({behavior:"smooth",block:"nearest"});
+});
+
+/* ---- CRL fetch / paste / enforce ---- */
+async function recomputeCrl(){
+  var master = STATE.master ? STATE.master.token : null;
+  var subJtis = STATE.subs.map(function(s){ return s.jti; }).filter(Boolean);
+  STATE.crlInfo = await PL.evaluateRevocation(VENDOR_PUB_RAW_B64, STATE.crl, master, subJtis, new Date());
+  updateCrlBanner();
+}
+function updateCrlBanner(){
+  var dot = $("crlDot"), txt = $("crlText");
+  if (!dot || !txt) return;
+  var ci = STATE.crlInfo;
+  if (!STATE.crl){ dot.className="dot"; txt.textContent="No CRL loaded — offline, best-effort. A valid license stays valid until a newer, fresher CRL revokes it."; return; }
+  if (ci && !ci.valid){ dot.className="dot warn"; txt.textContent="A CRL was provided but did not verify against the vendor key — IGNORED ("+(ci.reason||"invalid")+"). A forged or foreign-signed CRL cannot revoke anything (no new authority)."; return; }
+  var f = ci.freshness, parts = ["CRL v"+ci.version+" verified against the vendor public key"];
+  if (f.stale) parts.push("STALE ("+f.ageDays+"d) — past the freshness window; revocation can no longer be fully trusted, enterprise degrades until refreshed (known revocations still enforced, fail-safe)");
+  else if (f.ageing) parts.push("ageing ("+f.ageDays+"d) — inside the soft-offline grace");
+  else parts.push("fresh");
+  if (ci.masterRevoked) parts.push("this master is REVOKED — enterprise features locked");
+  else if (ci.revokedSubs.length) parts.push(ci.revokedSubs.length+" sub token(s) revoked");
+  else parts.push("no revocations affect this install");
+  dot.className = "dot "+(ci.masterRevoked ? "err" : ((ci.revokedSubs.length || f.stale) ? "warn" : "ok"));
+  txt.textContent = parts.join(" · ");
+}
+/* Verify a candidate CRL against the vendor key, enforce anti-rollback, cache the
+   newer one, re-evaluate, re-render. Returns true if it became the active CRL. */
+async function applyCrl(crl, source){
+  $("crlErr").textContent=""; $("crlOk").textContent="";
+  var v = await PL.verifyCrl(VENDOR_PUB_RAW_B64, crl);
+  if (!v.ok){ $("crlErr").textContent="CRL rejected: "+v.reason+". A CRL that does not verify against the vendor public key cannot revoke anything."; return false; }
+  if (STATE.crl && crl.payload.version < STATE.crl.payload.version){
+    $("crlErr").textContent="Rejected: CRL version "+crl.payload.version+" is OLDER than the cached version "+STATE.crl.payload.version+" (anti-rollback). Kept the newer cached CRL.";
+    return false;
+  }
+  STATE.crl = PL.pickNewerCrl(STATE.crl, crl);
+  await recomputeCrl();
+  $("crlOk").textContent = "CRL v"+STATE.crl.payload.version+" verified ("+source+") and enforced offline.";
+  render();
+  return true;
+}
+$("btnFetchCrl").addEventListener("click", async function(){
+  $("crlErr").textContent=""; $("crlOk").textContent="";
+  var btn=$("btnFetchCrl"); btn.disabled=true; var prev=btn.textContent; btn.textContent="Fetching…";
+  try {
+    var resp = await fetch(PL.CRL_STATUS_PATH, {method:"GET", headers:{"accept":"application/json"}});
+    if(!resp.ok){ $("crlErr").textContent="Fetch failed (HTTP "+resp.status+"). /license/status deploys on posternlabs.com; air-gapped installs paste a CRL below instead."; return; }
+    var data = await resp.json();
+    await applyCrl(data.crl || data, "fetched from /license/status");
+  } catch(e){
+    $("crlErr").textContent="Endpoint unreachable ("+String(e && e.message || e)+"). This console verifies OFFLINE; paste a CRL below for air-gapped revocation enforcement.";
+  } finally { btn.disabled=false; btn.textContent=prev; }
+});
+$("btnApplyCrl").addEventListener("click", async function(){
+  $("crlErr").textContent=""; $("crlOk").textContent="";
+  var raw=($("crlPaste").value||"").trim();
+  if(!raw){ $("crlErr").textContent="Paste a vendor-signed CRL JSON (the object served by /license/status)."; return; }
+  var crl; try { crl = JSON.parse(raw); } catch(e){ $("crlErr").textContent="Not valid JSON."; return; }
+  if (crl && crl.crl) crl = crl.crl; // accept the endpoint's { crl, freshness, note } envelope
+  await applyCrl(crl, "pasted");
+});
+
+/* theme */
+$("themeBtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", cur==="light"?"dark":"light");
+});
+
+render();
+</script>
+</body>
+</html>

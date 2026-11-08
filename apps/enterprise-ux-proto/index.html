@@ -1,0 +1,238 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT OR Apache-2.0
+  SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+  Enterprise + onboarding EXPERIENCE — UX prototype set (surface & flow design).
+  This is a DESIGN prototype: it draws the surfaces and the flow that sit on top
+  of the functional apps (Gramota onboarding, Consiglio admin console, Ezekiel 1
+  access-layer governance) and the host-run postern-consiglio-auth service. It
+  holds no crypto, makes no network calls (connect-src 'none'), and does not edit
+  or replace the functional files — it is the design of record for the flow.
+
+  HONESTY (load-bearing):
+   - UNAUDITED reference prototype. Demonstrates controls that ENABLE compliance;
+     it is NOT compliance and NOT legal advice — a DPO / Encarregado + counsel
+     decide compliance.
+   - Dual-control / separation-of-duty is ENFORCED AT RUNTIME in the console
+     SERVICE (host-run postern-consiglio-auth). These pages show the real
+     second-approver gate faithfully; the in-page primitives are a stand-in.
+   - The D&B (DUNS) gate is FORMAT-ONLY until credentials are provisioned — a
+     9-digit shape check today, a real entity resolution once wired.
+   - On-device OCR is the GOAL; manual entry is what today's build offers.
+   - Billing is fiat; the coin is not a security. Personal editions stay free.
+-->
+<html lang="en" data-surface="hub">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Enterprise + onboarding experience — UX prototype · Postern Labs</title>
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#0c0f13;--bg-glow:#0e141a;--surface:#13171e;--surface-2:#191f27;--surface-3:#202832;
+  --border:#28313c;--border-hi:#384451;--text:#e7ebef;--text-dim:#a6aeb6;--muted:#78818b;
+  --acc:#9aa7bd;--acc-hi:#c0cbdd;--acc-dim:#5f6a7e;--acc-ink:#0c0f13;
+  --gramota:#8fae7a;--consiglio:#5f87d6;--ezekiel:#4fb9ac;
+  --ok:#5fa87a;--warn:#d08c2e;--err:#d96a63;--radius:14px;--shadow:0 18px 50px rgba(0,0,0,.46);
+}
+:root[data-theme="light"]{
+  --bg:#eef0f3;--bg-glow:#f5f6f9;--surface:#fbfbfd;--surface-2:#eceef2;--surface-3:#e1e4ea;
+  --border:#d3d7de;--border-hi:#b8bdc8;--text:#212429;--text-dim:#4d525b;--muted:#767c86;
+  --acc:#4a5568;--acc-hi:#374151;--acc-dim:#8792a4;--acc-ink:#f6f8fb;
+  --gramota:#4f6e3c;--consiglio:#35569e;--ezekiel:#2f8175;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(50,56,70,.14);
+}
+@media (prefers-color-scheme: light){:root:not([data-theme]){
+  --bg:#eef0f3;--bg-glow:#f5f6f9;--surface:#fbfbfd;--surface-2:#eceef2;--surface-3:#e1e4ea;
+  --border:#d3d7de;--border-hi:#b8bdc8;--text:#212429;--text-dim:#4d525b;--muted:#767c86;
+  --acc:#4a5568;--acc-hi:#374151;--acc-dim:#8792a4;--acc-ink:#f6f8fb;
+  --gramota:#4f6e3c;--consiglio:#35569e;--ezekiel:#2f8175;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(50,56,70,.14);
+}}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:var(--font-ui);background:radial-gradient(1100px 520px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--text);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+a{color:var(--acc-hi);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+.mono{font-family:var(--font-mono)}
+header.site{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
+.site-inner{display:flex;align-items:center;gap:12px;padding:13px 0}
+.seal{width:30px;height:30px;flex:none;color:var(--acc)}
+.wordmark{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:.2em;color:var(--text)}
+.byline{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);padding-left:12px}
+.site-actions{margin-left:auto}
+.hbtn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim)}
+.hbtn:hover{border-color:var(--border-hi);color:var(--text)}
+.notice{border-bottom:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));background:color-mix(in srgb,var(--warn) 10%,var(--surface));font-size:12.5px;color:var(--text-dim)}
+.notice .wrap{padding:9px 20px}.notice strong{color:var(--warn)}
+main.wrap{padding:26px 20px 56px}
+.kicker{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+h1{font-size:26px;margin:.1em 0 .35em}
+h2{font-size:17px;margin:.1em 0 .5em}
+.lead{color:var(--text-dim);font-size:14px;max-width:70ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin:16px 0;box-shadow:var(--shadow)}
+
+/* flow map */
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:10px;align-items:stretch;margin:14px 0}
+@media(max-width:760px){.flow{grid-template-columns:1fr;text-align:center}.flow .arrow{transform:rotate(90deg)}}
+.node{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--surface-2);display:flex;flex-direction:column;gap:5px}
+.node .n-t{font-weight:650;font-size:14px}
+.node .n-d{font-size:12px;color:var(--text-dim)}
+.node .n-tag{font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:auto}
+.node[data-c="gramota"]{border-color:color-mix(in srgb,var(--gramota) 55%,var(--border))}
+.node[data-c="gramota"] .n-t{color:var(--gramota)}
+.node[data-c="consiglio"]{border-color:color-mix(in srgb,var(--consiglio) 55%,var(--border))}
+.node[data-c="consiglio"] .n-t{color:var(--consiglio)}
+.node[data-c="ezekiel"]{border-color:color-mix(in srgb,var(--ezekiel) 55%,var(--border))}
+.node[data-c="ezekiel"] .n-t{color:var(--ezekiel)}
+.arrow{align-self:center;color:var(--muted);font-family:var(--font-mono);font-size:20px}
+.split{display:grid;grid-template-rows:1fr 1fr;gap:10px}
+
+/* wall band */
+.wallband{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:12px;color:var(--text-dim)}
+.wallband .bar{flex:none;width:3px;height:34px;border-radius:2px;background:repeating-linear-gradient(180deg,var(--warn),var(--warn) 5px,transparent 5px,transparent 10px)}
+
+/* surface cards */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px}
+@media(max-width:760px){.cards{grid-template-columns:1fr}}
+.scard{display:flex;flex-direction:column;gap:9px;border:1px solid var(--border);border-left-width:3px;border-radius:12px;padding:16px;background:var(--surface);transition:transform .12s,border-color .15s}
+.scard:hover{transform:translateY(-2px)}
+.scard[data-c="gramota"]{border-left-color:var(--gramota)}
+.scard[data-c="consiglio"]{border-left-color:var(--consiglio)}
+.scard[data-c="ezekiel"]{border-left-color:var(--ezekiel)}
+.scard .sc-k{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.scard .sc-t{font-size:17px;font-weight:680}
+.scard .sc-d{font-size:12.8px;color:var(--text-dim);flex:1}
+.scard .sc-go{align-self:flex-start;font-family:var(--font-mono);font-size:12px;border:1px solid var(--border);border-radius:9px;padding:7px 13px;color:var(--text)}
+.scard .sc-go:hover{border-color:var(--acc)}
+
+/* honesty ledger */
+.ledger{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:6px}
+.lrow{display:grid;grid-template-columns:26px 1fr;gap:12px;padding:13px 15px;border-bottom:1px solid var(--border);font-size:13px}
+.lrow:last-child{border-bottom:0}
+.lrow .mk{text-align:center;color:var(--acc)}
+.lrow.ok .mk{color:var(--ok)}.lrow.warn .mk{color:var(--warn)}.lrow.err .mk{color:var(--err)}
+.lrow h3{margin:0 0 3px;font-size:13.5px;font-weight:640}
+.lrow p{margin:0;color:var(--text-dim);font-size:12.6px}
+.lrow code{font-family:var(--font-mono);font-size:11.5px;color:var(--acc-hi)}
+footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:11px;padding:18px 20px;text-align:center;font-family:var(--font-mono);letter-spacing:.05em}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap site-inner">
+  <svg class="seal" viewBox="0 0 40 40" fill="none" stroke="currentColor" aria-hidden="true">
+    <circle cx="20" cy="20" r="15" stroke-width="1.5"/><circle cx="20" cy="20" r="9" stroke-width="1.2"/>
+    <path d="M20 5 v6 M20 29 v6 M5 20 h6 M29 20 h6" stroke-width="1.2"/>
+  </svg>
+  <div class="wordmark">POSTERN · ENTERPRISE UX</div>
+  <div class="byline">onboarding → access-release · prototype</div>
+  <div class="site-actions"><button class="hbtn" id="themeBtn">theme</button></div>
+</div></header>
+
+<div class="notice"><div class="wrap">
+  <strong>UX prototype — UNAUDITED, pre-production.</strong> Surface &amp; flow design over the functional apps; it holds no crypto and makes no network calls.
+  Demonstrates controls that ENABLE compliance; is <strong>not</strong> compliance and <strong>not legal advice</strong>. Billing is fiat; the coin is not a security.
+</div></div>
+
+<main class="wrap">
+  <p class="kicker">Enterprise + onboarding experience</p>
+  <h1>From onboarding to access-release — one honest path</h1>
+  <p class="lead">Three surfaces, one journey. An owner onboards the organization in <b>Gramota</b>, holds the org master key, then <b>releases access</b> to two separated consoles: <b>Consiglio</b> (identity, seats, dual-control) and <b>Ezekiel&nbsp;1</b> (access layers, clearance, Chinese walls). A wall stands between them: neither sees the other's private material, and neither reaches an employee's personal Postern identity.</p>
+
+  <!-- ===== FLOW MAP ===== -->
+  <div class="card">
+    <h2>The flow</h2>
+    <div class="flow">
+      <div class="node" data-c="gramota">
+        <div class="n-t">Gramota · onboarding</div>
+        <div class="n-d">Owner/manager DUNS attestation + on-device KYC ladder. Lifts the 3-device cap to an unlimited master.</div>
+        <div class="n-tag">on-device · minimal-verdict</div>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node">
+        <div class="n-t">Master bundle</div>
+        <div class="n-d">Vendor-signed. The org master private key is returned <b>once</b> and stays with the owner — never stored server-side.</div>
+        <div class="n-tag">org holds the key</div>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="split">
+        <div class="node" data-c="consiglio">
+          <div class="n-t">Consiglio · identity</div>
+          <div class="n-d">Wallet-as-login, seats, dual-control / SoD.</div>
+          <div class="n-tag">two-person rule</div>
+        </div>
+        <div class="node" data-c="ezekiel">
+          <div class="n-t">Ezekiel 1 · access</div>
+          <div class="n-d">Clearance lattice + Chinese walls.</div>
+          <div class="n-tag">fail-closed</div>
+        </div>
+      </div>
+    </div>
+    <div class="wallband"><span class="bar" aria-hidden="true"></span><span><b>Chinese-wall visibility:</b> Consiglio and Ezekiel 1 each see only their own strand. The owner's master key signs both offline; the employee's personal Postern identity is out of the org's reach.</span></div>
+  </div>
+
+  <!-- ===== SURFACES ===== -->
+  <div class="card">
+    <h2>The three surfaces</h2>
+    <div class="cards">
+      <div class="scard" data-c="gramota">
+        <div class="sc-k">01 · onboarding</div>
+        <div class="sc-t">Gramota onboarding</div>
+        <div class="sc-d">Tier → DUNS → owner/manager attestation → on-device KYC (LoA ladder) → issue master → access-release. Honest about what crosses the wire and what does not.</div>
+        <a class="sc-go" href="onboarding.html">Open onboarding →</a>
+      </div>
+      <div class="scard" data-c="consiglio">
+        <div class="sc-k">02 · identity</div>
+        <div class="sc-t">Consiglio approval</div>
+        <div class="sc-d">Wallet-as-login (no passwords) + the dual-control / SoD approval UX: a change stays <b>pending until a second, separated approver</b> signs. Self-approval is refused.</div>
+        <a class="sc-go" href="consiglio.html">Open Consiglio →</a>
+      </div>
+      <div class="scard" data-c="ezekiel">
+        <div class="sc-k">03 · access</div>
+        <div class="sc-t">Ezekiel 1 visibility</div>
+        <div class="sc-d">The access-layer clearance floor (Bell–LaPadula) + Brewer–Nash Chinese walls, shown as an honest <b>can/can't-see</b> surface per user.</div>
+        <a class="sc-go" href="ezekiel.html">Open Ezekiel 1 →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HONESTY ===== -->
+  <div class="card">
+    <h2>Honesty — read this first</h2>
+    <p class="lead">The honest labeling <em>is</em> the product. Nothing here overclaims.</p>
+    <div class="ledger">
+      <div class="lrow ok"><div class="mk">●</div><div>
+        <h3>Dual-control / SoD is enforced at runtime — in the service</h3>
+        <p>The two-person rule (propose → a second, <b>separated</b> admin approves) is enforced by the host-run <code>postern-consiglio-auth</code> service: <code>propose_change</code> stages nothing, <code>approve_change</code> refuses self-approval and same-duty approval. These pages show that real gate; the in-page primitives are a browser stand-in.</p></div></div>
+      <div class="lrow warn"><div class="mk">◐</div><div>
+        <h3>D&amp;B (DUNS) gate is format-only until credentials</h3>
+        <p>Today the gate is a 9-digit <b>shape</b> check — it does not yet resolve a DUNS to a real entity. That resolution (and the assurance it would carry) arrives only when D&amp;B credentials are provisioned. The level-of-assurance stays honest about what has actually been verified.</p></div></div>
+      <div class="lrow warn"><div class="mk">◐</div><div>
+        <h3>On-device OCR is the goal; manual entry is today</h3>
+        <p>The privacy rail — OCR runs on the device, only a minimal non-PII verdict leaves it — is the design. Today's build takes what your on-device OCR <em>read</em> as manual input; a real build reads it from the camera/file. Either way, no document image or raw OCR text crosses the wire.</p></div></div>
+      <div class="lrow err"><div class="mk">◼</div><div>
+        <h3>Enforcement limits, stated</h3>
+        <p>Key-withholding is hard denial for data at rest; in-session containment needs OS-level MAC (Postern OS machine profiles). A client-side page is <b>advisory</b> — it demonstrates and audits the model. No software stops a human photographing a screen.</p></div></div>
+      <div class="lrow"><div class="mk">§</div><div>
+        <h3>Not legal advice — repeated on purpose</h3>
+        <p>Every control here <em>supports</em> a requirement area of LGPD / GDPR / CCPA; whether an org is compliant is a determination only a DPO / Encarregado + admitted counsel can make. This whole set is an UNAUDITED reference prototype.</p></div></div>
+    </div>
+  </div>
+</main>
+
+<footer class="site">Postern Labs · enterprise UX prototype · UNAUDITED · not legal advice · no network calls · fiat, not coin · personal editions stay free</footer>
+
+<script>
+"use strict";
+document.getElementById("themeBtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", cur === "light" ? "dark" : "light");
+});
+</script>
+</body>
+</html>

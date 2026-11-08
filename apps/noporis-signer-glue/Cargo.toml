@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# noporis-signer-glue — reference-prototype composition glue for the NoporIS
+# "guarded bridge": ONE phone holding TWO INDEPENDENT pairings, one per world,
+# never one signer that spans the bridge.
+#
+# "NoporIS" (Nopor Internet Systems) is a PROPOSED, COINED product name for the
+# guarded-bridge app, pending formal trademark clearance (the "Nopor" root shares
+# a bare "NOPOR" filing on record — clearance required before the mark is
+# committed). "Postern" stays the suite brand. The authentic myth is the crossing
+# between two worlds (the Kalinov Bridge); "Nopor" is NOT folklore.
+#
+# This crate is GLUE ONLY. It composes existing crates WITHOUT editing any of
+# their internals:
+#   - postern-signer-protocol — the frozen phone<->desktop signer protocol
+#     (PhoneApprover, WYSIWYS, revocable grants, replay-guard session binding).
+#   - postern-pairing         — the pairing ceremony + PairedTerminals (the
+#     sealed-at-rest, per-record collection with monotonic revoke).
+#   - postern-policy          — the one shared, fail-closed consent kernel
+#     (Decision / EnforcementMode) for the honest kill-switch label.
+#   - postern-mobile-signer   — the REAL WalletCore-backed signer (feature
+#     `wallet-core`, OFF by default; it pulls the heavyweight PQ crypto).
+#
+# It adds a two-world LANE; it never adds an approval shortcut. UNAUDITED,
+# reference-prototype. The signer is a SCAFFOLD by default (ScaffoldSigner is a
+# deterministic SHA3 stand-in, NOT real cryptography). This is an app on stock
+# Android — NEVER "Postern OS". The coin (BLCH) is not a security and buys no
+# software.
+
+[package]
+name = "noporis-signer-glue"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Reference-prototype composition glue for the NoporIS guarded bridge: ONE phone, TWO INDEPENDENT per-world pairings, fail-closed session binding (a grant to the Google-Play peer can never auto-approve the Porog peer), world-badging over the existing WYSIWYS peer_device (no new wire data), and three honest revocation surfaces. Glue only — does not modify the crates it composes. UNAUDITED; not a hardware wallet."
+
+# Standalone workspace: this reference shim deliberately does NOT join the root
+# `members` list (owned by other devs). It builds/checks on its own, the same way
+# the integration/* crates and porog-tor-glue carry their own empty [workspace].
+[workspace]
+
+[features]
+default = []
+# The REAL signer path. Consumes `postern-mobile-signer`'s WalletCore-backed
+# WalletCoreSigner (hybrid Falcon-ML-DSA), which pulls `bloch-crypto` (heavy, PQ)
+# — OFF by default exactly like porog-tor-glue's `live` Tor path. The default
+# build proves every honesty rail on the lightweight ScaffoldSigner and needs no
+# PQ toolchain.
+#
+# NOTE: `bloch-crypto` needs the seeded-RNG `pqcrypto-internals` fork, which the
+# root workspace supplies via `[patch.crates-io]`. That patch only applies from a
+# workspace ROOT, so this feature builds when the crate is compiled as part of the
+# bloch-protocol root workspace (or with that patch in scope) — NOT as this
+# standalone `[workspace]`. The glue itself (this crate + the two integration
+# crates) type-checks under the feature; only `bloch-crypto`'s internal RNG hook
+# is gated behind the root patch.
+wallet-core = ["dep:postern-mobile-signer"]
+
+[dependencies]
+# The frozen signer protocol: PhoneApprover, WYSIWYS render, ApprovalGrant, the
+# fail-closed ReplayGuard session binding, and the ScaffoldSigner test stand-in.
+postern-signer-protocol = { path = "../../integration/signer-protocol" }
+# The pairing ceremony + the sealed PairedTerminals collection (per-record
+# monotonic revoke, panic-revoke-all) that the per-world hard-unpair rests on.
+postern-pairing = { path = "../../integration/pairing" }
+# The one shared consent kernel — for the honest EnforcementMode label and the
+# kill-switch's fail-closed Decision. Same words everywhere, no round-up.
+postern-policy = { path = "../../crates/postern-policy" }
+thiserror = "2"
+
+# The REAL WalletCore-backed signer — feature-gated so the default check stays
+# fast and needs no PQ crypto. WalletCoreSigner: WalletSigner, so it drops
+# straight into the generic WorldSigner<S>.
+postern-mobile-signer = { path = "../../mobile/signer", optional = true }

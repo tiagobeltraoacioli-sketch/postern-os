@@ -1,0 +1,64 @@
+[package]
+name = "postern-vault"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs secrets/password vault — AEAD-sealed at rest, key from the TEE (StrongBox/Secure Enclave) or an Argon2id passphrase. Reuses the wallet's vault ethos."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_vault"
+
+[dependencies]
+# The AEAD seal + Argon2id KDF live once in postern-core (the canonical Postern
+# seal); the vault only adds its entry store, serialization, and RAM hygiene.
+postern-core = { path = "../postern-core" }
+zeroize = { version = "1", features = ["derive"] }  # wipe secrets from RAM
+thiserror = "2"
+# TOTP/HOTP (RFC 6238 / RFC 4226) — all RustCrypto, MIT OR Apache-2.0. SHA-1
+# here is the RFC 6238 default used inside HMAC only (HMAC-SHA-1 is not
+# affected by SHA-1 collision attacks); SHA-256/512 variants via sha2.
+hmac = "0.12"
+sha1 = "0.10"
+sha2 = "0.10"
+# RFC 4648 base32 for otpauth-style TOTP secrets (MIT).
+data-encoding = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Apple's Security.framework bindings (MIT OR Apache-2.0). Only pulled in on
+# macOS, and only linked when the `keychain-macos` feature is on — see
+# src/keychain_macos.rs for the honest "OS keychain, not a TEE" disclosure
+# (same caveat as src/keychain.rs).
+security-framework = { version = "3", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# freedesktop Secret Service (D-Bus) bindings, MIT OR Apache-2.0 — permissive,
+# no GPL/AGPL. Pure-Rust D-Bus (zbus) under the hood, no libdbus system dev
+# headers required. Only pulled in on Linux, and only linked when the
+# `keychain-linux` feature is on — see src/keychain_linux.rs for the honest
+# "OS keychain, not a TEE" disclosure (same caveat as src/keychain.rs).
+secret-service = { version = "4", features = ["rt-tokio-crypto-rust"], optional = true }
+
+[features]
+# Off by default: the `keychain` module is a key-wrap ABSTRACTION (a trait +
+# an in-memory test scaffold today) — it does not itself pull in any OS
+# keychain / TEE binding. See src/keychain.rs module docs for the honest
+# "NOT a TEE" disclosure.
+keychain = []
+# macOS login-Keychain-backed KeyStore (generic-password item, service
+# "com.posternlabs.vault"). Still NOT a TEE — see src/keychain_macos.rs.
+keychain-macos = ["keychain", "dep:security-framework"]
+# Linux freedesktop Secret Service (D-Bus)-backed KeyStore (collection item,
+# service attribute "com.posternlabs.vault"). Still NOT a TEE — see
+# src/keychain_linux.rs.
+keychain-linux = ["keychain", "dep:secret-service"]
+# Umbrella convenience feature: turns on BOTH per-OS keychain backends, exactly
+# like the desktop crate's own `vault-keychain` feature (desktop/src-tauri/
+# Cargo.toml). The per-OS scoping happens inside this crate — the modules are
+# gated `cfg(all(target_os = "…", feature = "keychain-…"))` and the native deps
+# live under `[target.'cfg(target_os = "…")'.dependencies]` — so the NET effect
+# is keychain-macos on macOS, keychain-linux on Linux, and only the plain
+# `keychain` abstraction (trait + InMemoryKeyStore) elsewhere. Lets
+# `cargo test -p postern-vault --features vault-keychain` exercise this host's
+# live OS keychain path under the same feature name the desktop uses. Still NOT
+# a TEE on any target — see src/keychain.rs's "NOT a TEE" disclosure.
+vault-keychain = ["keychain-macos", "keychain-linux"]

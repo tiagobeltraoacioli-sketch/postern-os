@@ -1,0 +1,1077 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT OR Apache-2.0
+  SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Content-Security-Policy — defense-in-depth, not "security" on its own.
+
+  default-src 'none'  — deny by default; every source is named explicitly below.
+
+  script-src 'self' 'sha256-tCnKc6yFKTIpVWYiH6yQkHo9kRWvUeXgtafczmrys08='
+      'self'   loads izbushka-companion.js (same-origin, the mascot + Sotto
+               intent bridge).
+      the hash pins the ONE executable inline <script> (the portal logic, at
+      the bottom of this file) so 'unsafe-inline' stays dropped. This file is
+      copied verbatim to public/ (cp, no minify) so served bytes == these
+      bytes. RECOMPUTE after ANY edit to that script — the command anchors on
+      its "use strict" prologue so it never matches this comment:
+        node -e 'const f=require("fs").readFileSync("apps/izbushka/index.html","utf8");const s=f.indexOf("<script>\n\"use strict")+8;const e=f.indexOf("</script>",s);console.log("sha256-"+require("crypto").createHash("sha256").update(f.slice(s,e),"utf8").digest("base64"))'
+
+  style-src 'unsafe-inline'  — kept on purpose: there is a hand-maintained
+      <style> block and the companion injects a <style> for the mascot
+      keyframes. No build step hashes them. Residual risk is CSS injection,
+      low here: the only inputs are your own manifests, always rendered via
+      textContent / escapeHtml — never innerHTML with user text.
+
+  img-src 'self'  — the mascot SVG (izbushka-mascot.svg), same-origin only.
+
+  connect-src 'none'  — the portal opens NO network connections. Zero
+      telemetry, no phone-home. (A task's manifest MAY declare network =
+      "api.anthropic.com" as a capability the Yagabona DAEMON honours at run
+      time; the portal that declares it never reaches the network itself.)
+
+  frame-ancestors is INERT in <meta> — real clickjacking defense is an HTTP
+  header (set in _headers), out of scope for this draft.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-tCnKc6yFKTIpVWYiH6yQkHo9kRWvUeXgtafczmrys08='; style-src 'unsafe-inline'; img-src 'self'; media-src 'none'; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Izbushka — the hut on chicken legs · Postern Labs</title>
+<style>
+/* ============================================================
+   IZBUSHKA · Postern Labs
+   The task portal — the only door into Yagabona. Warm ember /
+   log-cabin palette drawn from the mascot: roof brown, wall
+   amber, the glowing-window gold as the accent.
+   (Sotto brass · Vedetta steel-blue · Tolmach verdigris ·
+    Store amethyst · Izbushka ember-gold.)
+   ============================================================ */
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --bg:        #14100b;
+  --bg-glow:   #1b140c;
+  --surface:   #1c160f;
+  --surface-2: #241d14;
+  --surface-3: #2d251a;
+  --border:    #3a3020;
+  --border-hi: #4d4029;
+  --text:      #f0e7d8;
+  --text-dim:  #c1b299;
+  --muted:     #8a7c64;
+
+  --acc:       #f2c14e;   /* the glowing window — Izbushka's accent */
+  --acc-hi:    #ffd671;
+  --acc-dim:   #b98f2f;
+  --acc-ink:   #241a08;
+
+  --ok:        #7bb26a;
+  --warn:      #d99a3e;
+  --err:       #e0705f;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.5);
+  --radius: 14px;
+}
+:root[data-theme="light"] {
+  --bg:        #f3ecdf;
+  --bg-glow:   #f8f2e6;
+  --surface:   #fdfaf3;
+  --surface-2: #f2e9d7;
+  --surface-3: #e8dcc4;
+  --border:    #ddccae;
+  --border-hi: #c9b48c;
+  --text:      #2a2013;
+  --text-dim:  #5a4c37;
+  --muted:     #857458;
+
+  --acc:       #a9781a;
+  --acc-hi:    #855c0c;
+  --acc-dim:   #c19a4b;
+  --acc-ink:   #fff9ec;
+
+  --ok:        #3f7a34;
+  --warn:      #9a6210;
+  --err:       #b0453a;
+
+  --shadow: 0 14px 40px rgba(70,52,20,.16);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f3ecdf; --bg-glow:#f8f2e6; --surface:#fdfaf3; --surface-2:#f2e9d7;
+    --surface-3:#e8dcc4; --border:#ddccae; --border-hi:#c9b48c;
+    --text:#2a2013; --text-dim:#5a4c37; --muted:#857458;
+    --acc:#a9781a; --acc-hi:#855c0c; --acc-dim:#c19a4b; --acc-ink:#fff9ec;
+    --ok:#3f7a34; --warn:#9a6210; --err:#b0453a;
+    --shadow: 0 14px 40px rgba(70,52,20,.16);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  background: radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%), var(--bg);
+  color: var(--text); min-height: 100vh; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--acc); color: var(--acc-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+
+/* header */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.wordmark {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 700;
+  letter-spacing: .28em; text-indent: .28em; color: var(--text);
+  user-select: none; white-space: nowrap;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+  border-left: 1px solid var(--border); padding-left: 12px; margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border); border-radius: 9px;
+  padding: 6px 12px; font-family: var(--font-mono); font-size: 11.5px;
+  letter-spacing: .06em; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* honest draft banner */
+.draft {
+  border: 1px dashed color-mix(in srgb, var(--warn) 60%, var(--border));
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  border-radius: var(--radius); padding: 13px 16px; margin: 18px 0 4px;
+  font-size: 13px; color: var(--text-dim); line-height: 1.6;
+}
+.draft b { color: var(--warn); font-family: var(--font-mono); letter-spacing: .06em;
+  text-transform: uppercase; font-size: 11.5px; }
+.draft code { font-family: var(--font-mono); font-size: 12px; color: var(--acc); }
+
+/* hero */
+.hero { text-align: center; padding: 26px 0 6px; }
+.hero h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.01em; font-weight: 650; }
+.hero h1 em { font-style: normal; color: var(--acc); }
+.hero p.sub { margin: 0 auto; max-width: 640px; color: var(--text-dim); font-size: 14.5px; }
+.hero .quote { margin: 12px auto 0; color: var(--muted); font-style: italic; font-size: 13.5px; }
+
+/* intent notice (Sotto handoff) */
+.intent-notice {
+  display: none; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid var(--acc); border-left: 3px solid var(--acc);
+  background: color-mix(in srgb, var(--acc) 9%, var(--surface));
+  border-radius: 10px; padding: 10px 14px; margin: 16px 0 0; font-size: 13.5px;
+}
+.intent-notice[data-on="1"] { display: flex; }
+.intent-notice .ni-tag {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--acc); font-weight: 700;
+}
+.intent-notice .ni-x { margin-left: auto; }
+
+/* section titles */
+.sec-head {
+  display: flex; align-items: baseline; gap: 10px; padding: 24px 0 10px;
+}
+.sec-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.sec-head .count { font-family: var(--font-mono); font-size: 12px; color: var(--acc); }
+.sec-head .spacer { flex: 1; }
+
+/* the declare form */
+.panel {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 18px; box-shadow: var(--shadow);
+}
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field { display: flex; flex-direction: column; }
+.field.col-2 { grid-column: 1 / -1; }
+.field > label, .field > .flabel {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px;
+}
+.field .req { color: var(--acc); }
+.field input[type="text"], .field input[type="datetime-local"],
+.field textarea, .field select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px 11px; color: var(--text); font-size: 13.5px;
+}
+.field textarea { resize: vertical; min-height: 58px; font-family: var(--font-mono); font-size: 12.5px; }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--acc); outline: none; }
+.field .fhelp { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+.grp-label {
+  grid-column: 1 / -1; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--acc-dim);
+  border-top: 1px solid var(--border); padding-top: 12px; margin-top: 2px;
+}
+.grp-label:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+
+.form-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 650;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-acc:disabled { opacity: .5; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text); }
+.btn-danger { background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 8px 14px; font-size: 13px; }
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+
+/* live TOML + verdict preview */
+.preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+@media (max-width: 720px) { .preview-grid, .form-grid { grid-template-columns: 1fr; } }
+.preview-box { border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); overflow: hidden; }
+.preview-box h3 {
+  margin: 0; padding: 9px 13px; border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); background: var(--surface-3);
+}
+pre.toml {
+  margin: 0; padding: 13px; font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.55; color: var(--text-dim); white-space: pre; overflow-x: auto;
+}
+pre.toml .k { color: var(--acc-dim); }
+pre.toml .s { color: var(--ok); }
+pre.toml .h { color: var(--muted); }
+
+/* threshold verdict */
+.verdict { padding: 12px 13px; }
+.verdict .vhead {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 10px;
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em;
+}
+.verdict .vdot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
+.verdict[data-pass="yes"] .vdot { background: var(--ok); }
+.verdict[data-pass="no"] .vdot { background: var(--err); }
+.verdict .vword { font-weight: 700; letter-spacing: .1em; }
+.verdict[data-pass="yes"] .vword { color: var(--ok); }
+.verdict[data-pass="no"] .vword { color: var(--err); }
+.verdict .vprev {
+  margin-left: auto; font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  border-radius: 5px; padding: 2px 6px;
+}
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.checks li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; font-size: 12.5px; }
+.checks .cm { text-align: center; font-family: var(--font-mono); font-weight: 700; line-height: 1.4; }
+.checks li[data-s="pass"] .cm { color: var(--ok); }
+.checks li[data-s="fail"] .cm { color: var(--err); }
+.checks li[data-s="manual"] .cm { color: var(--warn); }
+.checks .cl { color: var(--text-dim); }
+.checks .cl b { color: var(--text); font-weight: 600; }
+.checks .cd { color: var(--muted); font-size: 11.5px; }
+.verdict .vnote { margin: 11px 0 0; font-size: 11px; color: var(--muted); line-height: 1.55; }
+
+/* task cards */
+.tasks { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.card {
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  padding: 15px 16px 14px; display: flex; flex-direction: column; gap: 11px;
+}
+.card .top { display: flex; align-items: flex-start; gap: 10px; }
+.card h3 { margin: 0; font-size: 15.5px; line-height: 1.3; flex: 1; word-break: break-word; }
+/* Status pill — Izbushka's inline MIRROR of the shared .ps-pill vocabulary
+   (apps/_design-system/components.css). Mirrored, not linked, because this
+   page's CSP style-src is 'unsafe-inline' only (no 'self', no external
+   stylesheet). Metrics and the status→semantic ramp are identical to the
+   shared component, so these chips read the same as gramota / ezekiel badges:
+     declared → neutral · granted → accent · scheduled → ok ·
+     paused → warn · revoked → err
+   Keep the two copies in lockstep. */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; font-weight: 700; line-height: 1;
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px;
+  white-space: nowrap; color: var(--text-dim);
+}
+.pill.declared { color: var(--muted); }
+.pill.granted  { color: var(--acc);  border-color: color-mix(in srgb, var(--acc) 50%, var(--border)); }
+.pill.scheduled{ color: var(--ok);   border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); }
+.pill.paused   { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.pill.revoked  { color: var(--err);  border-color: color-mix(in srgb, var(--err) 55%, var(--border)); }
+.card .desc { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.meta { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.meta .row { display: flex; gap: 8px; }
+.meta .mk { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); min-width: 78px; }
+.meta .mv { color: var(--text-dim); font-family: var(--font-mono); font-size: 11.5px; word-break: break-word; }
+.meta .mv.expired { color: var(--err); }
+.caps { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.caps .ck { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.caps .cv { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); word-break: break-word; }
+.caps .net-none { color: var(--ok); }
+.caps .net-api  { color: var(--warn); }
+/* The network line is a DECLARED capability the Yagabona daemon honours at
+   run time — never a call this portal makes (connect-src 'none'). The suffix
+   is injected in CSS (shared .ps-pill--capability vocabulary, ezekiel's
+   "declared, not run" reading) so the declaration framing can't be dropped. */
+.caps .net-api::after {
+  content: " · declared, not called — honoured by the Yagabona daemon";
+  color: var(--muted); font-weight: 400;
+}
+.trail {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
+  border-top: 1px solid var(--border); padding-top: 9px; display: flex; gap: 7px; align-items: baseline;
+}
+.trail .th { color: var(--acc-dim); word-break: break-all; }
+.mini-verdict { font-family: var(--font-mono); font-size: 10.5px; }
+.mini-verdict.pass { color: var(--ok); }
+.mini-verdict.fail { color: var(--err); }
+.card .actions { display: flex; gap: 7px; flex-wrap: wrap; padding-top: 2px; }
+.card .actions .hbtn { flex: 1 1 auto; text-align: center; }
+
+.empty {
+  border: 1px dashed var(--border); border-radius: var(--radius); padding: 30px;
+  text-align: center; color: var(--muted); font-size: 14px; grid-column: 1 / -1;
+}
+
+/* dialog */
+dialog {
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  color: var(--text); padding: 0; width: min(720px, calc(100vw - 36px));
+  max-height: min(88vh, 820px); box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(8,6,3,.66); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px; padding: 15px 20px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0;
+  background: var(--surface); z-index: 2; border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 { margin: 0; font-family: var(--font-mono); font-size: 13px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--acc); font-weight: 700; }
+.dlg-head .x { margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted); }
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+.dlg-body .field { margin-bottom: 16px; }
+.dlg-foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+.dlg-foot .grow { margin-right: auto; font-size: 12px; color: var(--muted); }
+
+footer.site {
+  padding: 18px 0 26px; text-align: center; font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase;
+}
+.visually-hidden { position: absolute; width: 1px; height: 1px; clip: rect(0 0 0 0);
+  clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 620px) { .byline { display: none; } .hero h1 { font-size: 21px; } }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Izbushka">IZBUSHKA<span class="tick">·</span></div>
+    <div class="byline">Postern Labs · the hut on chicken legs · the only door into Yagabona</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnDemo" title="Load two example manifests">Sample</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="draft" role="note">
+    <b>Draft v0.1 · portal UI only</b><br>
+    This is the Izbushka task portal. The <b style="text-transform:none;font-size:13px;color:var(--text)">Yagabona</b>
+    Rust daemon — the part that runs tasks, enforces the Threshold Test at the runtime boundary, and writes the
+    append-only <code>SHAKE-256</code> audit trail — is <b>not built</b>. This page persists manifests to your
+    browser's <code>localStorage</code> as a stand-in store; on Postern OS the daemon reads real <code>.toml</code>
+    files under <code>./izbushka/tasks/</code>. The verdicts shown here are a <b>PREVIEW</b> mirror of the daemon's
+    rejection rules — the daemon is authoritative and fail-closed. No network, no telemetry: the portal opens no
+    connections. Named <b style="text-transform:none;font-size:13px;color:var(--text)">Yagabona / Izbushka</b>
+    (coined marks) — never the registered "Baba&nbsp;Yaga" word mark.
+  </div>
+
+  <section class="hero">
+    <h1>Speak the ritual, and the hut turns its <em>door</em> to you.</h1>
+    <p class="sub">A scheduled task runs only when you have spoken an explicit, scoped, expiring capability grant —
+    a task manifest. No formula, no door. Declare a task, review Yagabona's threshold check, then grant.</p>
+    <p class="quote">"She does not work for the cloud. She works for you."</p>
+  </section>
+
+  <div class="intent-notice" id="intentNotice" role="status" aria-live="polite">
+    <span class="ni-tag">Sotto intent</span>
+    <span id="intentText">A voice intent was proposed.</span>
+    <button class="hbtn ni-x" id="intentDismiss">Dismiss</button>
+  </div>
+
+  <!-- ============ DECLARE A TASK ============ -->
+  <div class="sec-head"><h2>Declare a task</h2><span class="spacer"></span></div>
+  <section class="panel" aria-label="Declare a new task manifest">
+    <form id="declareForm" autocomplete="off">
+      <div class="form-grid">
+        <div class="grp-label">[task]</div>
+        <div class="field col-2">
+          <label for="fName">name <span class="req">*</span></label>
+          <input type="text" id="fName" placeholder="nightly-notes-index" spellcheck="false">
+        </div>
+        <div class="field col-2">
+          <label for="fDesc">description <span class="req">*</span></label>
+          <textarea id="fDesc" placeholder="Index ~/Notes into a local search db every night"></textarea>
+        </div>
+        <div class="field">
+          <label for="fSchedule">schedule <span class="req">*</span></label>
+          <input type="text" id="fSchedule" placeholder="daily 02:30" spellcheck="false">
+          <span class="fhelp">Free text as the daemon's scheduler reads it (e.g. <code>daily 02:30</code>).</span>
+        </div>
+        <div class="field">
+          <label for="fExpires">expires <span class="req">*</span></label>
+          <input type="datetime-local" id="fExpires">
+          <span class="fhelp">Every grant carries an expiry. Missing or past &rarr; the Threshold Test fails.</span>
+        </div>
+
+        <div class="grp-label">[capabilities]</div>
+        <div class="field col-2">
+          <label for="fRead">read_paths</label>
+          <textarea id="fRead" placeholder="~/Notes"></textarea>
+          <span class="fhelp">One path per line. Confined to your workspace; <code>..</code> traversal is rejected.</span>
+        </div>
+        <div class="field col-2">
+          <label for="fWrite">write_paths</label>
+          <textarea id="fWrite" placeholder="~/.local/share/izbushka/index"></textarea>
+          <span class="fhelp">One path per line.</span>
+        </div>
+        <div class="field">
+          <label for="fNetwork">network</label>
+          <select id="fNetwork">
+            <option value="none">none — nothing else exists</option>
+            <option value="api.anthropic.com">api.anthropic.com</option>
+          </select>
+          <span class="fhelp">The only two legal values. Anything else &rarr; the Threshold Test fails.</span>
+        </div>
+
+        <div class="grp-label">[ritual]</div>
+        <div class="field">
+          <label for="fGrantedBy">granted_by <span class="req">*</span></label>
+          <input type="text" id="fGrantedBy" placeholder="tiago" spellcheck="false">
+          <span class="fhelp">Who speaks the ritual. Recorded as the explicit consent.</span>
+        </div>
+        <div class="field col-2">
+          <span class="flabel">formula</span>
+          <input type="text" id="fFormula" value="izbushka-turn-your-face-to-me" readonly aria-readonly="true">
+          <span class="fhelp">The fixed ritual phrase. <code>granted_at</code> is stamped at the moment you grant.</span>
+        </div>
+      </div>
+
+      <div class="preview-grid">
+        <div class="preview-box">
+          <h3>manifest.toml — live preview</h3>
+          <pre class="toml" id="tomlPreview"></pre>
+        </div>
+        <div class="preview-box">
+          <div class="verdict" id="verdictPreview" data-pass="no">
+            <div class="vhead"><span class="vdot"></span><span class="vword">—</span>
+              <span class="vprev">preview check</span></div>
+            <ul class="checks" id="verdictChecks"></ul>
+            <p class="vnote">This preview mirrors the daemon's rejection rules in JS. The <b>Yagabona daemon is
+            authoritative</b> and enforces them fail-closed at the runtime boundary — filesystem and socket access
+            outside the grant is denied there, not by this page.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-acc" id="btnDeclare">Declare task</button>
+        <button type="button" class="btn-ghost" id="btnReset">Clear form</button>
+        <span class="fhelp" style="margin:0">Declaring stores the manifest as <b>declared</b>. It does not grant — you grant it below, after the check passes.</span>
+      </div>
+    </form>
+  </section>
+
+  <!-- ============ TASK LIST ============ -->
+  <div class="sec-head">
+    <h2>Tasks</h2><span class="count" id="taskCount"></span><span class="spacer"></span>
+  </div>
+  <section aria-label="Declared tasks">
+    <div class="tasks" id="taskList"></div>
+  </section>
+
+  <!-- ============ PRIVACY (honest, static — no script; CSP script-hash unaffected) ============ -->
+  <details class="privacy" style="margin:26px 0 6px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-dim); padding:0 16px;">
+    <summary style="cursor:pointer; padding:14px 2px; color:var(--text); font-weight:600;">Privacy — what leaves this device</summary>
+    <div style="padding:2px 0 16px; line-height:1.55;">
+      <p style="margin:0 0 10px;"><strong style="color:var(--text)">Nothing leaves.</strong> This portal opens no network connections — <code>connect-src 'none'</code>, no telemetry, no phone-home, no account. Your task manifests persist only in this browser's <code>localStorage</code>, on this device. There is no BYO-key or AI path here; no words are sent to any model.</p>
+      <p style="margin:0 0 10px;"><strong style="color:var(--text)">The honest caveat:</strong> this is defense-in-depth, <em>not</em> "100% private" and <em>not</em> "100% secure." <code>localStorage</code> is readable by anyone who can open this browser profile or unlock this device, and a compromised browser or OS can read it too. No web page can promise otherwise.</p>
+      <p style="margin:0;"><strong style="color:var(--text)">Preview only.</strong> The authority is the Yagabona Rust daemon on Postern OS — it enforces the Threshold Test at the runtime boundary and writes the append-only audit trail; this page only declares and mirrors it. Named <strong style="color:var(--text)">Yagabona / Izbushka</strong> (coined marks), never the registered "Baba&nbsp;Yaga" word mark.</p>
+    </div>
+  </details>
+
+</main>
+
+<footer class="site wrap">Izbushka · no formula, no door · grants are explicit, scoped and expiring · your machine, your trail · no telemetry</footer>
+
+<!-- ============ GRANT / REVIEW DIALOG ============ -->
+<dialog id="dlgGrant" aria-labelledby="grantTitle">
+  <div class="dlg-head">
+    <h2 id="grantTitle">Threshold Test</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="preview-box" style="margin-bottom:16px">
+      <h3>manifest.toml</h3>
+      <pre class="toml" id="grantToml"></pre>
+    </div>
+    <div class="preview-box" style="margin-bottom:16px">
+      <div class="verdict" id="grantVerdict" data-pass="no">
+        <div class="vhead"><span class="vdot"></span><span class="vword">—</span>
+          <span class="vprev">preview check</span></div>
+        <ul class="checks" id="grantChecks"></ul>
+        <p class="vnote">The daemon re-runs this fail-closed before any execution. A refused action is logged and
+        surfaced — never a silent retry.</p>
+      </div>
+    </div>
+    <div class="field">
+      <label for="grantBy">granted_by <span class="req">*</span></label>
+      <input type="text" id="grantBy" placeholder="tiago" spellcheck="false">
+      <span class="fhelp">Speaking the ritual records explicit consent: <code>granted_by</code> +
+      <code>granted_at</code> (now) + the formula. An intent from Sotto never fills this on its own.</span>
+    </div>
+    <div class="dlg-foot">
+      <span class="grow" id="grantHint"></span>
+      <button class="btn-ghost" data-close>Cancel</button>
+      <button class="btn-acc" id="btnDoGrant">Speak the ritual &amp; grant</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="izbushka-companion.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   IZBUSHKA — portal logic (the store's stand-in bridge)
+   Zero dependencies. connect-src 'none' — this script opens no
+   network. It reads/writes ONE localStorage store; on Postern OS
+   the Yagabona daemon reads real TOML files instead. The mascot +
+   Sotto-intent transport live in izbushka-companion.js (window.Izbushka).
+   ============================================================ */
+
+const $ = (s) => document.querySelector(s);
+const RITUAL = (window.Izbushka && window.Izbushka.RITUAL_FORMULA) || "izbushka-turn-your-face-to-me";
+const LEGAL_NET = ["none", "api.anthropic.com"];
+
+const LS = { TASKS: "izbushka.tasks", THEME: "izbushka.theme" };
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function uid() { return "t_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7); }
+function nowIso() {
+  // local ISO-8601 with offset, e.g. 2026-07-11T14:02:00-03:00
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? "+" : "-";
+  const oh = pad(Math.floor(Math.abs(off) / 60)), om = pad(Math.abs(off) % 60);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${oh}:${om}`;
+}
+function toLines(text) {
+  return String(text || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+/* ---------- store ---------- */
+let TASKS = [];
+function load() { try { TASKS = JSON.parse(store.get(LS.TASKS, "[]")) || []; } catch { TASKS = []; } }
+function save() { store.set(LS.TASKS, JSON.stringify(TASKS)); }
+
+/* ---------- non-crypto PREVIEW trail hash ----------
+   Honest stand-in: the Yagabona daemon chains the audit trail ("the glowing
+   skull") with SHAKE-256 (bloch-trail / RPAL-Internal pattern). The browser's
+   WebCrypto has no SHAKE, and this file must run over file:// with no secure
+   context, so we chain a small NON-CRYPTOGRAPHIC digest here purely to show the
+   append-only, prev-linked shape. Never presented as the real hash. */
+function previewHash(str) {
+  // FNV-1a x2 with different seeds -> 16 hex chars, labelled "preview".
+  let h1 = 0x811c9dc5, h2 = 0xcbf29ce4;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 ^= c; h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 = (h2 ^ (c + i)) >>> 0; h2 = Math.imul(h2, 0x01000193) >>> 0;
+  }
+  const hex = n => (n >>> 0).toString(16).padStart(8, "0");
+  return hex(h1) + hex(h2);
+}
+function appendTrail(task, action, result) {
+  const prev = task.trail.length ? task.trail[task.trail.length - 1].hash : "genesis";
+  const entry = { ts: nowIso(), task: task.task.name, action, result, prev_hash: prev };
+  entry.hash = previewHash(prev + "||" + JSON.stringify(entry));
+  task.trail.push(entry);
+  return entry.hash;
+}
+
+/* ---------- read form -> manifest ---------- */
+function readForm() {
+  return {
+    task: {
+      name: $("#fName").value.trim(),
+      description: $("#fDesc").value.trim(),
+      schedule: $("#fSchedule").value.trim(),
+      expires: expiresToIso($("#fExpires").value),
+    },
+    capabilities: {
+      read_paths: toLines($("#fRead").value),
+      write_paths: toLines($("#fWrite").value),
+      network: $("#fNetwork").value,
+    },
+    ritual: {
+      granted_by: $("#fGrantedBy").value.trim(),
+      granted_at: "",              // stamped at grant, not at declare
+      formula: RITUAL,
+    },
+  };
+}
+function expiresToIso(v) {
+  // datetime-local -> ISO-8601 Z (UTC), matching the spec's "…:59Z" style
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/* ---------- manifest -> TOML ---------- */
+function tomlArray(arr) {
+  return "[" + arr.map(s => '"' + String(s).replace(/"/g, '\\"') + '"').join(", ") + "]";
+}
+function toToml(m, opts = {}) {
+  const K = k => k.padEnd(12);
+  const q = s => '"' + String(s || "").replace(/"/g, '\\"') + '"';
+  const c = m.capabilities, r = m.ritual, t = m.task;
+  const netComment = c.network === "none" ? '  # or "api.anthropic.com" — nothing else exists' : "";
+  const lines = [
+    "[task]",
+    `${K("name")}= ${q(t.name)}`,
+    `${K("description")}= ${q(t.description)}`,
+    `${K("schedule")}= ${q(t.schedule)}`,
+    `${K("expires")}= ${q(t.expires)}`,
+    "",
+    "[capabilities]",
+    `${K("read_paths")}= ${tomlArray(c.read_paths)}`,
+    `${K("write_paths")}= ${tomlArray(c.write_paths)}`,
+    `${K("network")}= ${q(c.network)}${netComment}`,
+    "",
+    "[ritual]",
+    `${K("granted_by")}= ${q(r.granted_by)}`,
+    `${K("granted_at")}= ${r.granted_at ? q(r.granted_at) : '""  # stamped when you grant'}`,
+    `${K("formula")}= ${q(r.formula)}`,
+  ];
+  return lines.join("\n");
+}
+/* syntax-highlight the TOML for display (structure only, values escaped) */
+function tomlHtml(m, opts) {
+  const raw = toToml(m, opts);
+  return raw.split("\n").map(line => {
+    if (/^\[/.test(line)) return '<span class="k">' + escapeHtml(line) + "</span>";
+    const mm = line.match(/^(\S+\s*= )(.*)$/);
+    if (!mm) return escapeHtml(line);
+    let val = mm[2], comment = "";
+    const ci = val.indexOf("  #");
+    if (ci >= 0) { comment = val.slice(ci); val = val.slice(0, ci); }
+    return '<span class="k">' + escapeHtml(mm[1]) + "</span>" +
+           '<span class="s">' + escapeHtml(val) + "</span>" +
+           (comment ? '<span class="h">' + escapeHtml(comment) + "</span>" : "");
+  }).join("\n");
+}
+
+/* ============================================================
+   THE THRESHOLD TEST (PREVIEW) — mirrors the daemon's fail-closed
+   rejection rules. The daemon is authoritative; this is a preview.
+   Rules (spec §2.1 / §4):
+     · every path confined to the workspace; no ".." traversal
+     · network is exactly "none" or "api.anthropic.com"
+     · expires present and in the future
+     · no secret/token/credential inline
+     · capabilities must match the description — judged by Yagabona at
+       runtime; shown here as a MANUAL check, not auto-passed.
+   ============================================================ */
+const SECRET_PATTERNS = [
+  { re: /\bsk-[A-Za-z0-9_-]{6,}/, what: "an API-key-like token (sk-…)" },
+  { re: /\bAKIA[0-9A-Z]{8,}/, what: "an AWS access key id" },
+  { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, what: "an inline private key" },
+  { re: /\b(password|passwd|secret|token|api[_-]?key|bearer|credential)\b\s*[:=]\s*\S+/i, what: "an inline secret assignment" },
+  { re: /\bghp_[A-Za-z0-9]{20,}/, what: "a GitHub token" },
+];
+function badPath(p) {
+  if (!p) return "empty path";
+  const parts = p.split("/");
+  if (parts.some(seg => seg === "..")) return "'..' traversal";
+  // absolute paths must stay under the user's home / workspace
+  if (p.startsWith("/") && !/^\/home\//.test(p)) return "escapes the workspace (absolute, not under /home/)";
+  if (/^~[^/]/.test(p)) return "malformed home path";
+  return null;
+}
+function thresholdTest(m) {
+  const checks = [];
+  const t = m.task, c = m.capabilities;
+
+  // 1. paths confined
+  const allPaths = [...c.read_paths, ...c.write_paths];
+  const offenders = allPaths.map(p => ({ p, why: badPath(p) })).filter(x => x.why);
+  checks.push(offenders.length
+    ? { s: "fail", label: "Paths confined to the workspace", detail: offenders.map(o => `${o.p} — ${o.why}`).join("; ") }
+    : { s: "pass", label: "Paths confined to the workspace", detail: allPaths.length ? `${allPaths.length} path(s), no traversal` : "no paths declared" });
+
+  // 2. network
+  checks.push(LEGAL_NET.includes(c.network)
+    ? { s: "pass", label: "Network is none or api.anthropic.com", detail: `network = "${c.network}"` }
+    : { s: "fail", label: "Network is none or api.anthropic.com", detail: `illegal destination "${c.network}"` });
+
+  // 3. expiry present & future
+  let expState = "fail", expDetail = "expires is missing";
+  if (t.expires) {
+    const d = new Date(t.expires);
+    if (isNaN(d.getTime())) { expState = "fail"; expDetail = "expires is unparseable"; }
+    else if (d.getTime() <= Date.now()) { expState = "fail"; expDetail = `expires is in the past (${t.expires})`; }
+    else { expState = "pass"; expDetail = `expires ${t.expires}`; }
+  }
+  checks.push({ s: expState, label: "Grant expires in the future", detail: expDetail });
+
+  // 4. no inline secret
+  const haystacks = [t.name, t.description, t.schedule, ...allPaths, m.ritual.granted_by];
+  let secretHit = null;
+  for (const h of haystacks) {
+    for (const pat of SECRET_PATTERNS) { if (pat.re.test(String(h || ""))) { secretHit = pat.what; break; } }
+    if (secretHit) break;
+  }
+  checks.push(secretHit
+    ? { s: "fail", label: "No secret or credential inline", detail: `looks like ${secretHit}` }
+    : { s: "pass", label: "No secret or credential inline", detail: "no key/token pattern found" });
+
+  // 5. capabilities match description — manual, Yagabona weighs it at runtime
+  checks.push({ s: "manual", label: "Capabilities match the description",
+    detail: "Yagabona weighs this at run time — not auto-checked here." });
+
+  // 6. required fields present (declaration hygiene, not a daemon rule per se)
+  const missing = [];
+  if (!t.name) missing.push("name");
+  if (!t.description) missing.push("description");
+  if (!t.schedule) missing.push("schedule");
+  checks.push(missing.length
+    ? { s: "fail", label: "Required manifest fields present", detail: "missing: " + missing.join(", ") }
+    : { s: "pass", label: "Required manifest fields present", detail: "name, description, schedule set" });
+
+  const pass = !checks.some(k => k.s === "fail");
+  return { pass, checks };
+}
+
+function renderVerdict(rootSel, checksSel, verdict) {
+  const root = $(rootSel), ul = $(checksSel);
+  root.dataset.pass = verdict.pass ? "yes" : "no";
+  root.querySelector(".vword").textContent = verdict.pass ? "WOULD ADMIT" : "WOULD REFUSE";
+  ul.innerHTML = "";
+  for (const c of verdict.checks) {
+    const li = document.createElement("li");
+    li.dataset.s = c.s;
+    const cm = document.createElement("span"); cm.className = "cm";
+    cm.textContent = c.s === "pass" ? "✓" : c.s === "fail" ? "✕" : "◍";
+    const cl = document.createElement("span"); cl.className = "cl";
+    const b = document.createElement("b"); b.textContent = c.label;
+    const d = document.createElement("span"); d.className = "cd"; d.textContent = " — " + c.detail;
+    cl.append(b, d);
+    li.append(cm, cl);
+    ul.appendChild(li);
+  }
+}
+
+/* ---------- live preview on the declare form ---------- */
+function refreshPreview() {
+  const m = readForm();
+  $("#tomlPreview").innerHTML = tomlHtml(m);
+  renderVerdict("#verdictPreview", "#verdictChecks", thresholdTest(m));
+}
+["fName", "fDesc", "fSchedule", "fExpires", "fRead", "fWrite", "fNetwork", "fGrantedBy"]
+  .forEach(id => { const el = document.getElementById(id); el.addEventListener("input", refreshPreview); el.addEventListener("change", refreshPreview); });
+
+/* ---------- declare ---------- */
+$("#declareForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const m = readForm();
+  if (!m.task.name || !m.task.description || !m.task.schedule) {
+    flash("Name, description and schedule are required to declare.");
+    return;
+  }
+  const task = {
+    id: uid(), status: "declared", created: nowIso(),
+    task: m.task, capabilities: m.capabilities, ritual: m.ritual, trail: [],
+  };
+  appendTrail(task, "declare", "declared");
+  TASKS.unshift(task);
+  save(); render();
+  $("#declareForm").reset(); $("#fFormula").value = RITUAL; refreshPreview();
+  document.getElementById("taskList").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+$("#btnReset").addEventListener("click", () => { setTimeout(() => { $("#fFormula").value = RITUAL; refreshPreview(); }, 0); });
+
+function flash(msg) {
+  const hint = $("#grantHint");
+  // lightweight inline notice near the form actions
+  let n = document.getElementById("declareFlash");
+  if (!n) {
+    n = document.createElement("div"); n.id = "declareFlash";
+    n.style.cssText = "color:var(--err);font-size:12.5px;margin-top:10px;font-family:var(--font-mono)";
+    $(".form-actions").appendChild(n);
+  }
+  n.textContent = msg;
+  setTimeout(() => { if (n) n.textContent = ""; }, 4000);
+}
+
+/* ---------- task lifecycle ---------- */
+function findTask(id) { return TASKS.find(t => t.id === id); }
+
+let grantingId = null;
+function openGrant(id) {
+  const t = findTask(id); if (!t) return;
+  grantingId = id;
+  const m = { task: t.task, capabilities: t.capabilities, ritual: t.ritual };
+  $("#grantToml").innerHTML = tomlHtml(m);
+  const verdict = thresholdTest(m);
+  renderVerdict("#grantVerdict", "#grantChecks", verdict);
+  $("#grantBy").value = t.ritual.granted_by || "";
+  const btn = $("#btnDoGrant");
+  btn.disabled = !verdict.pass;
+  $("#grantHint").textContent = verdict.pass
+    ? "The check would admit this manifest."
+    : "Yagabona would refuse this — fix the manifest before granting.";
+  $("#dlgGrant").showModal();
+}
+$("#btnDoGrant").addEventListener("click", () => {
+  const t = findTask(grantingId); if (!t) return;
+  const by = $("#grantBy").value.trim();
+  if (!by) { $("#grantHint").textContent = "granted_by is required — who speaks the ritual?"; return; }
+  const verdict = thresholdTest({ task: t.task, capabilities: t.capabilities, ritual: t.ritual });
+  if (!verdict.pass) { $("#grantHint").textContent = "Refused: the manifest does not pass the Threshold Test."; return; }
+  t.ritual.granted_by = by;
+  t.ritual.granted_at = nowIso();
+  t.ritual.formula = RITUAL;
+  t.status = "granted";
+  appendTrail(t, "grant", "granted");
+  save(); render();
+  $("#dlgGrant").close();
+});
+
+function schedule(id) {
+  const t = findTask(id); if (!t || (t.status !== "granted" && t.status !== "paused")) return;
+  // schedule requires an active grant that still passes — daemon is authoritative
+  const verdict = thresholdTest({ task: t.task, capabilities: t.capabilities, ritual: t.ritual });
+  if (!verdict.pass) { openGrant(id); return; }
+  t.status = "scheduled";
+  appendTrail(t, "schedule", "scheduled");
+  save(); render();
+  // consent receipt: the hut only dances on a properly-spoken ritual
+  if (window.Izbushka && typeof window.Izbushka.celebrate === "function") window.Izbushka.celebrate();
+}
+function pause(id) {
+  const t = findTask(id); if (!t || t.status !== "scheduled") return;
+  t.status = "paused"; appendTrail(t, "pause", "paused"); save(); render();
+}
+function revoke(id) {
+  const t = findTask(id); if (!t || t.status === "revoked") return;
+  t.status = "revoked"; appendTrail(t, "revoke", "revoked — treated as never given"); save(); render();
+}
+function removeTask(id) {
+  TASKS = TASKS.filter(t => t.id !== id); save(); render();
+}
+
+/* ---------- render task cards ---------- */
+function isExpired(iso) { if (!iso) return false; const d = new Date(iso); return !isNaN(d) && d.getTime() <= Date.now(); }
+
+function render() {
+  const list = $("#taskList");
+  list.innerHTML = "";
+  $("#taskCount").textContent = TASKS.length ? `${TASKS.length} declared` : "";
+  if (!TASKS.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "No tasks yet. Declare one above, or load a Sample. No formula, no door.";
+    list.appendChild(e);
+    return;
+  }
+  for (const t of TASKS) list.appendChild(card(t));
+}
+
+function elWith(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function card(t) {
+  const c = document.createElement("div"); c.className = "card";
+
+  const top = elWith("div", "top");
+  top.append(elWith("h3", null, t.task.name || "(unnamed task)"),
+             elWith("span", "pill " + t.status, t.status));
+  c.appendChild(top);
+
+  c.appendChild(elWith("p", "desc", t.task.description || "(no description)"));
+
+  const meta = elWith("div", "meta");
+  const mkRow = (k, v, extraCls) => {
+    const row = elWith("div", "row");
+    row.append(elWith("span", "mk", k), elWith("span", "mv" + (extraCls ? " " + extraCls : ""), v));
+    return row;
+  };
+  meta.appendChild(mkRow("schedule", t.task.schedule || "—"));
+  const expExpired = isExpired(t.task.expires);
+  meta.appendChild(mkRow("expires", t.task.expires || "—", expExpired ? "expired" : ""));
+  c.appendChild(meta);
+
+  const caps = elWith("div", "caps");
+  caps.append(elWith("span", "ck", "read_paths"),
+              elWith("span", "cv", t.capabilities.read_paths.length ? t.capabilities.read_paths.join("  ·  ") : "—"),
+              elWith("span", "ck", "write_paths"),
+              elWith("span", "cv", t.capabilities.write_paths.length ? t.capabilities.write_paths.join("  ·  ") : "—"));
+  const netk = elWith("span", "ck", "network");
+  const netv = elWith("span", "cv " + (t.capabilities.network === "none" ? "net-none" : "net-api"), t.capabilities.network);
+  caps.append(netk, netv);
+  if (t.ritual.granted_at) {
+    caps.append(elWith("span", "ck", "ritual"),
+                elWith("span", "cv", `${t.ritual.granted_by} · ${t.ritual.granted_at}`));
+  }
+  c.appendChild(caps);
+
+  // mini verdict + trail hash
+  const verdict = thresholdTest({ task: t.task, capabilities: t.capabilities, ritual: t.ritual });
+  const trail = elWith("div", "trail");
+  trail.append(elWith("span", null, "trail-hash"),
+               elWith("span", "th", t.trail.length ? t.trail[t.trail.length - 1].hash : "genesis"));
+  const mv = elWith("span", "mini-verdict " + (verdict.pass ? "pass" : "fail"),
+                    verdict.pass ? "· check: admit" : "· check: refuse");
+  mv.title = "PREVIEW Threshold Test — the daemon is authoritative";
+  trail.appendChild(mv);
+  c.appendChild(trail);
+  const trailNote = elWith("span", null, "PREVIEW · SHA-256/SHAKE stand-in");
+  trailNote.style.cssText = "font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase";
+  c.appendChild(trailNote);
+
+  // actions per status
+  const actions = elWith("div", "actions");
+  const btn = (label, fn, cls) => { const b = elWith("button", "hbtn" + (cls ? " " + cls : ""), label); b.onclick = fn; return b; };
+  if (t.status === "declared") {
+    actions.append(btn("Review & grant", () => openGrant(t.id)), btn("Delete", () => removeTask(t.id)));
+  } else if (t.status === "granted") {
+    actions.append(btn("Schedule", () => schedule(t.id)), btn("Revoke", () => revoke(t.id)));
+  } else if (t.status === "scheduled") {
+    actions.append(btn("Pause", () => pause(t.id)), btn("Revoke", () => revoke(t.id)));
+  } else if (t.status === "paused") {
+    actions.append(btn("Resume schedule", () => schedule(t.id)), btn("Revoke", () => revoke(t.id)));
+  } else if (t.status === "revoked") {
+    actions.append(btn("Delete", () => removeTask(t.id)));
+  }
+  c.appendChild(actions);
+  return c;
+}
+
+/* ---------- dialog close wiring ---------- */
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", (e) => {
+  const d = e.target.closest("dialog"); if (d) d.close();
+}));
+
+/* ============================================================
+   SOTTO INTENT — pre-fill only, never auto-grant.
+   The transport + validation live in izbushka-companion.js; here we
+   only PRE-FILL the declare/grant form and ask for explicit confirmation.
+   ============================================================ */
+let pendingIntent = null;
+function applyIntent(intent) {
+  pendingIntent = intent;
+  const tk = intent.task || {};
+  // pre-fill declare form fields (never submit)
+  if (tk.name != null) $("#fName").value = tk.name;
+  if (tk.description != null) $("#fDesc").value = tk.description;
+  if (tk.schedule != null) $("#fSchedule").value = tk.schedule;
+  if (tk.read_paths) $("#fRead").value = (Array.isArray(tk.read_paths) ? tk.read_paths : [tk.read_paths]).join("\n");
+  if (tk.write_paths) $("#fWrite").value = (Array.isArray(tk.write_paths) ? tk.write_paths : [tk.write_paths]).join("\n");
+  if (tk.network && LEGAL_NET.includes(tk.network)) $("#fNetwork").value = tk.network;
+  if (tk.granted_by != null) $("#fGrantedBy").value = tk.granted_by;
+  if (tk.expires) {
+    const d = new Date(tk.expires);
+    if (!isNaN(d.getTime())) {
+      const pad = n => String(n).padStart(2, "0");
+      $("#fExpires").value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+  refreshPreview();
+  const notice = $("#intentNotice");
+  $("#intentText").textContent =
+    `Sotto proposed "${intent.action}"${tk.name ? ' · ' + tk.name : ""}. The form is pre-filled — review and confirm. Nothing was granted.`;
+  notice.dataset.on = "1";
+  document.querySelector(".panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  // acknowledge so the same intent is not replayed
+  if (window.Izbushka && typeof window.Izbushka.ackIntent === "function") window.Izbushka.ackIntent(intent.id);
+}
+$("#intentDismiss").addEventListener("click", () => { $("#intentNotice").dataset.on = "0"; pendingIntent = null; });
+if (window.Izbushka && typeof window.Izbushka.onIntent === "function") window.Izbushka.onIntent(applyIntent);
+
+/* ---------- sample manifests (honest demo data) ---------- */
+$("#btnDemo").addEventListener("click", () => {
+  const mk = (task, capabilities, status) => {
+    const t = { id: uid(), status: "declared", created: nowIso(), task, capabilities,
+      ritual: { granted_by: "", granted_at: "", formula: RITUAL }, trail: [] };
+    appendTrail(t, "declare", "declared");
+    if (status !== "declared") { t.ritual.granted_by = "tiago"; t.ritual.granted_at = nowIso(); appendTrail(t, "grant", "granted"); t.status = "granted"; }
+    if (status === "scheduled") { t.status = "scheduled"; appendTrail(t, "schedule", "scheduled"); }
+    return t;
+  };
+  const yr = new Date(); yr.setFullYear(yr.getFullYear() + 1);
+  const future = yr.toISOString().replace(/\.\d{3}Z$/, "Z");
+  TASKS.unshift(
+    mk({ name: "nightly-notes-index", description: "Index ~/Notes into a local search db every night",
+         schedule: "daily 02:30", expires: future },
+       { read_paths: ["~/Notes"], write_paths: ["~/.local/share/izbushka/index"], network: "none" }, "scheduled"),
+    mk({ name: "weekly-digest", description: "Summarise the week's notes via Claude and write a local digest",
+         schedule: "weekly sun 08:00", expires: future },
+       { read_paths: ["~/Notes"], write_paths: ["~/Notes/_digests"], network: "api.anthropic.com" }, "declared"),
+  );
+  save(); render();
+});
+
+/* ---------- theme ---------- */
+$("#btnTheme").addEventListener("click", () => {
+  const cur = store.get(LS.THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS.THEME, next); applyTheme();
+});
+function applyTheme() {
+  const t = store.get(LS.THEME, "auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = t;
+  $("#btnTheme").textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  $("#btnTheme").setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+
+/* ============================================================ boot */
+applyTheme();
+$("#fFormula").value = RITUAL;
+load();
+render();
+refreshPreview();
+document.documentElement.dataset.booted = "1";  // init completed without throwing
+</script>
+</body>
+</html>

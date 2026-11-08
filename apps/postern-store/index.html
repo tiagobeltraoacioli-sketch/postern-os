@@ -1,0 +1,3406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Content-Security-Policy — defense-in-depth. CSP reduces injection surface;
+  it is not "security" on its own.
+
+  script-src pins the ONE executable inline <script> (below) by sha256 hash,
+  so 'unsafe-inline' is dropped. The <script type="application/json"
+  id="catalog-index"> block is DATA, not executed, so it needs no hash.
+  RECOMPUTE the hash after ANY edit to the executable script (this file is
+  copied verbatim to public/ — cp, no minify — so the served bytes == these
+  bytes; if that ever changes, hash the SERVED file). The command anchors on
+  the script's "use strict" prologue so it never matches this comment's own
+  <script> text:
+    node -e 'const f=require("fs").readFileSync("apps/postern-store/index.html","utf8");const s=f.indexOf("<script>\n\"use strict")+8;const e=f.indexOf("</script>",s);console.log("sha256-"+require("crypto").createHash("sha256").update(f.slice(s,e),"utf8").digest("base64"))'
+
+  style-src keeps 'unsafe-inline' on purpose: the script injects style=""
+  attributes via innerHTML and there are static inline style="" attributes,
+  so a hash-only style policy would be brittle in this hand-maintained,
+  no-build-step file. Residual risk is CSS-based injection — low here: the
+  only inputs are the same-origin signed catalog (rendered through
+  escapeHtml) and your own text sent to your own Anthropic key.
+
+  connect-src: 'self' = the same-origin catalog.json refresh, AND (per
+  docs/store-fdroid/01-architecture.md §2) every Depot repo this deployment
+  is willing to fetch — connect-src IS the pinned-repo allowlist, nothing
+  looser. Third-party repos are pinned client-side (URL + key, in the Repos
+  dialog, stored in localStorage) but this is a static <meta> CSP in a
+  no-build-step single file: a repo whose ORIGIN isn't already listed here
+  cannot actually be fetched by a browser enforcing this policy, full stop
+  — no runtime script can loosen an already-parsed CSP meta tag. The Repos
+  UI is honest about this (see the CSP note in the Add-repo form): adding
+  such a repo pins it and shows "UNREACHABLE ... blocked by this page's
+  CSP" rather than silently failing or pretending to fetch it. Widening
+  this allowlist to include a new repo origin means editing THIS line —
+  the same edit-and-rehash discipline already used for CATALOG_PUBKEY_B64
+  below — never a wildcard, never 'connect-src *'. api.anthropic.com is the
+  OPT-IN concierge (you bring your own key; disclosed in the Privacy
+  panel). No analytics.
+
+  frame-ancestors is INERT in <meta> — the clickjacking defense must be an
+  HTTP response header (frame-ancestors / X-Frame-Options), set in _headers.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qO9GDnNxSglaOyNf099tUtlu8086J4fQAn6cP8q+jn0='; style-src 'unsafe-inline'; img-src 'self'; media-src 'none'; font-src 'none'; connect-src 'self' https://api.anthropic.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Postern Store — say what you need · Postern Labs</title>
+<style>
+/* ============================================================
+   POSTERN STORE · Postern Labs
+   The store front where you SAY the need and the store
+   parameterizes the search. Graphite/ink instrument panel +
+   one amethyst accent (Sotto wears brass, Vedetta steel-blue,
+   Tolmach verdigris — the Store wears amethyst).
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #0d1014;
+  --bg-glow:   #10141b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e8ec;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --acc:       #ab90e0;   /* amethyst — the Store's own accent */
+  --acc-hi:    #c7b1f0;
+  --acc-dim:   #7a63a8;
+  --acc-ink:   #140f1e;
+
+  --live:      #e4574f;   /* mic hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+
+:root[data-theme="light"] {
+  --bg:        #f0eff3;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #eceae2;
+  --surface-3: #e3e0d5;
+  --border:    #d5d0c4;
+  --border-hi: #bdb7a8;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --acc:       #6a4aa5;
+  --acc-hi:    #543a86;
+  --acc-dim:   #8f75c2;
+  --acc-ink:   #faf7ff;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(40,50,64,.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0eff3; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#eceae2;
+    --surface-3:#e3e0d5; --border:#d5d0c4; --border-hi:#bdb7a8;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --acc:#6a4aa5; --acc-hi:#543a86; --acc-dim:#8f75c2; --acc-ink:#faf7ff;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(40,50,64,.14);
+  }
+}
+
+/* High-contrast preference: raise border/text separation in both themes.
+   Dark stays default; forced-light and OS-auto-light both get the light set. */
+@media (prefers-contrast: more) {
+  :root {
+    --border:    #4a5666;
+    --border-hi: #64748a;
+    --text:      #ffffff;
+    --text-dim:  #c9ced6;
+  }
+  :root[data-theme="light"] {
+    --border:    #9a9384;
+    --border-hi: #6f6a5d;
+    --text:      #000000;
+    --text-dim:  #363b43;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --border:    #9a9384;
+    --border-hi: #6f6a5d;
+    --text:      #000000;
+    --text-dim:  #363b43;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--acc); color: var(--acc-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wrap { max-width: 1020px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 16px; font-weight: 700;
+  letter-spacing: .3em; text-indent: .3em;
+  color: var(--text); user-select: none;
+  white-space: nowrap;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 12px; margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn[data-attn="1"] { border-color: var(--acc); color: var(--acc); }
+
+/* ---------- hero + composer ---------- */
+.hero { text-align: center; padding: 34px 0 6px; }
+.hero h1 {
+  margin: 0 0 6px; font-size: 27px; letter-spacing: -.01em; font-weight: 650;
+}
+.hero h1 em { font-style: normal; color: var(--acc); }
+.hero p.sub { margin: 0 auto; max-width: 640px; color: var(--text-dim); font-size: 14.5px; }
+
+.composer-zone { padding: 18px 0 4px; }
+.composer {
+  display: flex; gap: 8px; align-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+  max-width: 760px; margin: 0 auto;
+  position: relative;
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--acc) 60%, var(--border)); }
+.composer input[type="text"] {
+  flex: 1; background: none; border: 0; outline: none;
+  padding: 8px 10px; font-size: 15.5px; color: var(--text); min-width: 0;
+}
+.composer input::placeholder { color: var(--muted); }
+.cbtn {
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 11px; width: 42px; height: 42px; flex: none;
+  display: grid; place-items: center;
+  color: var(--text-dim);
+  transition: color .15s, border-color .15s, background .15s;
+  touch-action: none;
+}
+.cbtn:hover { color: var(--text); border-color: var(--border-hi); }
+.cbtn svg { width: 19px; height: 19px; }
+.cbtn.primary { background: var(--acc); border-color: var(--acc); color: var(--acc-ink); }
+.cbtn.primary:hover { background: var(--acc-hi); border-color: var(--acc-hi); color: var(--acc-ink); }
+.cbtn[aria-pressed="true"] { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+.cbtn:disabled { opacity: .45; cursor: not-allowed; }
+
+@keyframes livepulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent); }
+                       55%     { box-shadow: 0 0 0 12px transparent; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
+
+body[data-state="listening"] .cbtn.mic {
+  color: #fff; background: var(--live); border-color: var(--live);
+  animation: livepulse 1.2s ease-out infinite;
+}
+.mic-live {
+  display: none;
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  align-items: center; gap: 7px;
+  background: var(--live); color: #fff;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em;
+  padding: 3px 12px; border-radius: 999px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--live) 50%, transparent);
+  z-index: 5; white-space: nowrap;
+}
+.mic-live .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: blink 1s infinite; }
+body[data-state="listening"] .mic-live { display: inline-flex; }
+
+body[data-state="thinking"] .cbtn.primary svg { animation: spin 1.2s linear infinite; }
+
+.status-line {
+  min-height: 1.5em;
+  margin: 12px auto 0; text-align: center;
+  font-size: 14px; color: var(--text-dim);
+  max-width: 640px;
+}
+.status-line .hint-key {
+  font-family: var(--font-mono); font-size: 11px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 7px; margin: 0 2px;
+  color: var(--muted); background: var(--surface-2);
+}
+.status-line[data-tone="err"]  { color: var(--err); }
+.status-line[data-tone="live"] { color: var(--live); font-weight: 500; }
+
+.composer-foot {
+  display: flex; justify-content: center; gap: 18px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--muted); padding: 8px 6px 0;
+  font-family: var(--font-mono); letter-spacing: .02em;
+}
+.composer-foot .lock { color: var(--acc); }
+.composer-foot button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+  font: inherit;
+}
+.composer-foot button.linkish:hover { color: var(--text-dim); }
+
+/* ---------- example chips ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 14px 0 4px; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: 6px 14px;
+  font-size: 13px; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.chip:hover { border-color: var(--acc); color: var(--text); background: var(--surface-2); }
+
+/* ---------- "interpreted as" filter chips ---------- */
+.interpreted {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 18px 0 4px;
+}
+.interpreted .ilabel {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.fchip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--acc) 45%, var(--border));
+  background: color-mix(in srgb, var(--acc) 9%, var(--surface));
+  border-radius: 999px; padding: 4px 6px 4px 12px;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.fchip .fk { color: var(--muted); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+.fchip .fv { color: var(--acc); font-weight: 600; }
+.fchip .fx {
+  background: none; border: 0; color: var(--muted); font-size: 13px;
+  line-height: 1; padding: 2px 6px; border-radius: 6px;
+}
+.fchip .fx:hover { color: var(--err); background: var(--surface-2); }
+.interpreted .none { font-size: 12.5px; color: var(--muted); font-style: italic; }
+.interpreted .ibtns { margin-left: auto; display: flex; gap: 8px; }
+
+/* ---------- manual filter panel ---------- */
+.filter-panel {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface);
+  padding: 16px; margin: 10px 0 0;
+  display: none;
+}
+.filter-panel[data-open="1"] { display: block; }
+.fp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.fp-field label {
+  display: block; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.fp-field select, .fp-field input[type="text"] {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px 10px; color: var(--text); font-size: 13.5px;
+}
+.fp-field select:focus, .fp-field input:focus { border-color: var(--acc); outline: none; }
+.fp-sec { margin-top: 14px; }
+.fp-sec .flabel {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; display: block;
+}
+.fp-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.fp-checks label {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 5px 12px; font-size: 13px; color: var(--text-dim); cursor: pointer;
+}
+.fp-checks label:has(input:checked) {
+  border-color: var(--acc); color: var(--text);
+  background: color-mix(in srgb, var(--acc) 9%, transparent);
+}
+.fp-checks input { accent-color: var(--acc); margin: 0; }
+.fp-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+
+/* ---------- narration (the concierge's reply) ---------- */
+.narration {
+  display: none;
+  border: 1px solid var(--border); border-left: 3px solid var(--acc);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 12px 16px; margin: 16px 0 0;
+  font-size: 14.5px; color: var(--text-dim);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.narration[data-on="1"] { display: block; }
+.narration .who {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--acc); display: block; margin-bottom: 4px;
+}
+.narration.streaming::after { content: "▍"; color: var(--acc); animation: blink 1s infinite; }
+
+/* ---------- results ---------- */
+.results-head {
+  display: flex; align-items: baseline; gap: 10px; padding: 22px 0 10px;
+}
+.results-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim);
+}
+.results-head .count { font-family: var(--font-mono); font-size: 12px; color: var(--acc); }
+
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; padding-bottom: 8px; }
+
+.card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface);
+  padding: 15px 16px 13px;
+  display: flex; flex-direction: column; gap: 9px;
+  transition: border-color .15s, transform .12s;
+}
+.card:hover { border-color: var(--border-hi); }
+.card .top { display: flex; align-items: flex-start; gap: 10px; }
+.card .glyph {
+  width: 38px; height: 38px; flex: none; border-radius: 10px;
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 15px; font-weight: 700;
+  background: color-mix(in srgb, var(--acc) 13%, var(--surface-2));
+  color: var(--acc);
+  border: 1px solid color-mix(in srgb, var(--acc) 30%, var(--border));
+}
+.card h3 { margin: 0; font-size: 15.5px; line-height: 1.3; }
+.card .cat {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.card .one { margin: 0; font-size: 13.5px; color: var(--text-dim); line-height: 1.5; flex: 1; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.badge {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .05em;
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 7px; color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); color: var(--ok); font-weight: 700; }
+.badge.designed { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); color: var(--warn); font-weight: 700; }
+.badge.lic  { color: var(--text-dim); }
+.badge.priv-local { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); color: var(--ok); }
+.badge.priv-e2e   { border-color: color-mix(in srgb, var(--acc) 45%, var(--border)); color: var(--acc); }
+.badge.priv-meta  { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); color: var(--warn); }
+.badge.sec { border-color: color-mix(in srgb, var(--acc) 40%, var(--border)); color: color-mix(in srgb, var(--acc) 80%, var(--text)); }
+/* An UNEARNED tier-intent chip (e.g. "attestable"): dashed + muted so it never
+   reads as a verified property. Earned only once a curator key is published AND
+   a two-builder reproduction AND a real TEE boot exist (R9). Inert until then. */
+.badge.sec.inert { border-style: dashed; border-color: color-mix(in srgb, var(--muted) 55%, var(--border)); color: var(--muted); font-weight: 400; }
+.badge.hosted   { border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); color: var(--ok); font-weight: 700; }
+.badge.linkonly { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); color: var(--warn); }
+.badge.prop     { border-color: var(--err); color: var(--err); font-weight: 700; }
+.badge.tier     { border-color: var(--border-hi); color: var(--text-dim); }
+.badge.attest   { border-color: color-mix(in srgb, var(--ok) 65%, var(--border)); color: var(--ok); font-weight: 700; }
+
+.fitrow { display: flex; align-items: center; gap: 8px; }
+.fitbar {
+  flex: 1; height: 4px; border-radius: 3px; background: var(--surface-3);
+  overflow: hidden;
+}
+.fitbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc-dim), var(--acc)); border-radius: 3px; }
+.fitrow .fitnum { font-family: var(--font-mono); font-size: 11px; color: var(--acc); min-width: 5.5ch; text-align: right; }
+
+.why { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.why li { padding-left: 14px; position: relative; }
+.why li::before { content: "◆"; position: absolute; left: 0; font-size: 8px; top: 4px; color: var(--acc-dim); }
+
+.card .actions { display: flex; gap: 8px; padding-top: 2px; }
+.card .actions .hbtn { flex: 1; text-align: center; }
+.card .actions .hbtn[aria-pressed="true"] { border-color: var(--acc); color: var(--acc); background: color-mix(in srgb, var(--acc) 8%, transparent); }
+
+.no-results {
+  border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 26px; text-align: center; color: var(--muted); font-size: 14px;
+}
+
+/* ---------- catalog trust banner (index-signature state) ----------
+   Honest by construction: amber for UNSIGNED/UNVERIFIED, red for
+   TAMPERED, and green ONLY when a detached signature actually verified. */
+.trust-banner {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface);
+  padding: 8px 13px; margin: 0 0 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .03em;
+}
+.trust-banner .tb-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.trust-banner .tb-k { color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+.trust-banner .tb-v { font-weight: 700; letter-spacing: .08em; }
+.trust-banner .tb-why { color: var(--text-dim); font-family: var(--font-ui); font-size: 12.5px; letter-spacing: normal; flex: 1 1 260px; min-width: 0; }
+.trust-banner[data-trust="checking"] .tb-v { color: var(--muted); }
+.trust-banner[data-trust="unsigned"],
+.trust-banner[data-trust="unverifiable"] { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.trust-banner[data-trust="unsigned"] .tb-dot,
+.trust-banner[data-trust="unverifiable"] .tb-dot { background: var(--warn); }
+.trust-banner[data-trust="unsigned"] .tb-v,
+.trust-banner[data-trust="unverifiable"] .tb-v { color: var(--warn); }
+.trust-banner[data-trust="verified"] { border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); }
+.trust-banner[data-trust="verified"] .tb-dot { background: var(--ok); }
+.trust-banner[data-trust="verified"] .tb-v { color: var(--ok); }
+.trust-banner[data-trust="tampered"] { border-color: var(--err); background: color-mix(in srgb, var(--err) 8%, var(--surface)); }
+.trust-banner[data-trust="tampered"] .tb-dot { background: var(--err); }
+.trust-banner[data-trust="tampered"] .tb-v { color: var(--err); }
+
+/* ---------- per-repo source badge (on a card) + Repos dialog ----------
+   Same honesty-by-construction palette as the catalog trust banner above,
+   generalized per repo instead of hardcoded to the one first-party catalog.
+   ROTATION lives in blue/acc, never green — it is a still-unconfirmed,
+   user-actionable state, not an adopted trust verdict. */
+.badge.repo { border-style: solid; font-weight: 700; }
+.badge.repo[data-trust="verified"]     { border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); color: var(--ok); }
+.badge.repo[data-trust="tampered"]     { border-color: var(--err); color: var(--err); background: color-mix(in srgb, var(--err) 10%, transparent); }
+.badge.repo[data-trust="unsigned"],
+.badge.repo[data-trust="unverifiable"],
+.badge.repo[data-trust="unreachable"]  { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); color: var(--warn); }
+.badge.repo[data-trust="rotation_pending"] { border-color: color-mix(in srgb, var(--acc) 60%, var(--border)); color: var(--acc); }
+.badge.repo[data-trust="checking"]     { border-color: var(--border-hi); color: var(--muted); }
+.crossref { font-size: 11.5px; color: var(--muted); margin: 2px 0 0; }
+
+.tofu-banner {
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 7%, var(--surface));
+  border-radius: 10px; padding: 10px 13px; margin-bottom: 16px;
+  font-size: 12.5px; color: var(--text-dim); line-height: 1.55;
+}
+.tofu-banner b { color: var(--warn); }
+
+.repo-row {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.repo-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.repo-row-head .rname { font-weight: 700; font-size: 14px; }
+.repo-row-head .rurl { font-family: var(--font-mono); font-size: 11px; color: var(--muted); word-break: break-all; }
+.repo-reason { font-size: 12.5px; color: var(--text-dim); margin: 6px 0 0; line-height: 1.5; }
+.repo-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.repo-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.repo-actions .hbtn { flex: none; }
+
+.rotation-box {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--acc) 50%, var(--border));
+  background: color-mix(in srgb, var(--acc) 7%, transparent);
+  font-size: 12.5px; color: var(--text-dim); line-height: 1.55;
+}
+.rotation-box b { color: var(--acc); }
+
+.repo-count-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted); margin-left: 5px; vertical-align: middle;
+}
+.repo-count-dot[data-alert="1"] { background: var(--err); }
+
+/* ---------- compare bar ---------- */
+.compare-bar {
+  position: sticky; bottom: 0; z-index: 15;
+  display: none;
+  padding: 10px 0 14px;
+  background: linear-gradient(transparent, var(--bg) 40%);
+}
+.compare-bar[data-on="1"] { display: block; }
+.compare-inner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid color-mix(in srgb, var(--acc) 45%, var(--border));
+  background: var(--surface);
+  border-radius: 14px; padding: 10px 14px;
+  box-shadow: var(--shadow);
+}
+.compare-inner .clabel {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.compare-inner .cnames { font-size: 13.5px; color: var(--text-dim); flex: 1; }
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-acc:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  width: min(680px, calc(100vw - 36px));
+  max-height: min(86vh, 800px);
+  box-shadow: var(--shadow);
+}
+dialog.wide { width: min(920px, calc(100vw - 36px)); }
+dialog::backdrop { background: rgba(6,8,10,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc);
+  font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+
+.field { margin-bottom: 18px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field input[type="password"], .field input[type="text"], .field select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+}
+.field input:focus, .field select:focus { border-color: var(--acc); outline: none; }
+.keyrow { display: flex; gap: 8px; }
+.keyrow input { flex: 1; font-family: var(--font-mono); font-size: 13px; }
+.keyrow .hbtn { flex: none; }
+.field input[type="range"] { width: 100%; accent-color: var(--acc); }
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 6%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--acc); }
+.radio-card .rc-t { font-size: 14px; }
+.radio-card .rc-d { font-size: 12px; color: var(--muted); }
+.radio-card input:disabled ~ div { opacity: .55; }
+
+.danger-zone { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 16px; }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+
+/* detail dialog */
+.detail-one { font-size: 15px; color: var(--text-dim); margin: 0 0 14px; }
+.detail-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.d-block {
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px;
+}
+.d-block h4 {
+  margin: 0 0 5px; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+.d-block p { margin: 0; font-size: 13.5px; color: var(--text-dim); line-height: 1.55; }
+.d-block.stays  { border-left: 3px solid var(--ok); }
+.d-block.leaves { border-left: 3px solid var(--warn); }
+.d-block.limits { border-left: 3px solid var(--err); }
+.d-block ul.caps { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--text-dim); }
+
+/* compare dialog */
+.cmp-scroll { overflow-x: auto; }
+table.cmp { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 560px; }
+table.cmp th, table.cmp td {
+  border: 1px solid var(--border); padding: 8px 11px; text-align: left; vertical-align: top;
+}
+table.cmp th {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-dim); background: var(--surface-2);
+}
+table.cmp td.prop {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+table.cmp td .y { color: var(--ok); font-weight: 700; }
+table.cmp td .n { color: var(--muted); }
+table.cmp td small { color: var(--muted); }
+
+/* privacy ledger */
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 10px 0 16px; }
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; line-height: 1.4; }
+.ledger-row.local .mark { color: var(--ok); }
+.ledger-row.leaves .mark { color: var(--warn); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--acc); }
+.pv-note { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+
+/* footer */
+footer.site {
+  padding: 14px 0 26px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  body[data-state="listening"] .cbtn.mic { box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 45%, transparent); }
+}
+
+@media (max-width: 620px) {
+  .byline { display: none; }
+  .hero h1 { font-size: 22px; }
+  .interpreted .ibtns { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body data-state="idle">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Postern Store">POSTERN<span class="tick">·</span>STORE</div>
+    <div class="byline">Postern Labs · the parameterized storefront</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnRepos">Repos<span class="repo-count-dot" id="repoCountDot" aria-hidden="true"></span></button>
+      <button class="hbtn" id="btnPrivacy">Privacy</button>
+      <button class="hbtn" id="btnSettings">Settings</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" aria-label="Store search">
+    <h1>Say what you <em>need</em>. The store parameterizes.</h1>
+    <p class="sub">A third-party app catalog with an honest spine: every app shows who hosts it —
+    apps we build and sign, apps we only link to, and proprietary apps we can never host. Describe a
+    need by voice or text, or set the filters by hand; all paths run the same local, deterministic search.</p>
+  </section>
+
+  <section class="composer-zone" aria-label="Search composer">
+    <form class="composer" id="composer">
+      <span class="mic-live" role="status"><span class="dot"></span>MIC LIVE</span>
+      <button type="button" class="cbtn mic" id="btnMic"
+              aria-label="Hold to talk. Push-to-talk only: the microphone is on only while you hold this button or the space bar.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+      </button>
+      <input type="text" id="needInput" autocomplete="off"
+             placeholder="I need to send a file to a source without a server…"
+             aria-label="Describe what you need">
+      <button type="button" class="cbtn" id="btnMute" aria-pressed="false" aria-label="Mute spoken summaries" title="Mute spoken summaries">
+        <svg id="icoSpeaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="spkWaves" d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/><line id="spkSlash" x1="22" y1="3" x2="14" y2="21" style="display:none"/></svg>
+      </button>
+      <button type="submit" class="cbtn primary" id="btnSend" aria-label="Search the catalog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/></svg>
+      </button>
+    </form>
+    <p class="status-line" id="statusLine" aria-live="polite"></p>
+    <div class="composer-foot">
+      <span><span class="lock">●</span> catalog local · search local · no account · no telemetry</span>
+      <span>concierge: <button class="linkish" id="modelHint" type="button">—</button></span>
+    </div>
+  </section>
+
+  <section class="chips" id="chips" aria-label="Example needs">
+    <button class="chip">an open-source password manager that stays offline</button>
+    <button class="chip">only apps you build and sign yourselves</button>
+    <button class="chip">a private messenger on Android</button>
+    <button class="chip">attestable, Nix-native apps only</button>
+    <button class="chip">something to share files anonymously over Tor</button>
+  </section>
+
+  <section class="interpreted" id="interpreted" aria-label="Interpreted query — the filters derived from your words">
+    <span class="ilabel">interpreted as</span>
+    <span id="chipRow"><span class="none">no filters yet — everything is listed</span></span>
+    <span class="ibtns">
+      <button class="hbtn" id="btnFilters" aria-expanded="false">⚙ Filters</button>
+      <button class="hbtn" id="btnClear">Clear</button>
+    </span>
+  </section>
+
+  <section class="filter-panel" id="filterPanel" aria-label="Manual filters — the same query, set by hand">
+    <div class="fp-grid">
+      <div class="fp-field">
+        <label for="fKeywords">Keywords</label>
+        <input type="text" id="fKeywords" placeholder="e.g. send file server">
+      </div>
+      <div class="fp-field">
+        <label for="fCategory">Category</label>
+        <select id="fCategory">
+          <option value="">any</option>
+          <option value="communication">communication</option>
+          <option value="files">files &amp; documents</option>
+          <option value="security">security &amp; identity</option>
+          <option value="media">media</option>
+          <option value="network">network</option>
+          <option value="finance">finance</option>
+          <option value="assistants">assistants</option>
+          <option value="system">system / OS</option>
+          <option value="developer">developer</option>
+        </select>
+      </div>
+      <div class="fp-field">
+        <label for="fSource">Source</label>
+        <select id="fSource">
+          <option value="">any source</option>
+          <option value="native-linux">native Linux</option>
+          <option value="flatpak">Flatpak</option>
+          <option value="fdroid">F-Droid</option>
+          <option value="waydroid-android">Waydroid / Android</option>
+          <option value="web">web / self-hosted</option>
+          <option value="postern-apk">Postern apk (we sign)</option>
+        </select>
+      </div>
+      <div class="fp-field">
+        <label for="fTier">Trust tier</label>
+        <select id="fTier">
+          <option value="">any tier</option>
+          <option value="attestable-nix">attestable (Nix-native)</option>
+          <option value="pmos-overlay">pmOS overlay (signed)</option>
+          <option value="sloboda-compat">Sloboda</option>
+          <option value="browser">browser / web</option>
+        </select>
+      </div>
+      <div class="fp-field">
+        <label for="fDist">Distribution</label>
+        <select id="fDist">
+          <option value="">any</option>
+          <option value="hosted">hosted by us (mirror / build / attest)</option>
+          <option value="link-proxy">link / proxy only (never hosted)</option>
+          <option value="attestable">attestable only (Nix-native)</option>
+        </select>
+      </div>
+      <div class="fp-field">
+        <label for="fPrivacy">Privacy (minimum)</label>
+        <select id="fPrivacy">
+          <option value="">any posture</option>
+          <option value="local-only">local-only — nothing leaves the device</option>
+          <option value="e2e">e2e — end-to-end encrypted or better</option>
+        </select>
+      </div>
+      <div class="fp-field">
+        <label for="fLicense">License</label>
+        <select id="fLicense">
+          <option value="">any</option>
+          <option value="foss">FOSS only (open source)</option>
+          <option value="permissive">permissive only (MIT / BSD / Apache)</option>
+          <option value="no-copyleft">exclude copyleft (no GPL / AGPL / MPL)</option>
+        </select>
+      </div>
+      <div class="fp-field">
+        <label for="fPlatform">Platform</label>
+        <select id="fPlatform">
+          <option value="">any</option>
+          <option value="mobile">mobile</option>
+          <option value="desktop">desktop</option>
+          <option value="both">mobile + desktop</option>
+        </select>
+      </div>
+    </div>
+    <div class="fp-sec">
+      <span class="flabel">Security features (require all checked)</span>
+      <div class="fp-checks" id="fSecurity">
+        <label><input type="checkbox" value="post-quantum">post-quantum</label>
+        <label><input type="checkbox" value="attestable">attestable (Seal)</label>
+        <label><input type="checkbox" value="over-tor">over Tor</label>
+        <label><input type="checkbox" value="tee-sealed">TEE-sealed</label>
+        <label><input type="checkbox" value="on-device-only">on-device only</label>
+      </div>
+    </div>
+    <p class="fp-note">Manual filters never touch the network — this panel, the chips above and
+    the concierge all drive the same local, deterministic search.</p>
+  </section>
+
+  <div class="narration" id="narration" aria-live="polite"><span class="who">concierge</span><span id="narrationText"></span></div>
+
+  <section aria-label="Catalog results">
+    <div class="results-head">
+      <h2>Catalog</h2>
+      <span class="count" id="resultCount"></span>
+    </div>
+    <div class="trust-banner" id="trustBanner" role="status" aria-live="polite" data-trust="unsigned"></div>
+    <div class="results" id="results"></div>
+  </section>
+
+  <div class="compare-bar" id="compareBar">
+    <div class="compare-inner">
+      <span class="clabel">compare</span>
+      <span class="cnames" id="compareNames"></span>
+      <button class="hbtn" id="btnCompareClear">Clear</button>
+      <button class="btn-acc" id="btnCompareOpen">Compare side by side</button>
+    </div>
+  </div>
+</main>
+
+<footer class="site wrap">Postern Store · honest shelves: hosted is hosted, linked is linked, proprietary is never hosted · your key, your query, your machine</footer>
+
+<!-- ================= APP DETAIL ================= -->
+<dialog id="dlgDetail" aria-labelledby="detailTitle">
+  <div class="dlg-head">
+    <h2 id="detailTitle">App</h2>
+    <button class="x" data-close aria-label="Close details">✕</button>
+  </div>
+  <div class="dlg-body" id="detailBody"></div>
+</dialog>
+
+<!-- ================= COMPARE ================= -->
+<dialog id="dlgCompare" class="wide" aria-labelledby="compareTitle">
+  <div class="dlg-head">
+    <h2 id="compareTitle">Compare</h2>
+    <button class="x" data-close aria-label="Close comparison">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="cmp-scroll" id="compareBody"></div>
+  </div>
+</dialog>
+
+<!-- ================= SETTINGS ================= -->
+<dialog id="dlgSettings" aria-labelledby="settingsTitle">
+  <div class="dlg-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <button class="x" data-close aria-label="Close settings">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="field">
+      <label for="apiKey">Your Anthropic API key (optional)</label>
+      <div class="keyrow">
+        <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button type="button" class="hbtn" id="btnShowKey">show</button>
+      </div>
+      <p class="fhelp">Only needed for the natural-language concierge. Stored only in this browser’s
+      localStorage and sent only to <code>api.anthropic.com</code> — the Store has no server that could
+      ever see it. Without a key, plain keyword search and manual filters work fully offline.</p>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Key at rest (optional lock)</span>
+      <p class="fhelp" id="keyLockState" aria-live="polite"></p>
+      <div class="keyrow">
+        <input type="password" id="keyPass" placeholder="passphrase (min 6 characters)" autocomplete="off" spellcheck="false" aria-label="Passphrase to seal the API key">
+        <button type="button" class="hbtn" id="btnKeyLock">lock key</button>
+      </div>
+      <p class="fhelp" id="keyLockHelp">Locking seals the key with <b>AES-256-GCM</b> under a key derived from your passphrase
+      (<b>PBKDF2-SHA-256, 310,000 it.</b> — a WebCrypto stand-in for the product's <b>Argon2id</b>, the same construction as Chiave, our sign-in reference).
+      localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means
+      re-entering the key. <b>Without a lock, the key sits readable in this browser’s localStorage</b> — any
+      code or person with access to this browser profile can read it.</p>
+    </div>
+
+    <div class="field">
+      <label for="modelSel">Claude model</label>
+      <select id="modelSel">
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest, best for voice (default)</option>
+        <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable, slower</option>
+      </select>
+      <p class="fhelp">Billed to your own Anthropic account at your account’s rates.</p>
+    </div>
+
+    <div class="field">
+      <span class="flabel" id="sttLabel">Speech-to-text engine</span>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="webspeech" id="sttWeb">
+        <div>
+          <div class="rc-t">Browser speech recognition (Web Speech API)</div>
+          <div class="rc-d">Works now in Chrome/Edge. Honest caveat: the browser may send your audio to its vendor’s servers for transcription — see the Privacy panel.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="ondevice" id="sttLocal">
+        <div>
+          <div class="rc-t">On-device Whisper (planned)</div>
+          <div class="rc-d">A whisper.cpp-WASM engine that never lets audio leave this machine. The engine slot is wired; the model isn’t bundled in this prototype. Until then, typing is the fully local path.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="field">
+      <label for="voiceSel">Voice for spoken summaries (on-device)</label>
+      <select id="voiceSel"></select>
+    </div>
+
+    <div class="field">
+      <label for="rate">Speaking rate <span id="rateVal" style="color:var(--muted)"></span></label>
+      <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
+    </div>
+
+    <div class="danger-zone">
+      <span class="flabel">Erase everything</span>
+      <p class="fhelp" style="margin:0 0 10px">Wipes your API key and all settings from the browser.
+      The Store never records what you searched or compared — there is nothing else to erase, and no server copy.</p>
+      <button type="button" class="btn-danger" id="btnErase">Erase key &amp; settings</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= REPOS (Depot multi-repo client) ================= -->
+<dialog id="dlgRepos" aria-labelledby="reposTitle">
+  <div class="dlg-head">
+    <h2 id="reposTitle">Repos — third-party app sources</h2>
+    <button class="x" data-close aria-label="Close repos">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="tofu-banner">
+      <b>Trust On First Use (TOFU) — read before adding a repo.</b>
+      Adding a repo means pinning a URL + Ed25519 public key that someone handed you
+      out of band (a website, a README, a QR code). The Store has no way to check
+      that pairing is genuine the first time — it trusts whoever gave you the string,
+      exactly like SSH's "authenticity of host can't be established" prompt or
+      F-Droid's own repo-add flow. If the URL/key pair you were given is wrong or
+      malicious, nothing protects you until you notice and remove it. This is also a
+      structurally <b>weaker floor</b> than the first-party Postern catalog above: that
+      one ships an embedded, CSP-hash-pinned fallback copy in this file; a repo you add
+      here has no shipped fallback at all — only whatever this browser itself has
+      previously cached as VERIFIED, or nothing.
+    </div>
+
+    <div class="field">
+      <span class="flabel">Add a repo</span>
+      <p class="fhelp" style="margin-top:0">Enter the URL and pinned Ed25519 public key (base64,
+      32 raw bytes) exactly as published by the repo operator. This page's Content-Security-Policy
+      only permits network fetches to origins already listed in <code>connect-src</code>
+      (see the CSP comment at the top of this file's source) — a repo hosted at a different
+      origin can still be pinned here, but its trust state will honestly read
+      "blocked by this page's CSP" until this deployment is rebuilt with that origin added.</p>
+      <label for="repoLabel" style="margin-top:10px">Label</label>
+      <input type="text" id="repoLabel" placeholder="e.g. Example Depot" autocomplete="off" spellcheck="false">
+      <label for="repoUrl" style="margin-top:10px">Index URL</label>
+      <input type="text" id="repoUrl" placeholder="https://example.com/depot/index.json" autocomplete="off" spellcheck="false">
+      <label for="repoKey" style="margin-top:10px">Pinned public key (base64)</label>
+      <input type="text" id="repoKey" placeholder="32-byte Ed25519 public key, base64" autocomplete="off" spellcheck="false">
+      <p class="fhelp" id="repoAddError" role="alert" aria-live="polite" style="color:var(--err)"></p>
+      <button type="button" class="btn-acc" id="btnRepoAdd" style="margin-top:6px">Add repo (TOFU)</button>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Pinned repos</span>
+      <div id="repoList"></div>
+      <p class="fhelp" id="repoListEmpty">No third-party repos added yet. The Postern first-party
+      catalog above is unaffected either way — it verifies against the key embedded in this page,
+      not against anything in this list.</p>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= PRIVACY ================= -->
+<dialog id="dlgPrivacy" aria-labelledby="privacyTitle">
+  <div class="dlg-head">
+    <h2 id="privacyTitle">Privacy — who sees what</h2>
+    <button class="x" data-close aria-label="Close privacy panel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">
+      The Postern Store is a static page. <strong>There is no store server, no account, no telemetry,
+      and no analytics — it does not track what you search, view, or “install”.</strong>
+      The entire catalog ships inside this file; searching and comparing run locally. The honest ledger:
+    </p>
+
+    <div class="ledger">
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>The catalog, the search, the filters — this page only</h3>
+          <p>The signed catalog index ships embedded in this HTML file (a copy of
+          <code>catalog.json</code>); if the page is served over the web it may fetch a newer
+          <code>catalog.json</code> from this same origin, nothing else. Filtering, ranking, comparing,
+          and plain keyword search are deterministic local code — <strong>a search sends nothing about
+          your query anywhere</strong> unless you ask the concierge to interpret it. The catalog lists
+          third-party apps: it shows for each whether Postern hosts a signed build, only links to the
+          upstream, or (for proprietary apps) can only ever link or proxy — <strong>never host</strong>.</p>
+        </div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your need text → Anthropic (only when you use the concierge)</h3>
+          <p>When you ask in natural language and have set an API key, the text of your need — spoken
+          or typed — goes from your browser directly to <code>api.anthropic.com</code> under
+          <em>your</em> key, so the model can derive the structured filters. No middleman relays or
+          logs it; Anthropic processes it under your agreement with them. Prefer never sending it?
+          Use the manual filter panel or keyword search — same results engine, zero network.</p>
+        </div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your voice → your browser’s vendor (only while you hold to talk)</h3>
+          <p>Voice input uses the browser’s Web Speech API, which in Chrome and most browsers
+          <strong>sends your audio to the browser vendor’s servers</strong> for transcription. It is
+          strictly push-to-talk: the microphone is captured only while you hold the mic button or the
+          space bar, never in the background. Want zero audio leaving the machine? Type instead.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Spoken summaries — on-device</h3>
+          <p>Text-to-speech uses your operating system’s voices via <code>speechSynthesis</code>.
+          Audio is generated locally and does not leave the device.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Key &amp; settings — this browser only</h3>
+          <p>API key + preferences: localStorage. With the optional lock set in Settings, the key is
+          stored only as AES-256-GCM ciphertext sealed under your passphrase; without it, it is readable
+          in localStorage — Settings says so plainly. Your searches, comparisons, and the conversation
+          with the concierge: tab memory only, never persisted. “Erase everything” in Settings wipes
+          all of it instantly.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="pv-note">
+      <strong>What we won’t claim:</strong> total privacy — no software can promise that, and the Store won’t pretend to. If you use the concierge,
+      the need you describe necessarily reaches Anthropic; if you speak, your audio may reach your
+      browser vendor. What the Store guarantees is <em>no extra parties</em>: no store servers, no
+      resellers, no analytics — the only network destination in this page’s code is
+      <code>api.anthropic.com</code>, and only when you choose it. The source is one readable HTML
+      file; verify it yourself.
+    </p>
+    <p style="text-align:right; margin: 14px 0 0">
+      <button class="btn-acc" data-close>Understood</button>
+    </p>
+  </div>
+</dialog>
+
+<script type="application/json" id="catalog-index">{"schema":"postern.catalog/v1","generated":"2026-07-13","publisher":"Postern Labs","honesty":"This index's LIST is now SIGNED: a detached raw Ed25519 signature over the EXACT served bytes of this file is published beside it as catalog.json.sig, and the Store verifies it in-page against the curator key pinned in index.html (CATALOG_PUBKEY_B64), rendering VERIFIED. That signature proves only that the LIST came from Postern's curator key; it does NOT, and cannot, attest any upstream app binary. Every HOSTED per-app artifact below is still UNBUILT: its checksum and signing.signature stay null with signing.state = \"unpublished\" until a real build runs — the pmOS apk mirrors need a Linux/pmbootstrap build host (see pmos-overlay/HONESTY.md), the attestable-nix entries need the Postern OS Nix closure. A proprietary app can only ever be linked or proxied — it is structurally impossible for hosted_by_us to be true when license.class is \"proprietary\". The 'attestable' badge is reserved for tier = attestable-nix (built from source inside the reproducible Postern OS Nix closure); a signed apk mirror is NOT attestable.","index_signature":{"scheme":"ed25519-detached","key_id":"postern-catalog@posternlabs.com","pubkey_b64":"xhW1EymjaCs8nAwYbFglWeGrTs4gMo8uoc2oV7nnAes=","sig_file":"catalog.json.sig","signature":null,"state":"signed","note":"A DETACHED raw Ed25519 signature (64 bytes) over the EXACT served bytes of this file, published beside it as catalog.json.sig. The Store verifies it in-page with SubtleCrypto against the curator public key pinned in index.html as CATALOG_PUBKEY_B64 (identical to pubkey_b64 here) and renders VERIFIED. 'signature' stays null in-band because the signature is detached — it cannot sign over bytes that contain itself. Proves the LIST came from Postern's curator key; it does not, and cannot, attest each upstream app's binary. The private half is never committed (see pmos-overlay/keys/postern-keygen.sh)."},"vocab":{"source":{"native-linux":"Upstream native Linux build (from source or upstream binary).","flatpak":"Flathub / flatpak remote — sandboxed desktop app.","fdroid":"F-Droid — reproducible, FOSS-only Android repo (F-Droid signs).","waydroid-android":"Android app run in Waydroid, or its upstream APK — user brings their own.","web":"Runs in the browser / self-hosted web app; nothing to install locally.","postern-apk":"Alpine/pmOS apk that WE build+sign and host in the Postern overlay repo."},"tier":{"attestable-nix":"Built from source inside the reproducible Postern OS Nix closure. The ONLY tier that earns the 'attestable' badge.","pmos-overlay":"Signed apk we host in the pmOS overlay. Proves who published it, NOT what it was built from. Not reproducible, not attestable.","sloboda-compat":"Android app reached via F-Droid, Waydroid, or the upstream APK. Trust chains to F-Droid or the upstream signer, not to us.","browser":"Web/self-hosted app opened in a browser. We host no binary; you run it or your own server does."},"license_class":{"permissive":"MIT / BSD / Apache-2.0 — redistribute and rebrand both allowed.","weak-copyleft":"MPL-2.0 / LGPL — file/library-level copyleft; redistribute freely, rebrand allowed if modified files stay open.","strong-copyleft":"GPL / AGPL — redistribute freely; a rebranded fork must ship its full source under the same license.","proprietary":"Closed source. We may never host or rebrand it — link or proxy to the vendor only."},"distribution_model":{"attest":"Built from source in the Postern OS Nix image; verity-sealed. hosted_by_us=true.","mirror":"We host an unmodified copy of the upstream binary as a signed apk. hosted_by_us=true.","overlay-build":"We build from source via an APKBUILD and host the signed apk. hosted_by_us=true.","link":"We only point at the upstream source (Flathub / F-Droid / vendor). hosted_by_us=false.","proxy":"We host a manifest/wrapper that fetches the upstream binary at install time — never the binary itself. hosted_by_us=false."},"rebrand_vs_redistribute":"redistribute = may we host the upstream binary as-is? rebrand = may we fork the source and ship it under Postern branding? Trademark can forbid using the upstream NAME/logo even when the license permits redistribution (Firefox/Thunderbird/Signal are the classic cases): those we link rather than mirror. Proprietary forbids both."},"apps":[{"id":"postern-vault","name":"Postern Vault","publisher":"Postern Labs","glyph":"V","category":"security","platform":"both","source":"native-linux","tier":"attestable-nix","oneliner":"First-party secrets/password vault, sealed with one canonical AEAD (XChaCha20-Poly1305 + Argon2id), software keystore — unaudited.","license":{"spdx":"MIT OR Apache-2.0","class":"permissive","foss":true,"redistribute":true,"rebrand":true,"trademark":false,"note":"Our own code; permissive by repo rule (deny.toml forbids GPL/AGPL)."},"distribution":{"model":"attest","hosted_by_us":true,"upstream":"https://posternlabs.com/vault","artifact":"nix-store://postern-os/vault","checksum":null,"signing":{"scheme":"nix-store+verity","state":"unpublished"},"verify":"Reproducible Nix build; verity-sealed in the Postern OS image."},"privacy":{"level":"local-only","stays":"Secrets, encrypted at rest, never leave the device.","leaves":"Nothing."},"security":["post-quantum","tee-sealed","attestable","on-device-only"],"capabilities":["store passwords","manage secrets","encrypted notes (planned)"],"tags":["passwords","secrets","vault","keepass alternative","bitwarden alternative"],"limits":"Built & tested at the crate level; the end-user UI is the remaining app layer."},{"id":"postern-courier","name":"Postern Courier","publisher":"Postern Labs","glyph":"C","category":"files","platform":"both","source":"native-linux","tier":"attestable-nix","oneliner":"First-party serverless file drop over an ephemeral Tor onion, payload sealed post-quantum.","license":{"spdx":"MIT OR Apache-2.0","class":"permissive","foss":true,"redistribute":true,"rebrand":true,"trademark":false,"note":"Our own permissive code."},"distribution":{"model":"attest","hosted_by_us":true,"upstream":"https://posternlabs.com/courier","artifact":"nix-store://postern-os/courier","checksum":null,"signing":{"scheme":"nix-store+verity","state":"unpublished"},"verify":"Reproducible Nix build; verity-sealed in the Postern OS image."},"privacy":{"level":"e2e","stays":"File contents — hybrid ML-KEM-sealed end-to-end to the recipient's key.","leaves":"Only ciphertext transits the Tor circuit."},"security":["post-quantum","over-tor","attestable"],"capabilities":["send files without a server","serverless p2p file drop","scrub metadata first"],"tags":["file","send","onionshare alternative","journalist","source"],"limits":"Sender must stay online for the live transfer; onion address crypto is classical."},{"id":"postern-os-desktop","name":"Postern OS Desktop","publisher":"Postern Labs","glyph":"O","category":"system","platform":"desktop","source":"native-linux","tier":"attestable-nix","oneliner":"First-party privacy Linux declared in Nix: reproducible image, Tor by default, zero telemetry.","license":{"spdx":"MIT","class":"permissive","foss":true,"redistribute":true,"rebrand":true,"trademark":false,"note":"Our own Nix profile."},"distribution":{"model":"attest","hosted_by_us":true,"upstream":"https://posternlabs.com/os","artifact":"nix-store://postern-os/image","checksum":null,"signing":{"scheme":"nix-store+verity","state":"unpublished"},"verify":"Reproducible NixOS image; the root of the attestable tier."},"privacy":{"level":"local-only","stays":"The OS sends nothing home: telemetry stripped, deny-inbound firewall, Tor client on.","leaves":"Only traffic you generate."},"security":["attestable","over-tor","post-quantum"],"capabilities":["daily-driver OS","full-disk encryption","reproducible image","hardened browser"],"tags":["os","nixos","linux","distro","hardened"],"limits":"A NixOS profile to iterate, not a frozen distro; the image is not built in this sandbox (labeled designed)."},{"id":"keepassxc","name":"KeePassXC","publisher":"KeePassXC Team","glyph":"K","category":"security","platform":"both","source":"flatpak","tier":"attestable-nix","oneliner":"Offline password manager with a local KDBX database — no cloud, no account.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPL permits a fork; the KeePassXC name/logo are the project's — a fork must be renamed. We build it unmodified in the Nix image."},"distribution":{"model":"attest","hosted_by_us":true,"upstream":"https://keepassxc.org/","artifact":"nix-store://postern-os/keepassxc","checksum":null,"signing":{"scheme":"nix-store+verity","state":"unpublished"},"verify":"Built from source in the Postern OS Nix closure — the attestation is of OUR image build, not of upstream's own binaries."},"privacy":{"level":"local-only","stays":"The KDBX vault stays on your device.","leaves":"Nothing unless you enable browser integration or sync the file yourself."},"security":["on-device-only","attestable"],"capabilities":["password manager","TOTP codes","KDBX database","browser autofill"],"tags":["passwords","kdbx","keepass","offline","vault"],"limits":"The 'attestable' badge covers our reproducible Nix build only; on Flathub/native you trust that channel's signer instead."},{"id":"syncthing","name":"Syncthing","publisher":"Syncthing Foundation","glyph":"S","category":"files","platform":"both","source":"native-linux","tier":"attestable-nix","oneliner":"Continuous file sync directly between your own devices — no server in the middle.","license":{"spdx":"MPL-2.0","class":"weak-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"MPL is file-level copyleft; redistribute freely. 'Syncthing' is a registered mark — a fork must drop the name."},"distribution":{"model":"attest","hosted_by_us":true,"upstream":"https://syncthing.net/","artifact":"nix-store://postern-os/syncthing","checksum":null,"signing":{"scheme":"nix-store+verity","state":"unpublished"},"verify":"Built from source in the Postern OS Nix closure."},"privacy":{"level":"e2e","stays":"Your files stay on the devices you own; transfers are TLS between them.","leaves":"Metadata to global discovery/relay servers unless you disable them and pin device addresses."},"security":["on-device-only","attestable"],"capabilities":["sync folders between devices","no cloud storage","versioned backups"],"tags":["sync","backup","p2p","dropbox alternative","files"],"limits":"Default discovery/relay servers see connection metadata; both are self-hostable."},{"id":"gimp","name":"GIMP","publisher":"The GIMP Team","glyph":"G","category":"media","platform":"desktop","source":"flatpak","tier":"attestable-nix","oneliner":"Full raster image editor — a fully offline Photoshop alternative.","license":{"spdx":"GPL-3.0-or-later","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPLv3+; a fork must rename off the GIMP mark."},"distribution":{"model":"attest","hosted_by_us":true,"upstream":"https://www.gimp.org/","artifact":"nix-store://postern-os/gimp","checksum":null,"signing":{"scheme":"nix-store+verity","state":"unpublished"},"verify":"Built from source in the Postern OS Nix closure."},"privacy":{"level":"local-only","stays":"Everything — image editing is entirely on-device.","leaves":"Nothing."},"security":["on-device-only","attestable"],"capabilities":["edit photos","retouch images","paint and draw","batch process"],"tags":["image","photo","editor","photoshop alternative","graphics"],"limits":"Not a vector tool; heavy files want RAM. The attestation is of our Nix build only."},{"id":"vlc","name":"VLC media player","publisher":"VideoLAN","glyph":"▶","category":"media","platform":"both","source":"postern-apk","tier":"pmos-overlay","oneliner":"Plays essentially any media file or stream, fully offline.","license":{"spdx":"GPL-2.0-or-later","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPLv2+; redistribute freely. 'VLC' and the cone logo are VideoLAN marks — a fork must rename."},"distribution":{"model":"overlay-build","hosted_by_us":true,"upstream":"https://www.videolan.org/vlc/","artifact":"https://apk.posternlabs.com/v26.06/<arch>/vlc-postern.apk","checksum":null,"signing":{"scheme":"abuild-rsa","key_id":"packages@posternlabs.com","state":"unpublished"},"verify":"We host a SIGNED apk (proves we published it) — NOT reproducible, NOT attestable. See pmos-overlay/HONESTY.md."},"privacy":{"level":"local-only","stays":"Local playback stays on-device.","leaves":"Only network streams you deliberately open."},"security":["on-device-only"],"capabilities":["play video and audio","play any format","open network streams"],"tags":["video","audio","player","media","codec"],"limits":"Signed, not attestable: the signature proves the publisher, not that the binary matches source."},{"id":"libreoffice","name":"LibreOffice","publisher":"The Document Foundation","glyph":"L","category":"files","platform":"both","source":"postern-apk","tier":"pmos-overlay","oneliner":"Complete offline office suite — documents, spreadsheets, presentations.","license":{"spdx":"MPL-2.0","class":"weak-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"MPL-2.0; redistribute freely. 'LibreOffice' is a TDF mark — a fork must rename (as Collabora/OxOffice do)."},"distribution":{"model":"overlay-build","hosted_by_us":true,"upstream":"https://www.libreoffice.org/","artifact":"https://apk.posternlabs.com/v26.06/<arch>/libreoffice-postern.apk","checksum":null,"signing":{"scheme":"abuild-rsa","key_id":"packages@posternlabs.com","state":"unpublished"},"verify":"Signed apk in the Postern overlay — signed, not attestable."},"privacy":{"level":"local-only","stays":"Your documents stay on the device.","leaves":"Nothing unless you enable an online feature. Run Postern Hygiene before sharing — office files carry author/GPS metadata."},"security":["on-device-only"],"capabilities":["write documents","edit spreadsheets","make presentations","open .docx / .xlsx"],"tags":["office","documents","word","excel","microsoft office alternative"],"limits":"Signed, not attestable. Large suite — the pmOS build is heavy on mobile."},{"id":"onionshare","name":"OnionShare","publisher":"Micah Lee / OnionShare","glyph":"◉","category":"files","platform":"desktop","source":"postern-apk","tier":"pmos-overlay","oneliner":"Share files, host a site, or chat over your own temporary Tor onion service.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPLv3; a fork must rename off the OnionShare mark."},"distribution":{"model":"overlay-build","hosted_by_us":true,"upstream":"https://onionshare.org/","artifact":"https://apk.posternlabs.com/v26.06/<arch>/onionshare-postern.apk","checksum":null,"signing":{"scheme":"abuild-rsa","key_id":"packages@posternlabs.com","state":"unpublished"},"verify":"Signed apk in the overlay; upstream also publishes GPG-signed releases you can cross-check."},"privacy":{"level":"e2e","stays":"Files and the service run on your own machine.","leaves":"Only over the Tor circuit to the recipient's onion address."},"security":["over-tor","on-device-only"],"capabilities":["share files anonymously","host a temporary website","anonymous chat"],"tags":["file","share","tor","anonymous","onion","journalist"],"limits":"Sender stays online during the transfer; Tor endpoint timing analysis remains out of scope."},{"id":"cryptomator","name":"Cryptomator","publisher":"Skymatic","glyph":"◧","category":"security","platform":"both","source":"postern-apk","tier":"pmos-overlay","oneliner":"Client-side encryption for any cloud folder — the provider only ever sees ciphertext.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"Desktop app is GPLv3; a fork must rename. (The mobile apps carry their own terms upstream.)"},"distribution":{"model":"overlay-build","hosted_by_us":true,"upstream":"https://cryptomator.org/","artifact":"https://apk.posternlabs.com/v26.06/<arch>/cryptomator-postern.apk","checksum":null,"signing":{"scheme":"abuild-rsa","key_id":"packages@posternlabs.com","state":"unpublished"},"verify":"Signed apk in the overlay — signed, not attestable."},"privacy":{"level":"local-only","stays":"Encryption keys and plaintext stay on the device.","leaves":"Only encrypted vault files, to whatever cloud folder you point it at."},"security":["on-device-only"],"capabilities":["encrypt cloud files","transparent vault folder","protect Dropbox / Nextcloud data"],"tags":["encryption","cloud","vault","dropbox","veracrypt alternative"],"limits":"Protects file contents, not filenames-count/size metadata the cloud can still see."},{"id":"mumble","name":"Mumble","publisher":"Mumble Project","glyph":"◌","category":"communication","platform":"both","source":"postern-apk","tier":"pmos-overlay","oneliner":"Low-latency voice chat you can self-host — permissively licensed.","license":{"spdx":"BSD-3-Clause","class":"permissive","foss":true,"redistribute":true,"rebrand":true,"trademark":false,"note":"Permissive — redistribute and rebrand both allowed with attribution."},"distribution":{"model":"overlay-build","hosted_by_us":true,"upstream":"https://www.mumble.info/","artifact":"https://apk.posternlabs.com/v26.06/<arch>/mumble-postern.apk","checksum":null,"signing":{"scheme":"abuild-rsa","key_id":"packages@posternlabs.com","state":"unpublished"},"verify":"Signed apk in the overlay — signed, not attestable."},"privacy":{"level":"metadata-exposed","stays":"Your identity/certificate is local.","leaves":"Voice + who-talks-to-whom to the server you connect to; run your own for control. Not end-to-end encrypted by default."},"security":[],"capabilities":["group voice chat","self-hosted voice server","push to talk"],"tags":["voice","chat","teamspeak alternative","discord alternative","gaming"],"limits":"Transport is client↔server TLS, not end-to-end; the server operator can hear channels unless configured otherwise."},{"id":"thunderbird","name":"Mozilla Thunderbird","publisher":"MZLA / Mozilla","glyph":"T","category":"communication","platform":"desktop","source":"flatpak","tier":"pmos-overlay","oneliner":"Full desktop email client with built-in OpenPGP encryption.","license":{"spdx":"MPL-2.0","class":"weak-copyleft","foss":true,"redistribute":true,"rebrand":false,"trademark":true,"note":"MPL code is free, but the Thunderbird NAME + logo are Mozilla trademarks: we may NOT ship a 'Thunderbird'-branded build. So we LINK to Flathub, never mirror under the name. A rebranded fork must strip Mozilla branding."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://www.thunderbird.net/","artifact":"https://flathub.org/apps/org.mozilla.Thunderbird","checksum":null,"signing":{"scheme":"flathub","state":"upstream"},"verify":"Install from Flathub; Flathub and Mozilla sign their builds. We host nothing."},"privacy":{"level":"e2e","stays":"OpenPGP private keys and local mail store stay on-device.","leaves":"Mail to/from your providers (SMTP/IMAP see everything unencrypted mail carries); PGP protects body, not headers/subject on older setups."},"security":[],"capabilities":["read and send email","OpenPGP encryption","multiple accounts","calendar"],"tags":["email","mail","pgp","outlook alternative","imap"],"limits":"Trademark forces link-only: we can't distribute a build called Thunderbird. Email metadata is inherently exposed to providers."},{"id":"newpipe","name":"NewPipe","publisher":"TeamNewPipe","glyph":"N","category":"media","platform":"mobile","source":"fdroid","tier":"sloboda-compat","oneliner":"Watch YouTube and other sites with no Google account, ads, or background tracking.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPLv3; a fork must rename off the NewPipe mark."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://newpipe.net/","artifact":"https://f-droid.org/packages/org.schabi.newpipe/","checksum":null,"signing":{"scheme":"fdroid","state":"upstream"},"verify":"Install from F-Droid, which builds from source and signs. We host nothing."},"privacy":{"level":"metadata-exposed","stays":"No account, no watch history synced anywhere.","leaves":"Your requests still reach the origin site (e.g. YouTube), which sees your IP and what you fetch."},"security":[],"capabilities":["watch YouTube without an account","background audio","download videos","no ads"],"tags":["youtube","video","no account","no ads","streaming"],"limits":"Depends on scraping origin sites; breaks when they change. The origin still sees your IP/requests."},{"id":"aegis","name":"Aegis Authenticator","publisher":"Beem Development","glyph":"◆","category":"security","platform":"mobile","source":"fdroid","tier":"sloboda-compat","oneliner":"Offline TOTP/HOTP two-factor codes in an encrypted local vault.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPLv3; a fork must rename off the Aegis mark."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://getaegis.app/","artifact":"https://f-droid.org/packages/com.beemdevelopment.aegis/","checksum":null,"signing":{"scheme":"fdroid","state":"upstream"},"verify":"Install from F-Droid; it builds and signs from source. We host nothing."},"privacy":{"level":"local-only","stays":"All 2FA secrets — encrypted at rest on the device.","leaves":"Nothing; codes are generated offline."},"security":["on-device-only"],"capabilities":["two-factor codes","TOTP and HOTP","encrypted export","authy alternative"],"tags":["2fa","totp","authenticator","authy alternative","offline"],"limits":"Back up your encrypted export yourself — there is no cloud recovery by design."},{"id":"briar","name":"Briar","publisher":"Briar Project","glyph":"B","category":"communication","platform":"mobile","source":"fdroid","tier":"sloboda-compat","oneliner":"Peer-to-peer messaging over Tor — or Wi-Fi/Bluetooth when the internet is down.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"GPLv3; a fork must rename off the Briar mark."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://briarproject.org/","artifact":"https://f-droid.org/packages/org.briarproject.briar.android/","checksum":null,"signing":{"scheme":"fdroid","state":"upstream"},"verify":"Install from F-Droid; upstream also publishes reproducible-build verification. We host nothing."},"privacy":{"level":"e2e","stays":"Messages and contacts — stored encrypted on-device; no central server.","leaves":"Only end-to-end encrypted traffic over Tor (or local radio); no phone number or account."},"security":["over-tor","on-device-only"],"capabilities":["encrypted messaging","works without internet","no phone number","forums and blogs"],"tags":["messaging","tor","offline","signal alternative","activist"],"limits":"Both parties must add each other; no async delivery if neither device is reachable."},{"id":"organic-maps","name":"Organic Maps","publisher":"Organic Maps","glyph":"M","category":"assistants","platform":"mobile","source":"fdroid","tier":"sloboda-compat","oneliner":"Offline maps and turn-by-turn navigation from OpenStreetMap — no tracking.","license":{"spdx":"Apache-2.0","class":"permissive","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"Apache-2.0 — permissive; the 'Organic Maps' name/logo are the project's, so a fork must rename."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://organicmaps.app/","artifact":"https://f-droid.org/packages/app.organicmaps/","checksum":null,"signing":{"scheme":"fdroid","state":"upstream"},"verify":"Install from F-Droid. We host nothing."},"privacy":{"level":"local-only","stays":"Downloaded maps and your location stay on the device.","leaves":"Nothing during navigation; only the map downloads you request."},"security":["on-device-only"],"capabilities":["offline maps","turn-by-turn navigation","hiking and cycling routes","no tracking"],"tags":["maps","navigation","gps","offline","google maps alternative"],"limits":"Map data quality is whatever OpenStreetMap has for the area; no live traffic."},{"id":"signal-android","name":"Signal (Android)","publisher":"Signal Foundation","glyph":"◈","category":"communication","platform":"mobile","source":"waydroid-android","tier":"sloboda-compat","oneliner":"Modern end-to-end encrypted messenger and calls; the client is open source.","license":{"spdx":"GPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":false,"trademark":true,"note":"Client is GPLv3, but 'Signal' is a registered mark and the Foundation asks that their build not be redistributed under the Signal name — so we LINK to the upstream APK, we do not mirror or rebrand it."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://signal.org/android/apk/","artifact":"https://signal.org/android/apk/","checksum":null,"signing":{"scheme":"upstream-apk","state":"upstream"},"verify":"Install the official APK from signal.org (or Play). We host nothing and do not rebrand it."},"privacy":{"level":"e2e","stays":"Message contents — end-to-end encrypted; keys only on your devices.","leaves":"Ciphertext plus minimal metadata to Signal's servers; registration needs a phone number."},"security":[],"capabilities":["encrypted messaging","encrypted calls","disappearing messages"],"tags":["messaging","encrypted","whatsapp alternative","calls","signal"],"limits":"Requires a phone number; runs in Waydroid on a Linux phone, not natively. FOSS client, but we link rather than repackage."},{"id":"jitsi-meet","name":"Jitsi Meet","publisher":"Jitsi / 8x8","glyph":"J","category":"communication","platform":"both","source":"web","tier":"browser","oneliner":"Self-hostable group video calls in the browser — no account, no install.","license":{"spdx":"Apache-2.0","class":"permissive","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"Apache-2.0 — permissive; a self-hosted deployment must drop the Jitsi trademark if rebranded."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://jitsi.org/","artifact":"https://meet.jit.si/","checksum":null,"signing":{"scheme":"web","state":"upstream"},"verify":"Run your own server, or use meet.jit.si. We host no instance."},"privacy":{"level":"metadata-exposed","stays":"Nothing local to install.","leaves":"Audio/video to whichever server hosts the room; the server sees participants. E2EE is optional and browser-dependent. Self-host for control."},"security":[],"capabilities":["group video calls","screen sharing","no account needed","self-hosted meetings"],"tags":["video call","conference","zoom alternative","meetings","self-hosted"],"limits":"On a shared public instance the operator is in the media path unless E2EE is on for every participant."},{"id":"nextcloud","name":"Nextcloud","publisher":"Nextcloud GmbH","glyph":"☁","category":"files","platform":"both","source":"web","tier":"browser","oneliner":"Self-hosted files, calendar, and collaboration — your own server, your data.","license":{"spdx":"AGPL-3.0-only","class":"strong-copyleft","foss":true,"redistribute":true,"rebrand":true,"trademark":true,"note":"AGPL-3.0 — network copyleft: any modified server you expose must offer its source. 'Nextcloud' is a mark; a rebranded fork must rename."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://nextcloud.com/","artifact":"https://nextcloud.com/install/","checksum":null,"signing":{"scheme":"web","state":"upstream"},"verify":"You (or a provider you choose) run the server. We host no instance and store none of your data."},"privacy":{"level":"metadata-exposed","stays":"Whatever stays on the server you control.","leaves":"Everything to the server operator — which is you if self-hosted, or your chosen provider otherwise."},"security":[],"capabilities":["file sync and share","calendar and contacts","collaborative docs","self-hosted cloud"],"tags":["cloud","files","self-hosted","google drive alternative","collaboration"],"limits":"Only as private as the server you run it on; AGPL applies if you expose a modified build."},{"id":"spotify","name":"Spotify","publisher":"Spotify AB","glyph":"♪","category":"media","platform":"both","source":"web","tier":"browser","oneliner":"Proprietary music streaming. Listed for reference — we can only link, never host.","license":{"spdx":"LicenseRef-Proprietary","class":"proprietary","foss":false,"redistribute":false,"rebrand":false,"trademark":true,"note":"Closed source. We may not host, mirror, or rebrand it under any circumstances — link or proxy only."},"distribution":{"model":"proxy","hosted_by_us":false,"upstream":"https://www.spotify.com/","artifact":"https://open.spotify.com/","checksum":null,"signing":{"scheme":"none","state":"vendor"},"verify":"Use the web player, or the community Flathub manifest that DOWNLOADS Spotify's own binary at install (a proxy — even Flathub hosts no binary). We host neither the binary nor a manifest."},"privacy":{"level":"metadata-exposed","stays":"Nothing you can verify — it is closed source.","leaves":"Account, listening history, and device telemetry to Spotify. This is not a private app; it is here so the catalog is honest about the boundary."},"security":[],"capabilities":["stream music","playlists","podcasts"],"tags":["music","streaming","proprietary","spotify"],"limits":"PROPRIETARY: closed binary, telemetry you cannot inspect. Structurally link/proxy only — the store will never host it."},{"id":"whatsapp","name":"WhatsApp","publisher":"Meta Platforms","glyph":"✆","category":"communication","platform":"mobile","source":"waydroid-android","tier":"sloboda-compat","oneliner":"Proprietary messenger. Listed for reference — bring your own; we can only link.","license":{"spdx":"LicenseRef-Proprietary","class":"proprietary","foss":false,"redistribute":false,"rebrand":false,"trademark":true,"note":"Closed source, Meta-owned. We may never host, mirror, or rebrand it — link only."},"distribution":{"model":"link","hosted_by_us":false,"upstream":"https://www.whatsapp.com/","artifact":"https://www.whatsapp.com/android/","checksum":null,"signing":{"scheme":"none","state":"vendor"},"verify":"Install the vendor's own APK / Play build inside Waydroid yourself. We host nothing and endorse nothing about its privacy."},"privacy":{"level":"metadata-exposed","stays":"Message bodies are E2E encrypted, but that is Meta's own unverifiable claim.","leaves":"Contacts, metadata (who/when/how often), and device signals to Meta. A phone number is required."},"security":[],"capabilities":["messaging","voice and video calls"],"tags":["messaging","chat","proprietary","meta"],"limits":"PROPRIETARY: closed source; message-content encryption is unverifiable and metadata is extensive. Structurally link-only."}]}</script>
+
+<script>
+"use strict";
+/* ============================================================
+   POSTERN STORE — application logic
+   Zero dependencies. Only network destination: api.anthropic.com
+   (and only when the user opts into the concierge with their key).
+   ============================================================ */
+
+/* ---------- tiny helpers ---------- */
+const $ = (sel) => document.querySelector(sel);
+const LS = {
+  KEY:    "posternstore.apiKey",
+  SEALED: "posternstore.apiKey.sealed",
+  MODEL: "posternstore.model",
+  VOICE: "posternstore.voiceURI",
+  RATE:  "posternstore.rate",
+  MUTE:  "posternstore.muted",
+  STT:   "posternstore.stt",
+  THEME: "posternstore.theme",
+};
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+/* ---------- sealed key at rest (optional lock) ----------
+   Adopts the ONE postern-sdk wiring seam (globalThis.PosternSDK): when a Postern
+   host shell (Tauri / mobile WebView / relaxed-CSP build) has installed the wasm
+   core, the key is sealed with the REAL Argon2id(64 MiB, t=3) + XChaCha20-Poly1305
+   from postern-core — killing stand-in S2. In a plain browser tab (this page's
+   strict CSP forbids fetching wasm) the seam is absent and we keep the honest
+   classical stand-in: PBKDF2-SHA-256 (310,000 it.) → AES-256-GCM. Never silently
+   weaker — a blob sealed by the real core refuses to open without it (fail-closed),
+   and the on-disk record is tagged with the KDF that produced it so open() can't
+   be tricked into a downgrade. When locked, localStorage holds ONLY ciphertext;
+   the readable key lives in this tab's memory, unlocked once per session. */
+const KeySeal = (() => {
+  const te = new TextEncoder(), td = new TextDecoder();
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  const KDF_ITER = 310000;      // classical stand-in iterations (PBKDF2-SHA-256)
+  const KDF_REAL = "Argon2id-postern-sdk";  // on-disk tag for real-core seals
+  const AAD = "posternstore.apikey.v1";
+  let plain = null;             // unlocked key — this tab's memory only, never persisted
+  let aesKey = null;            // PBKDF2-derived AES key (stand-in path); kept so edits re-seal without re-running the KDF
+  let realKey = null;           // opaque postern-sdk VaultKey handle (real path); kept for re-seals, lives in wasm memory
+  let realLabel = "";           // the core's honest KDF label, stored alongside the blob
+  let saltB64 = null;
+  let writing = Promise.resolve(); // serialize re-seals (last write wins)
+
+  const sdk = () => (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null;
+  const kdfReal = () => { const s = sdk(); return !!(s && s.kdf && s.kdf.available); };
+
+  const record = () => { try { return JSON.parse(store.get(LS.SEALED, "null")); } catch { return null; } };
+  const derive = async (pass, salt, iter) => {
+    const base = await crypto.subtle.importKey("raw", te.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iter },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  };
+  async function persist() {
+    if (realKey) {                                     // REAL postern-sdk core path
+      const blob = sdk().kdf.seal(realKey, te.encode(AAD), te.encode(JSON.stringify({ key: plain })));
+      store.set(LS.SEALED, JSON.stringify({
+        v: 1,
+        kdf: { algo: KDF_REAL, label: realLabel, salt: saltB64 },
+        cipher: { algo: "XChaCha20-Poly1305", blob: b64(blob) },
+      }));
+      return;
+    }
+    const iv = crypto.getRandomValues(new Uint8Array(12)); // fresh IV per write, always
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: te.encode(AAD) },
+      aesKey, te.encode(JSON.stringify({ key: plain })));
+    store.set(LS.SEALED, JSON.stringify({
+      v: 1,
+      kdf: { algo: "PBKDF2-SHA-256", iter: KDF_ITER, salt: saltB64 },
+      cipher: { algo: "AES-256-GCM", iv: b64(iv), ct: b64(ct) },
+    }));
+  }
+  return {
+    isSealed: () => !!record(),
+    isLocked: () => !!record() && plain === null,
+    key: () => plain,
+    real: () => kdfReal(),                             // is the real core installed right now?
+    cipherLabel: () => {                               // what actually sealed the current blob
+      const r = record();
+      if (r && r.kdf && r.kdf.algo === KDF_REAL) return "XChaCha20-Poly1305 (real Argon2id, via postern-sdk)";
+      return "AES-256-GCM (PBKDF2-SHA-256 stand-in)";
+    },
+    async lock(pass, currentKey) {          // seal, then drop the plaintext copy from disk
+      plain = currentKey;
+      const s = sdk();
+      if (kdfReal()) {
+        const salt = s.kdf.generateSalt();
+        realKey = s.kdf.deriveKey(te.encode(pass), salt);
+        realLabel = s.kdf.label || "Argon2id"; saltB64 = b64(salt); aesKey = null;
+      } else {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        aesKey = await derive(pass, salt, KDF_ITER);
+        saltB64 = b64(salt); realKey = null;
+      }
+      await persist();
+      store.del(LS.KEY);
+    },
+    async unlock(pass) {                    // per-session; a wrong passphrase fails the AEAD tag
+      const r = record(); if (!r) return false;
+      if (r.kdf && r.kdf.algo === KDF_REAL) {   // sealed by the real core — never downgrade
+        const s = sdk();
+        if (!kdfReal()) return false;           // honest fail-closed: the core isn't loaded here
+        try {
+          const key = s.kdf.deriveKey(te.encode(pass), unb64(r.kdf.salt));
+          const pt = s.kdf.open(key, te.encode(AAD), unb64(r.cipher.blob));
+          plain = JSON.parse(td.decode(pt)).key;
+          realKey = key; realLabel = r.kdf.label || (s.kdf.label || "Argon2id"); saltB64 = r.kdf.salt; aesKey = null;
+          return true;
+        } catch { return false; }
+      }
+      try {
+        const k = await derive(pass, unb64(r.kdf.salt), r.kdf.iter);
+        const pt = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: unb64(r.cipher.iv), additionalData: te.encode(AAD) },
+          k, unb64(r.cipher.ct));
+        plain = JSON.parse(td.decode(pt)).key;
+        aesKey = k; saltB64 = r.kdf.salt; realKey = null;
+        return true;
+      } catch { return false; }             // all-or-nothing: nothing decrypted, nothing leaked
+    },
+    update(newKey) {                        // edits while unlocked re-seal automatically
+      if (!aesKey && !realKey) return;
+      plain = newKey;
+      writing = writing.then(persist).catch(() => {});
+    },
+    removeLock() {                          // back to plaintext-at-rest, by explicit choice only
+      if (plain === null) return false;
+      store.set(LS.KEY, plain);
+      store.del(LS.SEALED);
+      if (realKey) { try { realKey.free(); } catch {} }
+      aesKey = null; realKey = null; saltB64 = null;
+      return true;
+    },
+    forget() { plain = null; aesKey = null; if (realKey) { try { realKey.free(); } catch {} } realKey = null; saltB64 = null; },
+  };
+})();
+
+/* ---------- constants ---------- */
+const API_URL = "https://api.anthropic.com/v1/messages";
+const MODELS = {
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+  "claude-sonnet-5": "Sonnet 5",
+  "claude-opus-4-8": "Opus 4.8",
+};
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const MAX_TOKENS = 1024;
+const MAX_TOOL_ROUNDS = 5;
+const MAX_HISTORY = 20; // turns kept so follow-ups ("only the built ones") work
+
+/* ============================================================
+   THE CATALOG — a third-party app distribution index.
+   Data lives in catalog.json (the canonical signed index) and is
+   embedded in this file (<script id="catalog-index">) so the page
+   renders offline, under this CSP, and from file://. loadCatalog()
+   parses + NORMALIZES + enforces the honesty invariants below; a
+   newer signed catalog.json is pulled opportunistically at boot.
+
+   Honesty invariants (enforced in normalizeEntry, not just documented):
+   - license.class "proprietary"  ⇒  dist.hostedByUs = false AND
+     dist.model ∈ {link, proxy}. It is structurally impossible to list a
+     proprietary app as hosted/mirrored/attested — the loader downgrades
+     any offending entry and flags it, rather than trusting the data.
+   - the "attestable" security badge is kept ONLY for tier attestable-nix
+     (built from source in the reproducible Postern OS Nix closure). A
+     signed apk mirror is signed, not attestable — the badge is stripped.
+   - hosted entries whose signing.state ≠ "published" render as
+     "unpublished" — we never imply a signature/checksum we don't have.
+   ============================================================ */
+const CATEGORIES = {
+  communication: "Communication",
+  files:         "Files & documents",
+  security:      "Security & identity",
+  media:         "Media",
+  network:       "Network",
+  finance:       "Finance",
+  assistants:    "Assistants",
+  system:        "System / OS",
+  developer:     "Developer",
+};
+
+/* how each app reaches the device */
+const SOURCE_LABELS = {
+  "native-linux":     "native Linux",
+  "flatpak":          "Flatpak",
+  "fdroid":           "F-Droid",
+  "waydroid-android": "Waydroid / Android",
+  "web":              "web / self-hosted",
+  "postern-apk":      "Postern apk",
+};
+/* the trust lane — attestable-nix is the only one that earns the attestable badge */
+const TIER_LABELS = {
+  "attestable-nix": "attestable · Nix-native",
+  "pmos-overlay":   "pmOS overlay · signed",
+  "sloboda-compat": "Sloboda",
+  "browser":        "browser / web",
+};
+const LICENSE_CLASS_LABELS = {
+  "permissive":      "permissive",
+  "weak-copyleft":   "weak copyleft",
+  "strong-copyleft": "strong copyleft",
+  "proprietary":     "PROPRIETARY",
+};
+/* how WE distribute it — the hosted-vs-link spine */
+const DIST_LABELS = {
+  "attest":        "attested (Nix)",
+  "mirror":        "mirrored (signed)",
+  "overlay-build": "overlay build (signed)",
+  "link":          "link only",
+  "proxy":         "proxy only",
+};
+const HOSTED_MODELS = new Set(["attest", "mirror", "overlay-build"]);
+
+const SECURITY_LABELS = {
+  "post-quantum":   "post-quantum",
+  "attestable":     "attestable",
+  "over-tor":       "over-Tor",
+  "tee-sealed":     "TEE-sealed",
+  "on-device-only": "on-device only",
+};
+const PRIVACY_LABELS = {
+  "local-only":       "fully local",
+  "e2e":              "end-to-end encrypted",
+  "metadata-exposed": "metadata exposed",
+};
+const PRIVACY_RANK = { "local-only": 3, "e2e": 2, "metadata-exposed": 1 };
+
+/* Is this license block a proprietary claim? Case- and type-ROBUST on
+   purpose: the naive `lic.class === "proprietary" || lic.foss === false` is
+   a strict-equality gate on attacker-controlled JSON, and a signed-but-
+   dishonest repo can dodge INVARIANT 1 (proprietary can never be hosted)
+   with a one-character change — `class: "Proprietary"` (wrong case) or
+   `foss: "false"` (the STRING, not the boolean) both make the naive check
+   evaluate false, so none of the "strip hosting/checksum" logic ever runs
+   even though the repo's own data plainly claims proprietary. This
+   normalizes both fields (trim + lowercase the class string; treat the
+   string "false" the same as the boolean false for foss) before comparing. */
+function isProprietaryClaim(lic) {
+  const cls = typeof lic?.class === "string" ? lic.class.trim().toLowerCase() : "";
+  const foss = lic?.foss;
+  const fossIsFalse = foss === false || (typeof foss === "string" && foss.trim().toLowerCase() === "false");
+  return cls === "proprietary" || fossIsFalse;
+}
+
+/* ---------- loader: parse → normalize → enforce honesty ---------- */
+function normalizeEntry(a) {
+  const lic = a.license || {};
+  const dist = a.distribution || {};
+  const proprietary = isProprietaryClaim(lic);
+
+  /* INVARIANT 1: proprietary can only ever be link/proxy, never hosted. */
+  let model = DIST_LABELS[dist.model] ? dist.model : "link";
+  let hostedByUs = !!dist.hosted_by_us;
+  let coerced = null;
+  if (proprietary && (hostedByUs || !["link", "proxy"].includes(model))) {
+    coerced = "proprietary app cannot be hosted — forced to link";
+    hostedByUs = false;
+    if (!["link", "proxy"].includes(model)) model = "link";
+  }
+  /* a hosted flag only holds for a genuinely hosting model */
+  if (hostedByUs && !HOSTED_MODELS.has(model)) hostedByUs = false;
+
+  const tier = TIER_LABELS[a.tier] ? a.tier : "browser";
+
+  /* INVARIANT 2: the attestable badge survives only in the Nix-native tier. */
+  let security = Array.isArray(a.security) ? a.security.filter(s => SECURITY_LABELS[s]) : [];
+  if (tier !== "attestable-nix") security = security.filter(s => s !== "attestable");
+
+  const signing = dist.signing || {};
+  const published = signing.state === "published";
+
+  return {
+    id: String(a.id), name: String(a.name), glyph: a.glyph || "·",
+    publisher: a.publisher || "unknown",
+    category: CATEGORIES[a.category] ? a.category : "developer",
+    platform: ["mobile", "desktop", "both"].includes(a.platform) ? a.platform : "both",
+    source: SOURCE_LABELS[a.source] ? a.source : "web",
+    tier,
+    oneliner: a.oneliner || "",
+    license: {
+      spdx: lic.spdx || "unknown",
+      class: LICENSE_CLASS_LABELS[lic.class] ? lic.class : (proprietary ? "proprietary" : "permissive"),
+      foss: lic.foss !== false && !proprietary,
+      redistribute: proprietary ? false : lic.redistribute !== false,
+      rebrand: proprietary ? false : !!lic.rebrand,
+      trademark: !!lic.trademark,
+      note: lic.note || "",
+    },
+    dist: {
+      model, hostedByUs, coerced,
+      upstream: dist.upstream || "",
+      artifact: hostedByUs ? (dist.artifact || "") : "",   /* only advertise an artifact we host */
+      checksum: published ? (dist.checksum || null) : null,
+      signing: { scheme: signing.scheme || "none", state: signing.state || "none", key_id: signing.key_id || "" },
+      published,
+      verify: dist.verify || "",
+    },
+    privacy: {
+      level: PRIVACY_RANK[a.privacy?.level] ? a.privacy.level : "metadata-exposed",
+      stays: a.privacy?.stays || "", leaves: a.privacy?.leaves || "",
+    },
+    security,
+    capabilities: Array.isArray(a.capabilities) ? a.capabilities : [],
+    tags: Array.isArray(a.tags) ? a.tags : [],
+    limits: a.limits || "",
+  };
+}
+
+function parseCatalog(raw) {
+  const apps = (raw && Array.isArray(raw.apps)) ? raw.apps : [];
+  const out = [];
+  const seen = new Set();
+  for (const a of apps) {
+    if (!a || !a.id || seen.has(a.id)) continue;
+    seen.add(a.id);
+    try { out.push(normalizeEntry(a)); } catch { /* skip a malformed entry, never the whole page */ }
+  }
+  return out;
+}
+
+let CATALOG_META = { generated: "", index_signature: null };
+function readEmbeddedCatalog() {
+  try {
+    const raw = JSON.parse(document.getElementById("catalog-index").textContent);
+    CATALOG_META = { generated: raw.generated || "", index_signature: raw.index_signature || null };
+    return parseCatalog(raw);
+  } catch { return []; }
+}
+
+/* CATALOG is populated synchronously from the embedded index so the
+   concierge prompt/tools below can build off it; a newer catalog.json is
+   merged in later by refreshCatalogFromNetwork(). */
+let CATALOG = readEmbeddedCatalog();
+
+/* ============================================================
+   CATALOG TRUST — the Store as a VERIFYING client of its catalog.
+
+   Near-term scheme (see SIGNING.md): a DETACHED Ed25519 signature over
+   the EXACT bytes served for catalog.json, published beside it as
+   catalog.json.sig (the raw 64-byte Ed25519 signature, BINARY — the file
+   is exactly 64 bytes; this verifier reads it with arrayBuffer() and
+   rejects any .sig whose byte length !== 64), checked in-page with
+   SubtleCrypto against a published Ed25519 public key pinned in
+   CATALOG_PUBKEY_B64 (a page constant, like the site's OS_MINISIGN_KEY).
+   A valid signature proves the LIST came from Postern's curator key — it
+   does NOT, and cannot, attest each upstream binary. The attested/PQ path
+   is the Depot (TUF + Falcon‖ML-DSA + chain-anchored build hashes); this
+   is the honest near-term step toward it.
+
+   HONEST STATE TODAY: the LIST is SIGNED. The curator's Ed25519 public key
+   is pinned below and catalog.json.sig (a real 64-byte detached signature
+   over catalog.json's served bytes) ships beside the index, so a catalog
+   served over http resolves to VERIFIED. A file:// open (no fetch) or a
+   browser without WebCrypto-Ed25519 falls back honestly to the embedded,
+   CSP-hash-pinned index and an UNSIGNED/UNVERIFIED banner — never a fake
+   "verified". A tampered network copy resolves to TAMPERED and is rejected.
+   Every per-app HOSTED artifact is still UNBUILT (checksum/signature null,
+   state "unpublished") — only the LIST is signed, not each binary. Rotating
+   the key means editing this page, which changes its sha256 and is visible
+   in review.
+   ============================================================ */
+const CATALOG_PUBKEY_B64 = "xhW1EymjaCs8nAwYbFglWeGrTs4gMo8uoc2oV7nnAes="; // raw 32-byte Ed25519 curator public key, base64. Matches catalog.json index_signature.pubkey_b64.
+
+/* The "attestable" tier badge is EARNED — not asserted (R9). It stays UI-inert
+   (dashed/muted, tooltip says "intent, not earned") until ALL THREE hold:
+     1. a curator signing key is published        (CATALOG_PUBKEY_B64 !== null),
+     2. a human two-builder bit-for-bit reproduction has matched (flake.lock),
+     3. a real TEE (SEV-SNP/TDX) boot has been measured.
+   None exist today, so this is false and the badge never reads as a settled
+   property. Flipping this constant alone does NOT earn the word — the artifacts
+   named above must exist first; this only gates the UI once they do. */
+const ATTESTATION_EARNED = (CATALOG_PUBKEY_B64 !== null) && false; // (2) reproduction + (3) TEE boot still absent.
+
+const TRUST = Object.freeze({
+  CHECKING:     "checking",
+  UNSIGNED:     "unsigned",      // no key published and/or no .sig present — current reality
+  VERIFIED:     "verified",      // .sig present AND valid for the published key
+  TAMPERED:     "tampered",      // .sig present but INVALID — the fetched copy is rejected
+  UNVERIFIABLE: "unverifiable",  // this engine's WebCrypto can't do Ed25519 — honest fallback
+});
+
+function b64ToBytes(s) {
+  const bin = atob(s);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+
+/* Does this engine's WebCrypto actually implement Ed25519? Cached one-shot probe. */
+let _ed25519Probe = null;
+function ed25519Available() {
+  if (!_ed25519Probe) {
+    _ed25519Probe = (async () => {
+      try {
+        if (!(crypto && crypto.subtle && crypto.subtle.importKey)) return false;
+        await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+        return true;
+      } catch { return false; }
+    })();
+  }
+  return _ed25519Probe;
+}
+
+/* Pure verify: raw 32-byte pubkey, 64-byte detached signature, message bytes → bool.
+   Self-tested against an RFC 8032 vector (test harness in the review notes). */
+async function ed25519Verify(pubkeyRaw, sig, message) {
+  const key = await crypto.subtle.importKey("raw", pubkeyRaw, { name: "Ed25519" }, false, ["verify"]);
+  return crypto.subtle.verify({ name: "Ed25519" }, key, sig, message);
+}
+
+/* Resolve the trust state of a catalog from its EXACT served bytes.
+   Never throws: degrades to UNSIGNED / UNVERIFIABLE so rendering is never blocked. */
+async function resolveCatalogTrust(bytes) {
+  if (!CATALOG_PUBKEY_B64) {
+    return { state: TRUST.UNSIGNED, reason: "No catalog signing key is published yet — this index is an unsigned scaffold." };
+  }
+  let sig = null;
+  try {
+    const r = await fetch("./catalog.json.sig", { cache: "no-cache" });
+    if (r.ok) sig = new Uint8Array(await r.arrayBuffer());
+  } catch { /* offline / file:// / blocked — treated as no signature */ }
+  if (!sig || sig.length !== 64) {
+    return { state: TRUST.UNSIGNED, reason: "No detached signature (catalog.json.sig) is published alongside the catalog." };
+  }
+  if (!(await ed25519Available())) {
+    return { state: TRUST.UNVERIFIABLE, reason: "This browser's WebCrypto has no Ed25519 — the signature cannot be checked here." };
+  }
+  try {
+    const ok = await ed25519Verify(b64ToBytes(CATALOG_PUBKEY_B64), sig, bytes);
+    return ok
+      ? { state: TRUST.VERIFIED, reason: "Detached Ed25519 signature is valid for the published curator key." }
+      : { state: TRUST.TAMPERED, reason: "A signature is present but does NOT match the published key — the fetched copy is rejected." };
+  } catch {
+    return { state: TRUST.UNVERIFIABLE, reason: "Signature verification could not be completed in this browser." };
+  }
+}
+
+const TRUST_UI = {
+  [TRUST.CHECKING]:     { label: "CHECKING…" },
+  [TRUST.UNSIGNED]:     { label: "UNSIGNED" },
+  [TRUST.VERIFIED]:     { label: "VERIFIED" },
+  [TRUST.TAMPERED]:     { label: "TAMPERED" },
+  [TRUST.UNVERIFIABLE]: { label: "UNVERIFIED" },
+};
+
+/* Render the honest index-signature banner. Defaults to UNSIGNED when no
+   trust has been resolved yet — never implies a signature we don't have. */
+function renderTrustBanner() {
+  const b = el.trustBanner;
+  if (!b) return;
+  const t = (CATALOG_META && CATALOG_META.trust) ||
+    { state: TRUST.UNSIGNED, reason: "No catalog signing key is published yet — this index is an unsigned scaffold." };
+  const ui = TRUST_UI[t.state] || TRUST_UI[TRUST.UNSIGNED];
+  b.dataset.trust = t.state;
+  b.innerHTML = "";
+  const dot = document.createElement("span"); dot.className = "tb-dot"; dot.setAttribute("aria-hidden", "true");
+  const k = document.createElement("span"); k.className = "tb-k"; k.textContent = "catalog signature";
+  const v = document.createElement("span"); v.className = "tb-v"; v.textContent = ui.label;
+  const why = document.createElement("span"); why.className = "tb-why"; why.textContent = t.reason || "";
+  b.append(dot, k, v, why);
+  b.title = "In-page Ed25519 detached-signature check over catalog.json (see SIGNING.md). " + (t.reason || "");
+}
+
+/* ============================================================
+   MULTI-REPO — Depot client (docs/store-fdroid/01-architecture.md §2-3).
+   The Store becomes a client that holds a LIST of repos — the first-party
+   catalog above (unchanged, CSP-hash-pinned) plus N user-added third-party
+   repos — and verifies each independently against ITS OWN pinned key,
+   never a single hardcoded one. Same VERIFIED/TAMPERED/UNSIGNED/UNVERIFIABLE
+   posture as resolveCatalogTrust() above, generalized per repo, plus two
+   states that only apply to a pinned (not embedded) repo: ROTATION_PENDING
+   and UNREACHABLE (this page's CSP or the network simply couldn't be
+   reached — never conflated with "no signature published").
+
+   KEY ROTATION (red-team fix #5): a repo whose index verifies against a
+   DIFFERENT key than the one this client has pinned for it is TAMPERED —
+   full stop, no dialog, no "click to trust the new key". The ONLY path to
+   ROTATION_PENDING is a repo.key_rotation block whose transition_signature_b64
+   verifies against the OLD (already pinned) key over the exact
+   (repo_id, old_key, new_key, timestamp) tuple. That is the one and only
+   thing distinguishing a legitimate rotation from a phishing prompt: a
+   forged "your key changed, continue?" dialog is trivial for an attacker
+   who controls the served index to produce, but forging a signature under
+   a key they don't hold is not. Even a verified rotation is never
+   auto-adopted — it stages a re-pin the user must explicitly accept — but
+   an UNVERIFIED one is never even offered as a choice.
+   ============================================================ */
+const REPO_TRUST = Object.freeze({
+  CHECKING:         "checking",
+  UNSIGNED:         "unsigned",
+  VERIFIED:         "verified",
+  TAMPERED:         "tampered",
+  UNVERIFIABLE:     "unverifiable",
+  ROTATION_PENDING: "rotation_pending",  // valid old-key-signed transition found; awaiting explicit user accept
+  UNREACHABLE:      "unreachable",       // fetch failed — offline, origin down, or blocked by this page's CSP
+});
+const REPO_TRUST_UI = {
+  [REPO_TRUST.CHECKING]:         "CHECKING…",
+  [REPO_TRUST.UNSIGNED]:         "UNSIGNED",
+  [REPO_TRUST.VERIFIED]:         "VERIFIED",
+  [REPO_TRUST.TAMPERED]:         "TAMPERED",
+  [REPO_TRUST.UNVERIFIABLE]:     "UNVERIFIED",
+  [REPO_TRUST.ROTATION_PENDING]: "KEY ROTATION — confirm",
+  [REPO_TRUST.UNREACHABLE]:      "UNREACHABLE",
+};
+
+/* Canonical, fixed-order transition message — never JSON.stringify(obj),
+   whose key order is not a cross-implementation guarantee. Both the repo
+   operator's signer and this verifier must byte-for-byte agree on what was
+   signed. */
+function rotationTransitionMessage(repoId, oldPubkeyB64, newPubkeyB64, timestamp) {
+  return new TextEncoder().encode(
+    "postern-repo-key-rotation/v1\n" + repoId + "\n" + oldPubkeyB64 + "\n" + newPubkeyB64 + "\n" + timestamp
+  );
+}
+
+/* Returns { ok:false, reason } for every case EXCEPT a fully-verified,
+   old-key-signed transition statement — the default is always rejection.
+   Never throws: a malformed key_rotation block is a REJECTED rotation, not
+   an exception that could skip past the caller's TAMPERED branch. */
+async function verifyKeyRotation(repo, parsedIndex) {
+  const kr = parsedIndex && parsedIndex.repo && parsedIndex.repo.key_rotation;
+  if (!kr || typeof kr !== "object") {
+    return { ok: false, reason: "No repo.key_rotation transition statement was published alongside the new signature — an unexplained key change is never adopted, ever." };
+  }
+  const newKeyB64 = kr.new_pubkey_b64, sigB64 = kr.transition_signature_b64, ts = kr.timestamp, oldKeyB64 = kr.old_pubkey_b64;
+  if (!newKeyB64 || !sigB64 || typeof ts !== "number") {
+    return { ok: false, reason: "repo.key_rotation is missing new_pubkey_b64, transition_signature_b64, or a numeric timestamp — an incomplete rotation statement is rejected exactly like a missing one." };
+  }
+  if (oldKeyB64 && oldKeyB64 !== repo.pubkey_b64) {
+    return { ok: false, reason: "repo.key_rotation.old_pubkey_b64 does not match the key this client actually has pinned for this repo — rejected." };
+  }
+  if (!(await ed25519Available())) {
+    return { ok: false, reason: "This browser cannot verify Ed25519, so it cannot check the transition statement either — a rotation is never accepted on faith." };
+  }
+  let sigBytes, newKeyBytes;
+  try { sigBytes = b64ToBytes(sigB64); newKeyBytes = b64ToBytes(newKeyB64); }
+  catch { return { ok: false, reason: "transition_signature_b64 or new_pubkey_b64 is not valid base64 — rejected." }; }
+  if (sigBytes.length !== 64 || newKeyBytes.length !== 32) {
+    return { ok: false, reason: "transition_signature_b64 must be a raw 64-byte Ed25519 signature and new_pubkey_b64 a raw 32-byte key — rejected." };
+  }
+  const msg = rotationTransitionMessage(repo.repo_id, repo.pubkey_b64, newKeyB64, ts);
+  let validOldSig = false;
+  try { validOldSig = await ed25519Verify(b64ToBytes(repo.pubkey_b64), sigBytes, msg); } catch { validOldSig = false; }
+  if (!validOldSig) {
+    return { ok: false, reason: "The transition statement's signature does NOT verify against the OLD key already pinned for this repo — this is not a legitimate rotation, regardless of what the new index claims." };
+  }
+  return {
+    ok: true,
+    newPubkeyB64: newKeyB64,
+    reason: "A transition statement signed by the OLD pinned key vouches for this new key — cryptographically legitimate rotation candidate. Still requires your explicit confirmation before this client re-pins.",
+  };
+}
+
+/* The per-repo generalization of resolveCatalogTrust() above: same
+   never-throws, degrade-honestly contract, pinned key is repo.pubkey_b64
+   instead of the hardcoded CATALOG_PUBKEY_B64. */
+async function resolveRepoTrust(repo, indexBytes, sigBytes) {
+  if (!repo.pubkey_b64) {
+    return { state: REPO_TRUST.UNSIGNED, reason: "No key pinned for this repo yet — nothing to verify a signature against (TOFU candidate)." };
+  }
+  if (!sigBytes || sigBytes.length !== 64) {
+    return { state: REPO_TRUST.UNSIGNED, reason: "No detached signature is published alongside this repo's index (expected at <url>.sig), or it is not exactly 64 raw bytes." };
+  }
+  if (!(await ed25519Available())) {
+    return { state: REPO_TRUST.UNVERIFIABLE, reason: "This browser's WebCrypto has no Ed25519 — this repo's signature cannot be checked here." };
+  }
+  let pinnedKeyBytes;
+  try { pinnedKeyBytes = b64ToBytes(repo.pubkey_b64); }
+  catch { return { state: REPO_TRUST.TAMPERED, reason: "This repo's pinned key is not valid base64 — treated as an unverifiable pin, not silently ignored." }; }
+
+  let ok = false;
+  try { ok = await ed25519Verify(pinnedKeyBytes, sigBytes, indexBytes); } catch { ok = false; }
+
+  let parsed = null;
+  try { parsed = JSON.parse(new TextDecoder().decode(indexBytes)); } catch { /* handled per-branch below */ }
+
+  if (ok) {
+    if (!parsed) return { state: REPO_TRUST.TAMPERED, reason: "Signature verified, but the bytes are not valid JSON — treated as tampered/corrupt, rejected." };
+    return { state: REPO_TRUST.VERIFIED, reason: "Detached Ed25519 signature is valid for this repo's pinned key.", index: parsed };
+  }
+
+  // Signature is invalid for the pinned key. Before declaring TAMPERED,
+  // check for a MANDATORY, cryptographically-verified rotation (fix #5) —
+  // this is the ONLY branch that can ever soften a signature-mismatch
+  // verdict, and it requires actual proof, not a prompt.
+  if (!parsed) {
+    return { state: REPO_TRUST.TAMPERED, reason: "Signature is invalid for the pinned key, and the bytes aren't even valid JSON to check for a rotation statement — rejected outright." };
+  }
+  const rotation = await verifyKeyRotation(repo, parsed);
+  if (!rotation.ok) {
+    return {
+      state: REPO_TRUST.TAMPERED,
+      reason: "Signature is present but does NOT verify against this repo's pinned key. " + rotation.reason + " The fetched copy is rejected — this is never offered as a click-through \"trust the new key\" prompt.",
+    };
+  }
+  let okNew = false;
+  try { okNew = await ed25519Verify(b64ToBytes(rotation.newPubkeyB64), sigBytes, indexBytes); } catch { okNew = false; }
+  if (!okNew) {
+    return { state: REPO_TRUST.TAMPERED, reason: "A validly old-key-signed transition statement was found, but the index's own signature still does not verify against the announced new key — rejected." };
+  }
+  return { state: REPO_TRUST.ROTATION_PENDING, reason: rotation.reason, newPubkeyB64: rotation.newPubkeyB64, index: parsed };
+}
+/* ===== end pure repo-trust logic (extracted verbatim by test-repo-trust.mjs) ===== */
+
+const LS_REPOS = "posternstore.repos.v1";
+function repoCacheKey(repoId) { return "posternstore.repocache." + repoId; }
+
+const repoStore = {
+  load() { try { return JSON.parse(localStorage.getItem(LS_REPOS) || "[]"); } catch { return []; } },
+  save(list) { try { localStorage.setItem(LS_REPOS, JSON.stringify(list)); } catch { /* storage full/blocked — in-memory state still works this session */ } },
+};
+
+function slugify(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "").slice(0, 40) || "repo";
+}
+function uniqueRepoId(label, url, existing) {
+  const base = slugify(label) || slugify(url);
+  let id = base, n = 2;
+  const ids = new Set(existing.map(r => r.repo_id));
+  while (ids.has(id)) { id = base + "-" + n; n++; }
+  return id;
+}
+/* Repo-scoped id — an app id from repo X never collides with the same id
+   from repo Y or from the first-party catalog (which uses bare ids). */
+function scopedId(repoId, appId) { return repoId + "::" + appId; }
+
+/* REPO_STATUS is transient (session-only) — the last-known VERDICT is what
+   persists (repo.last_state/last_reason below), but a pending rotation's
+   candidate key is never written to localStorage un-accepted: re-opening
+   the Store always re-derives it fresh from a live fetch+verify, never
+   from a stale cached "click to accept" left over from a previous tab. */
+const REPO_STATUS = new Map();
+const REPO_APP_IDS = new Map();
+
+function getRepoRecord(repoId) { return repoStore.load().find(r => r.repo_id === repoId) || null; }
+function updateRepoRecord(repoId, patch) {
+  const list = repoStore.load();
+  const i = list.findIndex(r => r.repo_id === repoId);
+  if (i === -1) return;
+  list[i] = { ...list[i], ...patch };
+  repoStore.save(list);
+}
+
+function updateRepoStatus(repoId, status) {
+  REPO_STATUS.set(repoId, { ...status, checkedAt: Date.now() });
+  updateRepoRecord(repoId, {
+    last_state: status.state,
+    last_reason: status.reason || "",
+    last_verified_at: status.state === REPO_TRUST.VERIFIED ? Date.now() : getRepoRecord(repoId)?.last_verified_at ?? null,
+  });
+  renderRepoList();
+  renderRepoCountDot();
+}
+
+/* honesty invariants (normalizeEntry) run IDENTICALLY on every repo's
+   entries, first-party or third-party — a third-party repo cannot opt out
+   by writing different JSON (01-architecture.md §3). */
+function mergeRepoApps(repo, parsedIndex) {
+  retractRepoApps(repo.repo_id);
+  const rawApps = Array.isArray(parsedIndex && parsedIndex.apps) ? parsedIndex.apps : [];
+  const scopedIds = [];
+  for (const raw of rawApps) {
+    if (!raw || !raw.id) continue;
+    let entry;
+    try { entry = normalizeEntry(raw); } catch { continue; } // one bad entry never breaks the merge
+    const bareId = entry.id;
+    const collidesFirstParty = CATALOG.some(c => !c.sourceRepo && c.id === bareId);
+    entry.id = scopedId(repo.repo_id, bareId);
+    entry.sourceRepo = { repoId: repo.repo_id, label: repo.label || repo.repo_id, state: REPO_TRUST.VERIFIED };
+    if (collidesFirstParty) {
+      entry.crossRef = "also listed by Postern Store's first-party catalog — not verified by this repo, never shadows that entry.";
+    }
+    CATALOG.push(entry);
+    scopedIds.push(entry.id);
+  }
+  REPO_APP_IDS.set(repo.repo_id, scopedIds);
+}
+function retractRepoApps(repoId) {
+  const ids = REPO_APP_IDS.get(repoId);
+  if (!ids || !ids.length) { REPO_APP_IDS.delete(repoId); return; }
+  const idSet = new Set(ids);
+  CATALOG = CATALOG.filter(e => !idSet.has(e.id));
+  REPO_APP_IDS.delete(repoId);
+}
+
+function cacheVerifiedIndex(repoId, parsedIndex) {
+  try { localStorage.setItem(repoCacheKey(repoId), JSON.stringify({ index: parsedIndex, cachedAt: Date.now() })); } catch { /* best effort only */ }
+}
+function loadCachedIndex(repoId) {
+  try { return JSON.parse(localStorage.getItem(repoCacheKey(repoId)) || "null"); } catch { return null; }
+}
+
+/* Fetch + verify one repo, then adopt/retract/cache per the resolved
+   state. Never throws — every branch degrades to an honest status. */
+async function fetchAndVerifyRepo(repo) {
+  updateRepoStatus(repo.repo_id, { state: REPO_TRUST.CHECKING, reason: "Fetching…" });
+
+  let indexBytes;
+  try {
+    const res = await fetch(repo.url, { cache: "no-cache" });
+    if (!res.ok) throw new Error("http " + res.status);
+    indexBytes = new TextEncoder().encode(await res.text());
+  } catch {
+    const cached = loadCachedIndex(repo.repo_id);
+    if (cached && cached.index) {
+      mergeRepoApps(repo, cached.index);
+      applySearch(state.filters, { silent: true });
+    } else {
+      retractRepoApps(repo.repo_id);
+      applySearch(state.filters, { silent: true });
+    }
+    updateRepoStatus(repo.repo_id, {
+      state: REPO_TRUST.UNREACHABLE,
+      reason: "Could not fetch this repo's index — offline, the origin is down, or this page's CSP connect-src doesn't allow this origin yet (a third-party origin must be added to connect-src at deploy time; see the CSP comment at the top of this file's source). " +
+        (cached ? "Showing the last locally-cached VERIFIED snapshot instead." : "No cached snapshot exists — this repo currently contributes zero apps."),
+    });
+    return;
+  }
+
+  let sigBytes = null;
+  try {
+    const sigRes = await fetch(repo.url + ".sig", { cache: "no-cache" });
+    if (sigRes.ok) sigBytes = new Uint8Array(await sigRes.arrayBuffer());
+  } catch { /* no signature reachable — resolveRepoTrust treats this as UNSIGNED, not UNREACHABLE, since the index itself DID load */ }
+
+  const result = await resolveRepoTrust(repo, indexBytes, sigBytes);
+
+  if (result.state === REPO_TRUST.VERIFIED) {
+    mergeRepoApps(repo, result.index);
+    cacheVerifiedIndex(repo.repo_id, result.index);
+    applySearch(state.filters, { silent: true });
+  } else if (result.state === REPO_TRUST.ROTATION_PENDING) {
+    // Never adopted automatically — the previous cached-verified snapshot
+    // (if any) keeps standing until the user explicitly accepts the rotation.
+    const cached = loadCachedIndex(repo.repo_id);
+    if (cached && cached.index) mergeRepoApps(repo, cached.index); else retractRepoApps(repo.repo_id);
+    applySearch(state.filters, { silent: true });
+  } else {
+    // TAMPERED / UNSIGNED / UNVERIFIABLE — fall back to the last cached
+    // VERIFIED snapshot if one exists; otherwise this repo contributes zero
+    // apps. Never silently drop the repo from the pinned list either way.
+    const cached = loadCachedIndex(repo.repo_id);
+    if (result.state === REPO_TRUST.TAMPERED && cached && cached.index) {
+      mergeRepoApps(repo, cached.index);
+      for (const id of (REPO_APP_IDS.get(repo.repo_id) || [])) {
+        const e = CATALOG.find(x => x.id === id);
+        if (e) e.sourceRepo.state = REPO_TRUST.TAMPERED; // badge still reads red — this is a STALE fallback, not a fresh verdict
+      }
+    } else {
+      retractRepoApps(repo.repo_id);
+    }
+    applySearch(state.filters, { silent: true });
+  }
+
+  updateRepoStatus(repo.repo_id, result);
+}
+
+function addRepo() {
+  el.repoAddError.textContent = "";
+  const label = el.repoLabel.value.trim();
+  const url = el.repoUrl.value.trim();
+  const keyRaw = el.repoKey.value.trim();
+
+  if (!url) { el.repoAddError.textContent = "Index URL is required."; return; }
+  if (!/^https:\/\//i.test(url) && !/^\.?\//.test(url)) {
+    el.repoAddError.textContent = "URL must be https:// (or a same-origin relative path for local testing).";
+    return;
+  }
+  let keyBytes;
+  try { keyBytes = b64ToBytes(keyRaw); } catch { el.repoAddError.textContent = "Pinned key must be valid base64."; return; }
+  if (keyBytes.length !== 32) { el.repoAddError.textContent = "Pinned key must decode to exactly 32 raw bytes (an Ed25519 public key)."; return; }
+
+  const existing = repoStore.load();
+  if (existing.some(r => r.url === url)) { el.repoAddError.textContent = "This URL is already pinned as a repo."; return; }
+
+  const repo = {
+    repo_id: uniqueRepoId(label, url, existing),
+    url, label: label || url,
+    pubkey_b64: keyRaw,
+    priority: existing.length + 1,
+    added_at: Date.now(),
+    tofu_at: Date.now(),   // this pin was accepted via Trust On First Use — surfaced permanently in the row, never a one-time toast
+    enabled: true,
+    key_history: [],
+    last_state: null, last_reason: null, last_verified_at: null,
+  };
+  existing.push(repo);
+  repoStore.save(existing);
+  el.repoLabel.value = ""; el.repoUrl.value = ""; el.repoKey.value = "";
+  renderRepoList();
+  fetchAndVerifyRepo(repo);
+}
+
+function removeRepo(repoId) {
+  retractRepoApps(repoId);
+  applySearch(state.filters, { silent: true });
+  repoStore.save(repoStore.load().filter(r => r.repo_id !== repoId));
+  try { localStorage.removeItem(repoCacheKey(repoId)); } catch { /* best effort */ }
+  REPO_STATUS.delete(repoId);
+  renderRepoList();
+  renderRepoCountDot();
+}
+
+function toggleRepoEnabled(repoId) {
+  const repo = getRepoRecord(repoId);
+  if (!repo) return;
+  updateRepoRecord(repoId, { enabled: !repo.enabled });
+  if (!repo.enabled) {
+    fetchAndVerifyRepo(getRepoRecord(repoId)); // was disabled, now enabling — fetch fresh
+  } else {
+    retractRepoApps(repoId);                    // was enabled, now disabling — drop its apps immediately
+    applySearch(state.filters, { silent: true });
+    REPO_STATUS.delete(repoId);
+    renderRepoList();
+  }
+}
+
+/* Re-pin ONLY reachable via a status that already passed verifyKeyRotation
+   (REPO_STATUS.state === ROTATION_PENDING carries a cryptographically
+   checked newPubkeyB64 — see resolveRepoTrust). There is no path that lets
+   a caller supply an arbitrary "new key" here; accepting just adopts the
+   one this session already proved was transitioned-to by the old key. */
+function acceptRotation(repoId) {
+  const status = REPO_STATUS.get(repoId);
+  const repo = getRepoRecord(repoId);
+  if (!repo || !status || status.state !== REPO_TRUST.ROTATION_PENDING || !status.newPubkeyB64) return;
+  const history = Array.isArray(repo.key_history) ? repo.key_history : [];
+  history.push({ old_pubkey_b64: repo.pubkey_b64, new_pubkey_b64: status.newPubkeyB64, adopted_at: Date.now(), transition_verified: true });
+  updateRepoRecord(repoId, { pubkey_b64: status.newPubkeyB64, key_history: history });
+  REPO_STATUS.delete(repoId);
+  fetchAndVerifyRepo(getRepoRecord(repoId));
+}
+function rejectRotation(repoId) {
+  updateRepoStatus(repoId, { state: REPO_TRUST.TAMPERED, reason: "You declined the proposed key rotation. This repo stays pinned to its original key and will read TAMPERED until it is signed with that key again, or a new rotation is accepted." });
+}
+
+function renderRepoCountDot() {
+  if (!el.repoCountDot) return;
+  const bad = repoStore.load().some(r => {
+    const s = REPO_STATUS.get(r.repo_id);
+    return r.enabled && s && (s.state === REPO_TRUST.TAMPERED || s.state === REPO_TRUST.ROTATION_PENDING);
+  });
+  el.repoCountDot.dataset.alert = bad ? "1" : "0";
+}
+
+function renderRepoList() {
+  if (!el.repoList) return;
+  const repos = repoStore.load();
+  el.repoListEmpty.style.display = repos.length ? "none" : "";
+  el.repoList.innerHTML = "";
+  for (const repo of repos) {
+    const status = REPO_STATUS.get(repo.repo_id) || { state: repo.last_state || REPO_TRUST.CHECKING, reason: repo.last_reason || "Not checked yet this session." };
+    const row = document.createElement("div");
+    row.className = "repo-row";
+
+    const head = document.createElement("div"); head.className = "repo-row-head";
+    const name = document.createElement("span"); name.className = "rname"; name.textContent = repo.label;
+    const badge = document.createElement("span"); badge.className = "badge repo"; badge.dataset.trust = status.state;
+    badge.textContent = REPO_TRUST_UI[status.state] || status.state;
+    head.append(name, badge);
+    if (!repo.enabled) { const off = document.createElement("span"); off.className = "badge"; off.textContent = "disabled"; head.appendChild(off); }
+    row.appendChild(head);
+
+    const url = document.createElement("div"); url.className = "rurl"; url.textContent = repo.url;
+    row.appendChild(url);
+
+    const reason = document.createElement("p"); reason.className = "repo-reason"; reason.textContent = status.reason || "";
+    row.appendChild(reason);
+
+    const meta = document.createElement("div"); meta.className = "repo-meta";
+    const tofuDate = new Date(repo.tofu_at || repo.added_at).toLocaleDateString();
+    meta.textContent = "Pinned via TOFU on " + tofuDate + " · key " + (repo.pubkey_b64 || "").slice(0, 8) + "…" +
+      (Array.isArray(repo.key_history) && repo.key_history.length ? " · rotated " + repo.key_history.length + "×" : "");
+    row.appendChild(meta);
+
+    if (status.state === REPO_TRUST.ROTATION_PENDING) {
+      const rb = document.createElement("div"); rb.className = "rotation-box";
+      rb.innerHTML = "";
+      const p1 = document.createElement("p"); p1.style.margin = "0 0 8px";
+      p1.innerHTML = "<b>This repo's index is now signed by a different key.</b> It also published a transition statement, verified above to be signed by the OLD key you already trust — this is a cryptographically legitimate rotation, not merely an announcement.";
+      rb.appendChild(p1);
+      const actions = document.createElement("div"); actions.className = "repo-actions";
+      const accept = document.createElement("button"); accept.className = "hbtn"; accept.textContent = "Accept new key & re-pin";
+      accept.onclick = () => acceptRotation(repo.repo_id);
+      const reject = document.createElement("button"); reject.className = "hbtn"; reject.textContent = "Reject (keep old pin)";
+      reject.onclick = () => rejectRotation(repo.repo_id);
+      actions.append(accept, reject);
+      rb.appendChild(actions);
+      row.appendChild(rb);
+    }
+
+    const actions = document.createElement("div"); actions.className = "repo-actions";
+    const retry = document.createElement("button"); retry.className = "hbtn"; retry.textContent = "Re-check now";
+    retry.onclick = () => fetchAndVerifyRepo(getRepoRecord(repo.repo_id));
+    const toggle = document.createElement("button"); toggle.className = "hbtn"; toggle.textContent = repo.enabled ? "Disable" : "Enable";
+    toggle.onclick = () => toggleRepoEnabled(repo.repo_id);
+    const remove = document.createElement("button"); remove.className = "hbtn"; remove.textContent = "Remove";
+    remove.onclick = () => { if (confirm("Remove \"" + repo.label + "\" and drop its apps from the catalog?")) removeRepo(repo.repo_id); };
+    actions.append(retry, toggle, remove);
+    row.appendChild(actions);
+
+    el.repoList.appendChild(row);
+  }
+}
+
+function bootRepos() {
+  renderRepoList();
+  renderRepoCountDot();
+  for (const repo of repoStore.load()) {
+    if (repo.enabled) fetchAndVerifyRepo(repo);
+  }
+}
+
+/* ============================================================
+   THE PARAMETERIZED SEARCH — one deterministic local engine.
+   Voice, text (via the concierge's tool call) and the manual
+   filter panel all end up in applySearch(filters).
+   ============================================================ */
+const EMPTY_FILTERS = () => ({
+  query_text: "", category: "", capabilities: [],
+  privacy_level: "", platform: "",
+  source: "", tier: "", license_class: "", distribution: "",
+  security_features: [],
+});
+
+let state = {
+  filters: EMPTY_FILTERS(),
+  results: [],          // last computed [{entry, fit, why}]
+  compare: [],          // selected ids for comparison
+};
+
+const STOPWORDS = new Set(("i,me,my,we,our,you,your,need,needs,want,wants,wanted,looking,for,a,an,the,to,of,in,on,with,without,and,or,but,is,are,be,that,this,it,app,apps,something,some,way,tool,please,find,show,me,can,could,do,does,how,what,which,get,use,using,one,ones,only,all,any,no,not,like").split(","));
+
+function tokenize(text) {
+  return String(text || "").toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")   /* hyphens split too: "post-quantum" ⇒ "post","quantum" */
+    .split(/[\s]+/)
+    .filter(w => w.length > 2 && !STOPWORDS.has(w))
+    .map(w => w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w);
+}
+
+function normalizeFilters(raw) {
+  const f = EMPTY_FILTERS();
+  if (!raw || typeof raw !== "object") return f;
+  if (typeof raw.query_text === "string") f.query_text = raw.query_text.slice(0, 200);
+  if (typeof raw.category === "string" && CATEGORIES[raw.category]) f.category = raw.category;
+  if (Array.isArray(raw.capabilities)) f.capabilities = raw.capabilities.filter(c => typeof c === "string").slice(0, 6);
+  if (["local-only", "e2e", "metadata-exposed"].includes(raw.privacy_level)) f.privacy_level = raw.privacy_level === "metadata-exposed" ? "" : raw.privacy_level;
+  if (["mobile", "desktop", "both"].includes(raw.platform)) f.platform = raw.platform;
+  if (SOURCE_LABELS[raw.source]) f.source = raw.source;
+  if (TIER_LABELS[raw.tier]) f.tier = raw.tier;
+  if (["foss", "permissive", "no-copyleft"].includes(raw.license_class)) f.license_class = raw.license_class;
+  if (["hosted", "link-proxy", "attestable"].includes(raw.distribution)) f.distribution = raw.distribution;
+  if (Array.isArray(raw.security_features)) f.security_features = raw.security_features.filter(s => SECURITY_LABELS[s]).slice(0, 5);
+  return f;
+}
+
+/* The deterministic ranker. Returns [{entry, fit, why}] sorted by fit desc, name asc. */
+function searchCatalog(filters) {
+  const f = filters;
+  const qTokens = tokenize(f.query_text);
+  const capTokens = tokenize((f.capabilities || []).join(" "));
+  const out = [];
+
+  for (const e of CATALOG) {
+    const why = [];
+
+    /* -------- hard filters -------- */
+    if (f.category && e.category !== f.category) continue;
+    if (f.source && e.source !== f.source) continue;
+    if (f.tier && e.tier !== f.tier) continue;
+    if (f.platform) {
+      const ok = f.platform === "both" ? e.platform === "both"
+               : (e.platform === f.platform || e.platform === "both");
+      if (!ok) continue;
+    }
+    if (f.privacy_level && PRIVACY_RANK[e.privacy.level] < PRIVACY_RANK[f.privacy_level]) continue;
+    if (f.license_class) {
+      if (f.license_class === "foss" && !e.license.foss) continue;
+      if (f.license_class === "permissive" && e.license.class !== "permissive") continue;
+      if (f.license_class === "no-copyleft" && (e.license.class === "strong-copyleft" || e.license.class === "weak-copyleft")) continue;
+    }
+    if (f.distribution) {
+      if (f.distribution === "hosted" && !e.dist.hostedByUs) continue;
+      if (f.distribution === "link-proxy" && e.dist.hostedByUs) continue;
+      if (f.distribution === "attestable" && e.tier !== "attestable-nix") continue;
+    }
+    if (f.security_features.length) {
+      if (!f.security_features.every(s => e.security.includes(s))) continue;
+      why.push(f.security_features.map(s => SECURITY_LABELS[s] + " ✓").join(" · "));
+    }
+
+    if (f.category) why.push("category: " + CATEGORIES[e.category]);
+    if (f.source) why.push("source: " + SOURCE_LABELS[e.source]);
+    if (f.tier) why.push("tier: " + TIER_LABELS[e.tier]);
+    if (f.license_class) why.push("license " + e.license.spdx + " (" + LICENSE_CLASS_LABELS[e.license.class] + ")");
+    if (f.distribution) why.push(e.dist.hostedByUs ? "hosted by us: " + DIST_LABELS[e.dist.model] : "not hosted: " + DIST_LABELS[e.dist.model]);
+    if (f.privacy_level) why.push("privacy: " + PRIVACY_LABELS[e.privacy.level]);
+    if (f.platform) why.push("platform: " + e.platform);
+
+    /* -------- soft text relevance -------- */
+    const hay = {
+      name: tokenize(e.name), one: tokenize(e.oneliner),
+      caps: tokenize(e.capabilities.join(" ")), tags: tokenize(e.tags.join(" ")),
+      cat: tokenize(CATEGORIES[e.category]),
+    };
+    const W = { name: 6, caps: 5, tags: 4, one: 3, cat: 2 };
+    let text = 0;
+    const hitWords = new Set();
+    const allTokens = [...new Set([...qTokens, ...capTokens])];
+    for (const t of allTokens) {
+      for (const [field, words] of Object.entries(hay)) {
+        if (words.includes(t)) { text += W[field]; hitWords.add(t); break; }
+      }
+    }
+    /* if capabilities were requested, require at least one capability-token hit */
+    if (capTokens.length && !capTokens.some(t => hitWords.has(t))) continue;
+    /* if there is query text but zero relevance AND no other filters, drop it */
+    const hasHardFilters = !!(f.category || f.source || f.tier || f.platform || f.privacy_level || f.security_features.length || f.license_class || f.distribution);
+    if (allTokens.length && text === 0 && !hasHardFilters) continue;
+
+    if (hitWords.size) why.unshift("matched " + [...hitWords].slice(0, 4).map(w => "“" + w + "”").join(", "));
+
+    /* -------- fit score -------- */
+    let fit;
+    if (allTokens.length && text === 0) {
+      /* kept only because it passes the hard filters — say so, rank low */
+      fit = 25;
+      why.push("passes every filter, but no keyword match");
+    } else {
+      const maxText = Math.max(1, allTokens.length * 6);
+      fit = Math.round(Math.min(100, 40 + (allTokens.length ? (text / maxText) * 60 : (hasHardFilters ? 45 : 20))));
+    }
+    out.push({ entry: e, fit, why: why.slice(0, 4) });
+  }
+
+  out.sort((a, b) => b.fit - a.fit || a.entry.name.localeCompare(b.entry.name));
+  return out;
+}
+
+/* Apply + render — the single funnel for ALL three input paths. */
+function applySearch(filters, opts = {}) {
+  state.filters = filters;
+  state.results = searchCatalog(filters);
+  renderChips();
+  syncFilterPanel();
+  renderResults();
+  if (!opts.silent) {
+    const n = state.results.length;
+    el.resultCount.textContent = describeFilters(filters) ? `${n} match${n === 1 ? "" : "es"}` : `${n} apps`;
+  }
+  return state.results;
+}
+
+function describeFilters(f) {
+  return !!(f.query_text || f.category || f.capabilities.length || f.privacy_level ||
+            f.source || f.tier || f.license_class || f.distribution ||
+            f.platform || f.security_features.length);
+}
+
+/* ============================================================
+   Elements
+   ============================================================ */
+const el = {
+  body: document.body,
+  status: $("#statusLine"),
+  composer: $("#composer"),
+  input: $("#needInput"),
+  btnMic: $("#btnMic"),
+  btnSend: $("#btnSend"),
+  btnMute: $("#btnMute"),
+  spkWaves: $("#spkWaves"),
+  spkSlash: $("#spkSlash"),
+  chips: $("#chips"),
+  chipRow: $("#chipRow"),
+  btnFilters: $("#btnFilters"),
+  btnClear: $("#btnClear"),
+  filterPanel: $("#filterPanel"),
+  fKeywords: $("#fKeywords"),
+  fCategory: $("#fCategory"),
+  fSource: $("#fSource"),
+  fTier: $("#fTier"),
+  fDist: $("#fDist"),
+  fPrivacy: $("#fPrivacy"),
+  fLicense: $("#fLicense"),
+  fPlatform: $("#fPlatform"),
+  fSecurity: $("#fSecurity"),
+  narration: $("#narration"),
+  narrationText: $("#narrationText"),
+  results: $("#results"),
+  resultCount: $("#resultCount"),
+  trustBanner: $("#trustBanner"),
+  compareBar: $("#compareBar"),
+  compareNames: $("#compareNames"),
+  btnCompareClear: $("#btnCompareClear"),
+  btnCompareOpen: $("#btnCompareOpen"),
+  dlgDetail: $("#dlgDetail"),
+  detailTitle: $("#detailTitle"),
+  detailBody: $("#detailBody"),
+  dlgCompare: $("#dlgCompare"),
+  compareBody: $("#compareBody"),
+  dlgSettings: $("#dlgSettings"),
+  dlgPrivacy: $("#dlgPrivacy"),
+  apiKey: $("#apiKey"),
+  btnShowKey: $("#btnShowKey"),
+  keyPass: $("#keyPass"),
+  btnKeyLock: $("#btnKeyLock"),
+  keyLockState: $("#keyLockState"),
+  keyLockHelp: $("#keyLockHelp"),
+  modelSel: $("#modelSel"),
+  voiceSel: $("#voiceSel"),
+  rate: $("#rate"),
+  rateVal: $("#rateVal"),
+  sttWeb: $("#sttWeb"),
+  sttLocal: $("#sttLocal"),
+  btnErase: $("#btnErase"),
+  btnSettings: $("#btnSettings"),
+  btnPrivacy: $("#btnPrivacy"),
+  btnRepos: $("#btnRepos"),
+  repoCountDot: $("#repoCountDot"),
+  dlgRepos: $("#dlgRepos"),
+  repoLabel: $("#repoLabel"),
+  repoUrl: $("#repoUrl"),
+  repoKey: $("#repoKey"),
+  repoAddError: $("#repoAddError"),
+  btnRepoAdd: $("#btnRepoAdd"),
+  repoList: $("#repoList"),
+  repoListEmpty: $("#repoListEmpty"),
+  btnTheme: $("#btnTheme"),
+  modelHint: $("#modelHint"),
+};
+
+/* ============================================================
+   Rendering — chips, results, detail, compare
+   ============================================================ */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function chipDefs(f) {
+  const chips = [];
+  if (f.query_text) chips.push({ k: "keywords", v: f.query_text, del: () => { f.query_text = ""; } });
+  if (f.category) chips.push({ k: "category", v: CATEGORIES[f.category], del: () => { f.category = ""; } });
+  for (const c of f.capabilities) chips.push({ k: "can", v: c, del: () => { f.capabilities = f.capabilities.filter(x => x !== c); } });
+  if (f.source) chips.push({ k: "source", v: SOURCE_LABELS[f.source], del: () => { f.source = ""; } });
+  if (f.tier) chips.push({ k: "tier", v: TIER_LABELS[f.tier], del: () => { f.tier = ""; } });
+  if (f.distribution) chips.push({ k: "dist", v: f.distribution === "hosted" ? "hosted by us" : f.distribution === "link-proxy" ? "link / proxy only" : "attestable only", del: () => { f.distribution = ""; } });
+  if (f.license_class) chips.push({ k: "license", v: f.license_class === "foss" ? "FOSS only" : f.license_class === "permissive" ? "permissive only" : "no copyleft", del: () => { f.license_class = ""; } });
+  if (f.privacy_level) chips.push({ k: "privacy", v: PRIVACY_LABELS[f.privacy_level] + " (min)", del: () => { f.privacy_level = ""; } });
+  if (f.platform) chips.push({ k: "platform", v: f.platform, del: () => { f.platform = ""; } });
+  for (const s of f.security_features) chips.push({ k: "security", v: SECURITY_LABELS[s], del: () => { f.security_features = f.security_features.filter(x => x !== s); } });
+  return chips;
+}
+
+function renderChips() {
+  const chips = chipDefs(state.filters);
+  el.chipRow.innerHTML = "";
+  if (!chips.length) {
+    const none = document.createElement("span");
+    none.className = "none";
+    none.textContent = "no filters yet — everything is listed";
+    el.chipRow.appendChild(none);
+    return;
+  }
+  for (const c of chips) {
+    const span = document.createElement("span");
+    span.className = "fchip";
+    const k = document.createElement("span"); k.className = "fk"; k.textContent = c.k;
+    const v = document.createElement("span"); v.className = "fv"; v.textContent = c.v;
+    const x = document.createElement("button");
+    x.className = "fx"; x.textContent = "✕";
+    x.setAttribute("aria-label", `Remove filter ${c.k}: ${c.v}`);
+    x.onclick = () => { c.del(); applySearch(state.filters); };
+    span.append(k, v, x);
+    el.chipRow.appendChild(span);
+  }
+}
+
+/* The honest badge — reads distribution.hostedByUs + tier + license.class.
+   A proprietary app can only ever show "link/proxy" here (normalizeEntry
+   guarantees hostedByUs=false for it); the attestable badge only appears
+   for tier attestable-nix. */
+function hostingBadge(e) {
+  const b = document.createElement("span");
+  b.className = "badge";
+  const unpub = e.dist.hostedByUs && !e.dist.published ? " · unpublished" : "";
+  if (e.dist.model === "attest") {
+    b.className += " attest";
+    b.textContent = "ATTESTED" + unpub;
+    b.title = "Built from source in the reproducible Postern OS Nix closure. " + e.dist.verify;
+  } else if (e.dist.hostedByUs) {
+    b.className += " hosted";
+    b.textContent = (e.dist.model === "mirror" ? "MIRRORED" : "OVERLAY") + " · SIGNED" + unpub;
+    b.title = "We host a SIGNED apk — proves the publisher, NOT that the binary matches source. Not attestable. " + e.dist.verify;
+  } else {
+    b.className += " linkonly";
+    b.textContent = e.dist.model === "proxy" ? "PROXY ONLY" : "LINK ONLY";
+    b.title = "We host no binary. " + (e.dist.verify || "You install from the upstream source.");
+  }
+  return b;
+}
+/* A card never claims a badge without also showing which repo is vouching
+   for it (01-architecture.md §3, "Merging"). First-party entries have no
+   sourceRepo and render exactly as before — this is purely additive. */
+function repoSourceBadge(e) {
+  if (!e.sourceRepo) return null;
+  const b = document.createElement("span");
+  b.className = "badge repo";
+  b.dataset.trust = e.sourceRepo.state;
+  b.textContent = "via " + e.sourceRepo.label + " · " + (REPO_TRUST_UI[e.sourceRepo.state] || e.sourceRepo.state);
+  b.title = "This entry comes from the third-party repo \"" + e.sourceRepo.label + "\", not Postern's first-party catalog. Its trust state is this repo's own, independently verified.";
+  return b;
+}
+function badgeRow(e) {
+  const div = document.createElement("div");
+  div.className = "badges";
+
+  const rb = repoSourceBadge(e);
+  if (rb) div.appendChild(rb);
+  div.appendChild(hostingBadge(e));
+
+  const tier = document.createElement("span");
+  tier.className = "badge tier";
+  tier.textContent = TIER_LABELS[e.tier];
+  tier.title = "Trust tier · source: " + SOURCE_LABELS[e.source];
+  div.appendChild(tier);
+
+  const lic = document.createElement("span");
+  const proprietary = e.license.class === "proprietary";
+  lic.className = "badge " + (proprietary ? "prop" : "lic");
+  lic.textContent = proprietary ? "PROPRIETARY" : e.license.spdx;
+  lic.title = e.license.spdx + " — " + LICENSE_CLASS_LABELS[e.license.class] + ". " + e.license.note;
+  div.appendChild(lic);
+
+  const pv = document.createElement("span");
+  pv.className = "badge priv-" + (e.privacy.level === "local-only" ? "local" : e.privacy.level === "e2e" ? "e2e" : "meta");
+  pv.textContent = PRIVACY_LABELS[e.privacy.level];
+  pv.title = "Leaves the device: " + e.privacy.leaves;
+  div.appendChild(pv);
+
+  for (const s of e.security) {
+    const b = document.createElement("span");
+    /* "attestable" is a tier INTENT, not an earned property, until the R9
+       artifacts exist (curator key + reproduction + TEE boot). Keep it inert:
+       dashed/muted, an honest suffix, and a tooltip that refuses the claim. */
+    const attestUnearned = (s === "attestable") && !ATTESTATION_EARNED;
+    b.className = attestUnearned ? "badge sec inert" : "badge sec";
+    b.textContent = attestUnearned ? SECURITY_LABELS[s] + " · intent" : SECURITY_LABELS[s];
+    if (attestUnearned) {
+      b.title = "TIER INTENT, not an earned attestation. No curator signing key " +
+        "is published, no two-builder reproduction has matched, and nothing has " +
+        "booted in a TEE. 'attestable-nix' is the design lane — never read this as " +
+        "a verified or attested property.";
+    }
+    div.appendChild(b);
+  }
+  return div;
+}
+
+function renderResults() {
+  el.results.innerHTML = "";
+  const rs = state.results;
+  const n = rs.length;
+  el.resultCount.textContent = describeFilters(state.filters) ? `${n} match${n === 1 ? "" : "es"}` : `${n} apps`;
+  if (!n) {
+    const d = document.createElement("div");
+    d.className = "no-results";
+    d.textContent = "Nothing in the catalog fits every constraint. Loosen a filter chip above — the store won't invent an app to please you.";
+    el.results.appendChild(d);
+    return;
+  }
+  const filtered = describeFilters(state.filters);
+  for (const r of rs) {
+    const e = r.entry;
+    const card = document.createElement("article");
+    card.className = "card";
+    card.setAttribute("aria-label", e.name);
+
+    const top = document.createElement("div"); top.className = "top";
+    const glyph = document.createElement("div"); glyph.className = "glyph"; glyph.textContent = e.glyph; glyph.setAttribute("aria-hidden", "true");
+    const twrap = document.createElement("div");
+    const h3 = document.createElement("h3"); h3.textContent = e.name;
+    const cat = document.createElement("div"); cat.className = "cat"; cat.textContent = e.publisher + " · " + CATEGORIES[e.category] + " · " + e.platform;
+    twrap.append(h3, cat);
+    top.append(glyph, twrap);
+    card.appendChild(top);
+
+    const one = document.createElement("p"); one.className = "one"; one.textContent = e.oneliner;
+    card.appendChild(one);
+    card.appendChild(badgeRow(e));
+    if (e.crossRef) {
+      const cr = document.createElement("p"); cr.className = "crossref"; cr.textContent = e.crossRef;
+      card.appendChild(cr);
+    }
+
+    if (filtered) {
+      const fr = document.createElement("div"); fr.className = "fitrow";
+      const bar = document.createElement("div"); bar.className = "fitbar";
+      const i = document.createElement("i"); i.style.width = r.fit + "%";
+      bar.appendChild(i);
+      const num = document.createElement("span"); num.className = "fitnum"; num.textContent = "fit " + r.fit;
+      fr.append(bar, num);
+      card.appendChild(fr);
+      if (r.why.length) {
+        const ul = document.createElement("ul"); ul.className = "why";
+        for (const w of r.why) { const li = document.createElement("li"); li.textContent = w; ul.appendChild(li); }
+        card.appendChild(ul);
+      }
+    }
+
+    const actions = document.createElement("div"); actions.className = "actions";
+    const bd = document.createElement("button"); bd.className = "hbtn"; bd.textContent = "Details";
+    bd.onclick = () => openDetail(e.id);
+    const bc = document.createElement("button"); bc.className = "hbtn"; bc.textContent = state.compare.includes(e.id) ? "✓ Comparing" : "+ Compare";
+    bc.setAttribute("aria-pressed", String(state.compare.includes(e.id)));
+    bc.onclick = () => toggleCompare(e.id);
+    actions.append(bd, bc);
+    card.appendChild(actions);
+
+    el.results.appendChild(card);
+  }
+}
+
+function getEntry(id) { return CATALOG.find(e => e.id === id) || null; }
+
+function openDetail(id) {
+  const e = getEntry(id);
+  if (!e) return;
+  el.detailTitle.textContent = e.name;
+  el.detailBody.innerHTML = "";
+
+  const one = document.createElement("p"); one.className = "detail-one"; one.textContent = e.oneliner;
+  el.detailBody.appendChild(one);
+  el.detailBody.appendChild(badgeRow(e));
+  if (e.sourceRepo) {
+    const src = document.createElement("p"); src.className = "repo-reason";
+    src.textContent = "Listed by the third-party repo \"" + e.sourceRepo.label + "\" (state: " +
+      (REPO_TRUST_UI[e.sourceRepo.state] || e.sourceRepo.state) + "), not Postern's first-party catalog. " +
+      "The same honesty invariants (normalizeEntry) were re-run on this entry as on every first-party one, " +
+      "regardless of the repo's signature — a signed claim is still just a claim." +
+      (e.crossRef ? " " + e.crossRef : "");
+    el.detailBody.appendChild(src);
+  }
+
+  const grid = document.createElement("div"); grid.className = "detail-grid"; grid.style.marginTop = "14px";
+  const block = (cls, title, body, isList) => {
+    const d = document.createElement("div"); d.className = "d-block " + (cls || "");
+    const h = document.createElement("h4"); h.textContent = title; d.appendChild(h);
+    if (isList) {
+      const ul = document.createElement("ul"); ul.className = "caps";
+      for (const c of body) { const li = document.createElement("li"); li.textContent = c; ul.appendChild(li); }
+      d.appendChild(ul);
+    } else {
+      const p = document.createElement("p"); p.textContent = body; d.appendChild(p);
+    }
+    return d;
+  };
+  grid.appendChild(block("", "What it can do", e.capabilities, true));
+  grid.appendChild(block("stays", "Stays on your device", e.privacy.stays));
+  grid.appendChild(block("leaves", "Leaves your device", e.privacy.leaves));
+  grid.appendChild(block("limits", "Honest limits", e.limits));
+
+  /* how Postern distributes it — the hosted-vs-link spine, stated plainly */
+  const distText =
+    (e.dist.hostedByUs
+      ? (e.dist.model === "attest"
+          ? "HOSTED & ATTESTED by us — built from source in the reproducible Postern OS Nix closure. "
+          : "HOSTED by us as a SIGNED apk in the pmOS overlay — the signature proves who published it, NOT that the binary matches source; this tier is not attestable. " + (e.dist.published ? "" : "(Not published yet — no checksum/signature exists in this scaffold.) "))
+      : (e.dist.model === "proxy"
+          ? "NOT hosted by us — a proxy: install pulls the upstream binary directly from the vendor; we host no bytes. "
+          : "NOT hosted by us — link only: you install from the upstream source below. ")) +
+    e.dist.verify + (e.dist.upstream ? "  Upstream: " + e.dist.upstream : "") + (e.dist.artifact ? "  Our artifact: " + e.dist.artifact : "");
+  grid.appendChild(block(e.dist.hostedByUs ? "stays" : "leaves", "How we distribute it (" + DIST_LABELS[e.dist.model] + ")", distText));
+
+  const licText =
+    e.license.spdx + " — " + LICENSE_CLASS_LABELS[e.license.class] + (e.license.foss ? " (open source)" : " (closed source)") + ". " +
+    "Redistribute (host the binary as-is): " + (e.license.redistribute ? "allowed" : "NOT allowed") + ". " +
+    "Rebrand (fork under Postern branding): " + (e.license.rebrand ? "allowed" : "NOT allowed") + "." +
+    (e.license.trademark ? " Trademark: the upstream name/logo are protected — a fork must be renamed." : "") +
+    (e.license.note ? "  " + e.license.note : "");
+  grid.appendChild(block(e.license.foss ? "" : "limits", "License · rebrand vs redistribute", licText));
+
+  grid.appendChild(block("", "Source · tier · platform", SOURCE_LABELS[e.source] + " · " + TIER_LABELS[e.tier] + " · " + e.platform + (e.security.length ? " · security: " + e.security.map(s => SECURITY_LABELS[s]).join(", ") : "")));
+  el.detailBody.appendChild(grid);
+  el.dlgDetail.showModal();
+}
+
+/* ---------- compare ---------- */
+function toggleCompare(id) {
+  if (state.compare.includes(id)) state.compare = state.compare.filter(x => x !== id);
+  else {
+    if (state.compare.length >= 4) { setStatus("Compare holds at most four apps at a time.", "err"); setTimeout(idleStatus, 3000); return; }
+    state.compare.push(id);
+  }
+  syncCompareBar();
+  renderResults();
+}
+function syncCompareBar() {
+  const names = state.compare.map(id => getEntry(id)?.name).filter(Boolean);
+  el.compareBar.dataset.on = names.length ? "1" : "0";
+  el.compareNames.textContent = names.join("  ·  ");
+  el.btnCompareOpen.disabled = names.length < 2;
+}
+el.btnCompareClear.addEventListener("click", () => { state.compare = []; syncCompareBar(); renderResults(); });
+el.btnCompareOpen.addEventListener("click", () => openCompare(state.compare));
+
+function openCompare(ids) {
+  const entries = ids.map(getEntry).filter(Boolean);
+  if (entries.length < 2) return;
+  const yn = (b) => b ? '<span class="y">✓</span>' : '<span class="n">—</span>';
+  const rows = [
+    ["publisher", e => escapeHtml(e.publisher)],
+    ["hosted by us", e => e.dist.hostedByUs ? '<span class="y">' + escapeHtml(DIST_LABELS[e.dist.model]) + '</span>' : '<span style="color:var(--warn)">no · ' + escapeHtml(DIST_LABELS[e.dist.model]) + '</span>'],
+    ["trust tier", e => escapeHtml(TIER_LABELS[e.tier])],
+    ["source", e => escapeHtml(SOURCE_LABELS[e.source])],
+    ["license", e => (e.license.class === "proprietary" ? '<span style="color:var(--err);font-weight:700">' : "<span>") + escapeHtml(e.license.spdx) + "</span>"],
+    ["open source", e => yn(e.license.foss)],
+    ["redistribute", e => yn(e.license.redistribute)],
+    ["rebrand", e => yn(e.license.rebrand)],
+    ["attestable", e => yn(e.security.includes("attestable"))],
+    ["privacy posture", e => escapeHtml(PRIVACY_LABELS[e.privacy.level])],
+    ["post-quantum", e => yn(e.security.includes("post-quantum"))],
+    ["over Tor", e => yn(e.security.includes("over-tor"))],
+    ["on-device only", e => yn(e.security.includes("on-device-only"))],
+    ["platform", e => escapeHtml(e.platform)],
+    ["leaves the device", e => "<small>" + escapeHtml(e.privacy.leaves) + "</small>"],
+    ["honest limits", e => "<small>" + escapeHtml(e.limits) + "</small>"],
+  ];
+  let html = '<table class="cmp"><thead><tr><th scope="col"></th>';
+  for (const e of entries) html += "<th scope=\"col\">" + escapeHtml(e.name) + "</th>";
+  html += "</tr></thead><tbody>";
+  for (const [label, fn] of rows) {
+    html += '<tr><td class="prop">' + escapeHtml(label) + "</td>";
+    for (const e of entries) html += "<td>" + fn(e) + "</td>";
+    html += "</tr>";
+  }
+  html += "</tbody></table>";
+  el.compareBody.innerHTML = html;
+  el.dlgCompare.showModal();
+}
+
+/* ============================================================
+   Manual filter panel — path #3 to the same query
+   ============================================================ */
+let panelSyncing = false;
+function syncFilterPanel() {
+  panelSyncing = true;
+  const f = state.filters;
+  el.fKeywords.value = f.query_text;
+  el.fCategory.value = f.category;
+  el.fSource.value = f.source;
+  el.fTier.value = f.tier;
+  el.fDist.value = f.distribution;
+  el.fPrivacy.value = f.privacy_level;
+  el.fLicense.value = f.license_class;
+  el.fPlatform.value = f.platform;
+  el.fSecurity.querySelectorAll("input").forEach(cb => { cb.checked = f.security_features.includes(cb.value); });
+  panelSyncing = false;
+}
+function readFilterPanel() {
+  if (panelSyncing) return;
+  const f = state.filters;
+  f.query_text = el.fKeywords.value.trim();
+  f.category = el.fCategory.value;
+  f.source = el.fSource.value;
+  f.tier = el.fTier.value;
+  f.distribution = el.fDist.value;
+  f.privacy_level = el.fPrivacy.value;
+  f.license_class = el.fLicense.value;
+  f.platform = el.fPlatform.value;
+  f.security_features = [...el.fSecurity.querySelectorAll("input:checked")].map(cb => cb.value);
+  applySearch(f);
+}
+[el.fCategory, el.fSource, el.fTier, el.fDist, el.fPrivacy, el.fLicense, el.fPlatform].forEach(s => s.addEventListener("change", readFilterPanel));
+el.fSecurity.addEventListener("change", readFilterPanel);
+el.fKeywords.addEventListener("input", () => { clearTimeout(el.fKeywords._t); el.fKeywords._t = setTimeout(readFilterPanel, 200); });
+
+el.btnFilters.addEventListener("click", () => {
+  const open = el.filterPanel.dataset.open === "1";
+  el.filterPanel.dataset.open = open ? "0" : "1";
+  el.btnFilters.setAttribute("aria-expanded", String(!open));
+});
+el.btnClear.addEventListener("click", () => {
+  applySearch(EMPTY_FILTERS());
+  hideNarration();
+});
+
+/* ============================================================
+   Speech OUT — on-device TTS (speechSynthesis)
+   ============================================================ */
+let ttsQueue = [];
+let ttsSpeaking = false;
+const tts = {
+  voices: [],
+  loadVoices() {
+    this.voices = (window.speechSynthesis ? speechSynthesis.getVoices() : []) || [];
+    const sel = el.voiceSel;
+    sel.innerHTML = "";
+    if (!window.speechSynthesis) {
+      sel.appendChild(new Option("Speech synthesis unavailable in this browser", ""));
+      sel.disabled = true;
+      return;
+    }
+    const saved = store.get(LS.VOICE, "");
+    sel.appendChild(new Option("System default voice", ""));
+    this.voices.forEach(v => {
+      const o = new Option(`${v.name} (${v.lang})${v.localService ? "" : " ⚠ network voice"}`, v.voiceURI);
+      if (v.voiceURI === saved) o.selected = true;
+      sel.appendChild(o);
+    });
+  },
+  pick() {
+    const uri = store.get(LS.VOICE, "");
+    return this.voices.find(v => v.voiceURI === uri) || null;
+  },
+  muted() { return store.get(LS.MUTE, "0") === "1"; },
+  enqueue(sentence) {
+    if (!window.speechSynthesis || this.muted()) return;
+    const clean = sentence.replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    ttsQueue.push(clean);
+    this.pump();
+  },
+  pump() {
+    if (ttsSpeaking || ttsQueue.length === 0 || !window.speechSynthesis) return;
+    const text = ttsQueue.shift();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = this.pick();
+    if (v) u.voice = v;
+    u.rate = parseFloat(store.get(LS.RATE, "1")) || 1;
+    ttsSpeaking = true;
+    if (!busy) setState("speaking");
+    u.onend = u.onerror = () => {
+      ttsSpeaking = false;
+      if (ttsQueue.length) this.pump();
+      else if (!busy) setState("idle");
+    };
+    speechSynthesis.speak(u);
+  },
+  stop() {
+    ttsQueue = [];
+    ttsSpeaking = false;
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  },
+};
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => tts.loadVoices();
+
+function speakable(text) {
+  return text.replace(/[*_`#>|]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
+}
+
+/* ============================================================
+   Speech IN — swappable STT engines behind one interface.
+   Engine contract: { id, label, available():bool,
+                      start({onInterim,onFinal,onError}), stop() }
+   ============================================================ */
+const WebSpeechEngine = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  let rec = null, finals = "", interim = "", cb = null, stopping = false;
+  return {
+    id: "webspeech",
+    label: "Browser (Web Speech API)",
+    available: () => !!SR,
+    start(callbacks) {
+      if (!SR) { callbacks.onError("Speech recognition is not available in this browser."); return; }
+      cb = callbacks; finals = ""; interim = ""; stopping = false;
+      rec = new SR();
+      rec.lang = navigator.language || "en-US";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (ev) => {
+        interim = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (r.isFinal) finals += r[0].transcript;
+          else interim += r[0].transcript;
+        }
+        cb.onInterim((finals + " " + interim).trim());
+      };
+      rec.onerror = (ev) => {
+        if (stopping && (ev.error === "aborted" || ev.error === "no-speech")) return;
+        const msgs = {
+          "not-allowed": "Microphone permission was denied. The Store only listens while you hold to talk — allow the mic to use voice, or keep typing.",
+          "no-speech": "Didn’t catch anything — hold and try again, or type instead.",
+          "audio-capture": "No microphone found. Typing works fully.",
+          "network": "The browser’s speech service couldn’t be reached. Typing is fully local and always works.",
+        };
+        cb.onError(msgs[ev.error] || ("Speech recognition error: " + ev.error));
+      };
+      rec.onend = () => {
+        if (!cb) return;
+        const text = (finals + " " + interim).trim();
+        const done = cb.onFinal; cb = null;
+        done(text);
+      };
+      try { rec.start(); } catch (e) { cb && cb.onError("Couldn’t start the microphone: " + e.message); cb = null; }
+    },
+    stop() {
+      stopping = true;
+      if (rec) { try { rec.stop(); } catch {} }
+    },
+  };
+})();
+
+/* Honest stub: the slot the real product fills with whisper.cpp-WASM. */
+const OnDeviceWhisperEngine = {
+  id: "ondevice",
+  label: "On-device Whisper (whisper.cpp / WASM)",
+  available: () => false, // flips to true when a wasm build + model are bundled
+  start({ onError }) {
+    onError("The on-device Whisper engine isn’t bundled in this prototype yet. Until it is, typing is the fully local path.");
+  },
+  stop() {},
+};
+
+const STT_ENGINES = { webspeech: WebSpeechEngine, ondevice: OnDeviceWhisperEngine };
+const stt = {
+  engine() {
+    const want = store.get(LS.STT, "webspeech");
+    const e = STT_ENGINES[want] || WebSpeechEngine;
+    return e.available() ? e : WebSpeechEngine;
+  },
+  available() { return this.engine().available(); },
+  start(cbs) { this.engine().start(cbs); },
+  stop() { this.engine().stop(); },
+};
+
+/* ---------- push-to-talk (mic button or space bar) ---------- */
+let ptt = false;
+function pttStart() {
+  if (ptt || busy) return;
+  if (!stt.available()) {
+    setStatus("Voice input isn’t available here — type below instead (it’s the most private path).", "err");
+    setTimeout(idleStatus, 4000);
+    return;
+  }
+  ptt = true;
+  tts.stop(); // barge-in
+  setState("listening");
+  setStatus("Listening… release to search.", "live");
+  stt.start({
+    onInterim: (text) => { if (ptt) setStatus(escapeHtml(text) || "Listening… release to search.", "live"); },
+    onFinal: (text) => {
+      setState("idle");
+      if (text) { el.input.value = text; submitNeed(text); }
+      else { setStatus("Didn’t catch that — hold and try again, or type.", "err"); setTimeout(idleStatus, 3500); }
+    },
+    onError: (msg) => {
+      ptt = false;
+      setState("idle");
+      setStatus(escapeHtml(msg), "err");
+      setTimeout(idleStatus, 5000);
+    },
+  });
+}
+function pttStop() {
+  if (!ptt) return;
+  ptt = false;
+  setStatus("…", null);
+  stt.stop();
+}
+
+el.btnMic.addEventListener("pointerdown", (e) => { e.preventDefault(); el.btnMic.setPointerCapture(e.pointerId); pttStart(); });
+el.btnMic.addEventListener("pointerup", () => pttStop());
+el.btnMic.addEventListener("pointercancel", () => pttStop());
+el.btnMic.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); pttStart(); } });
+el.btnMic.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); pttStop(); } });
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== " " || e.repeat) return;
+  const a = document.activeElement;
+  const typing = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT" || a.isContentEditable);
+  const dialogOpen = document.querySelector("dialog[open]");
+  if (typing || dialogOpen || a === el.btnMic) return;
+  e.preventDefault();
+  pttStart();
+});
+document.addEventListener("keyup", (e) => {
+  if (e.key !== " ") return;
+  if (document.activeElement === el.btnMic) return;
+  pttStop();
+});
+window.addEventListener("blur", () => pttStop()); // never leave the mic hot
+
+/* ============================================================
+   UI state & status line
+   ============================================================ */
+let busy = false;
+let abortCtl = null;
+function setState(s) { el.body.dataset.state = s; } // idle | listening | thinking | speaking
+function setStatus(html, tone) {
+  el.status.innerHTML = html;
+  if (tone) el.status.dataset.tone = tone; else delete el.status.dataset.tone;
+}
+function idleStatus() {
+  if (!getKey()) {
+    if (KeySeal.isLocked()) {
+      setStatus('Your API key is sealed at rest. Unlock it in <b>Settings</b> for this session — keyword search works meanwhile.');
+    } else {
+      setStatus('Local search is live. Add your API key in <b>Settings</b> to let the concierge interpret plain language — or just use keywords and filters, fully offline.');
+    }
+    el.btnSettings.dataset.attn = "1";
+    return;
+  }
+  el.btnSettings.removeAttribute("data-attn");
+  if (stt.available()) {
+    setStatus('Hold the mic — or hold <span class="hint-key">space</span> — and say what you need. Release to search. Or type.');
+  } else {
+    setStatus("Voice input isn’t available in this browser, but typing works fully — and it’s the most private path anyway.");
+  }
+}
+
+function showNarration() { el.narration.dataset.on = "1"; }
+function hideNarration() { el.narration.dataset.on = "0"; el.narrationText.textContent = ""; }
+
+/* ============================================================
+   Claude concierge — direct browser → api.anthropic.com, SSE.
+   The ONLY network call in this file. Tool-use turns the user's
+   words into the SAME structured filters the manual panel sets.
+   ============================================================ */
+function getKey() {
+  if (KeySeal.isSealed()) return (KeySeal.key() || "").trim();
+  return (store.get(LS.KEY, "") || "").trim();
+}
+function setKey(v) {
+  if (KeySeal.isSealed()) KeySeal.update(v); // re-seal; never write plaintext while locked mode is on
+  else store.set(LS.KEY, v);
+}
+function getModel() { return store.get(LS.MODEL, DEFAULT_MODEL); }
+
+let history = []; // concierge conversation memory (tab only)
+
+const CATALOG_INDEX = CATALOG.map(e =>
+  `${e.id} — ${e.name} by ${e.publisher} [${e.category}, ${e.source}, tier ${e.tier}, ${e.license.spdx}, ${e.dist.hostedByUs ? "hosted:" + e.dist.model : "not-hosted:" + e.dist.model}]: ${e.oneliner}`).join("\n");
+
+const SYSTEM_PROMPT = [
+  "You are the concierge of the Postern Store, a privacy-respecting THIRD-PARTY app distribution catalog by Postern Labs. It lists first-party Postern apps AND real third-party FOSS apps, plus a few proprietary apps for reference. The user describes a NEED; you turn it into a STRUCTURED catalog query with the search_catalog tool. Rules:",
+  "- ALWAYS call search_catalog for any need or refinement — the search itself runs locally in the user's browser; you only choose the parameters.",
+  "- NEVER invent apps, features, licenses, or security properties. Speak only about what the tools return.",
+  "- The honesty spine, state it when relevant: FOSS apps we may host (mirror a signed apk) or link to their upstream; PROPRIETARY apps are structurally link/proxy only — we NEVER host them. The 'attestable' badge means built from source in our reproducible Nix image; a signed apk is signed, not attestable.",
+  "- Your replies may be read aloud: one to three short sentences, plain prose, no markdown, no lists, no emoji. Name at most the top two or three results and why they fit.",
+  "- Mapping hints: 'open source' / 'FOSS' → license_class foss. 'permissive' / 'MIT/BSD/Apache' → license_class permissive. 'no GPL' / 'no copyleft' → license_class no-copyleft. 'fully local' / 'offline' → privacy_level local-only. 'end-to-end' → privacy_level e2e. 'verifiable' / 'attested' / 'reproducible' → tier attestable-nix or distribution attestable. 'hosted by you' / 'that you sign' → distribution hosted. 'don't want you hosting it' → distribution link-proxy. 'Android' → source fdroid or waydroid-android. 'Flatpak' → source flatpak. 'in the browser' / 'self-hosted' → source web. 'over Tor' / 'anonymous' → security_features over-tor. 'post-quantum' → security_features post-quantum.",
+  "- Follow-ups refine the previous query: start from the last filters and adjust.",
+  "- Use explain_app when the user asks about one app; use compare for 'which is better / line them up'; list_categories to orient a vague browser.",
+  "The catalog (ids you may pass to explain_app/compare — nothing else exists):",
+  CATALOG_INDEX,
+].join("\n");
+
+const TOOLS = [
+  {
+    name: "search_catalog",
+    description: "Run a structured, deterministic search over the local Postern catalog. Fill only the fields the user's need implies. Results render in the UI automatically; you get back the ranked matches with fit scores and why they matched.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query_text: { type: "string", description: "Free-text keywords distilled from the need, e.g. 'send file source server'. Optional." },
+        category: { type: "string", enum: ["communication", "files", "security", "media", "network", "finance", "assistants", "system", "developer"], description: "Catalog category, if the need clearly implies one." },
+        capabilities: { type: "array", items: { type: "string" }, description: "Capability phrases the app must plausibly offer, e.g. 'send files', 'take meeting notes'." },
+        privacy_level: { type: "string", enum: ["local-only", "e2e", "metadata-exposed"], description: "MINIMUM privacy posture. local-only = nothing leaves the device; e2e = end-to-end encrypted or better; metadata-exposed = no constraint." },
+        source: { type: "string", enum: ["native-linux", "flatpak", "fdroid", "waydroid-android", "web", "postern-apk"], description: "How the app is delivered, if the user cares (e.g. 'Android' → fdroid/waydroid-android; 'Flatpak'; 'in the browser' → web)." },
+        tier: { type: "string", enum: ["attestable-nix", "pmos-overlay", "sloboda-compat", "browser"], description: "Trust lane. attestable-nix = built from source in the reproducible Postern OS Nix image (the only attestable tier)." },
+        license_class: { type: "string", enum: ["foss", "permissive", "no-copyleft"], description: "License constraint. foss = open source only; permissive = MIT/BSD/Apache only; no-copyleft = exclude GPL/AGPL/MPL." },
+        distribution: { type: "string", enum: ["hosted", "link-proxy", "attestable"], description: "hosted = Postern hosts/signs it; link-proxy = we only link or proxy (never host); attestable = Nix-native only. Proprietary apps are always link/proxy." },
+        platform: { type: "string", enum: ["mobile", "desktop", "both"], description: "Where it must run. 'both' means it must run on both." },
+        security_features: { type: "array", items: { type: "string", enum: ["post-quantum", "attestable", "over-tor", "tee-sealed", "on-device-only"] }, description: "Security features that are ALL required." },
+      },
+    },
+  },
+  {
+    name: "explain_app",
+    description: "Open one catalog entry's full honest detail (capabilities, what stays local, what leaves the device, security features, limits, status, license). Also opens the detail panel in the UI.",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Catalog id, e.g. 'courier'." } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "compare",
+    description: "Line up 2–4 catalog entries side by side on their verifiable properties (publisher, hosted-by-us vs link/proxy, trust tier, license, open-source, redistribute, rebrand, attestable, privacy posture, honest limits). Also opens the compare view in the UI.",
+    input_schema: {
+      type: "object",
+      properties: { ids: { type: "array", items: { type: "string" }, description: "2 to 4 catalog ids." } },
+      required: ["ids"],
+    },
+  },
+  {
+    name: "list_categories",
+    description: "List the catalog categories with app counts — useful when the user is browsing vaguely.",
+    input_schema: { type: "object", properties: {} },
+  },
+];
+
+/* Tool execution — LOCAL and deterministic; also drives the UI. */
+function resultForModel(r) {
+  const e = r.entry;
+  return {
+    id: e.id, name: e.name, publisher: e.publisher, fit: r.fit, why: r.why,
+    category: e.category, platform: e.platform, source: e.source, tier: e.tier,
+    license: e.license.spdx, license_class: e.license.class, foss: e.license.foss,
+    hosted_by_us: e.dist.hostedByUs, distribution: e.dist.model,
+    privacy_level: e.privacy.level, security: e.security,
+    oneliner: e.oneliner,
+  };
+}
+function entryForModel(e) {
+  return {
+    id: e.id, name: e.name, publisher: e.publisher, oneliner: e.oneliner, category: e.category,
+    platform: e.platform, source: e.source, tier: e.tier,
+    license: e.license, distribution: { ...e.dist },
+    capabilities: e.capabilities, privacy: e.privacy, security: e.security, limits: e.limits,
+  };
+}
+function runTool(name, input) {
+  try {
+    if (name === "search_catalog") {
+      const filters = normalizeFilters(input);
+      const results = applySearch(filters);
+      return JSON.stringify({
+        interpreted_filters: filters,
+        total: results.length,
+        results: results.slice(0, 8).map(resultForModel),
+        note: results.length === 0 ? "No catalog entry passes every constraint. Be honest about that; suggest loosening one filter." : undefined,
+      });
+    }
+    if (name === "explain_app") {
+      const e = getEntry(String(input.id || "").trim());
+      if (!e) return JSON.stringify({ error: "No such app id. Valid ids: " + CATALOG.map(x => x.id).join(", ") });
+      openDetail(e.id);
+      return JSON.stringify(entryForModel(e));
+    }
+    if (name === "compare") {
+      const ids = (Array.isArray(input.ids) ? input.ids : []).map(String).filter(id => getEntry(id)).slice(0, 4);
+      if (ids.length < 2) return JSON.stringify({ error: "Need 2–4 valid ids. Valid ids: " + CATALOG.map(x => x.id).join(", ") });
+      state.compare = ids;
+      syncCompareBar();
+      renderResults();
+      openCompare(ids);
+      return JSON.stringify({ compared: ids.map(id => entryForModel(getEntry(id))) });
+    }
+    if (name === "list_categories") {
+      const counts = {};
+      for (const e of CATALOG) counts[e.category] = (counts[e.category] || 0) + 1;
+      return JSON.stringify(Object.entries(CATEGORIES).map(([k, label]) => ({ id: k, label, apps: counts[k] || 0 })));
+    }
+    return JSON.stringify({ error: `unknown tool "${name}"` });
+  } catch (e) {
+    return JSON.stringify({ error: "tool failed: " + e.message });
+  }
+}
+
+/* ---------- the send path ---------- */
+function submitNeed(text) {
+  if (!text || busy) return;
+  if (getKey()) sendToConcierge(text);
+  else localOnlySearch(text);
+}
+
+/* No key → still useful: plain local keyword parameterization. */
+function localOnlySearch(text) {
+  const f = EMPTY_FILTERS();
+  f.query_text = text;
+  applySearch(f);
+  hideNarration();
+  setStatus("Searched locally by keywords — nothing left this page. Add a key in Settings for plain-language interpretation.");
+  setTimeout(idleStatus, 6000);
+}
+
+async function sendToConcierge(userText) {
+  if (busy) return;
+  busy = true;
+  tts.stop();
+  setState("thinking");
+  setStatus("Parameterizing…");
+  showNarration();
+  el.narrationText.textContent = "";
+  el.narration.classList.add("streaming");
+  abortCtl = new AbortController();
+
+  const histMark = history.length;
+  history.push({ role: "user", content: userText });
+
+  let fullText = "";
+  let spokenUpTo = 0;
+  const onText = (delta) => {
+    fullText += delta;
+    el.narrationText.textContent = fullText;
+    let m;
+    const re = /[.!?…]["')\]]?\s/g;
+    re.lastIndex = spokenUpTo;
+    while ((m = re.exec(fullText)) !== null) {
+      tts.enqueue(speakable(fullText.slice(spokenUpTo, m.index + m[0].length)));
+      spokenUpTo = m.index + m[0].length;
+    }
+  };
+
+  try {
+    await runTurn(onText, MAX_TOOL_ROUNDS);
+    if (fullText.slice(spokenUpTo).trim()) tts.enqueue(speakable(fullText.slice(spokenUpTo)));
+    if (!fullText.trim()) el.narrationText.textContent = "(the concierge said nothing — the results above stand on their own)";
+    /* cap the conversation memory */
+    if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
+  } catch (err) {
+    history.length = histMark; // never leave a dangling tool_use in memory
+    if (err.name === "AbortError") {
+      el.narrationText.textContent = "(stopped)";
+    } else {
+      const msg = friendlyError(err);
+      setStatus(escapeHtml(msg), "err");
+      el.narrationText.textContent = msg + " — manual filters and keyword search still work, fully offline.";
+    }
+  } finally {
+    el.narration.classList.remove("streaming");
+    busy = false;
+    abortCtl = null;
+    setState(ttsSpeaking ? "speaking" : "idle");
+    if (!el.status.dataset.tone) idleStatus();
+  }
+}
+
+/* One assistant turn, following tool_use rounds as needed. */
+async function runTurn(onText, roundsLeft) {
+  const { content, stopReason } = await streamMessage(onText);
+  history.push({ role: "assistant", content });
+
+  if (stopReason === "tool_use" && roundsLeft > 0) {
+    const results = content
+      .filter(b => b.type === "tool_use")
+      .map(b => ({ type: "tool_result", tool_use_id: b.id, content: runTool(b.name, b.input) }));
+    if (results.length) {
+      history.push({ role: "user", content: results });
+      return runTurn(onText, roundsLeft - 1);
+    }
+  }
+  if (stopReason === "refusal") {
+    onText(" I can’t help with that request.");
+  }
+}
+
+/* POST /v1/messages with stream:true and parse the SSE stream. */
+async function streamMessage(onText) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    signal: abortCtl.signal,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": getKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: getModel(),
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT,
+      tools: TOOLS,
+      messages: history,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json())?.error?.message || ""; } catch {}
+    const e = new Error(detail || res.statusText);
+    e.status = res.status;
+    e.retryAfter = res.headers.get("retry-after");
+    throw e;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const blocks = [];
+  let stopReason = null;
+
+  const handleEvent = (ev) => {
+    switch (ev.type) {
+      case "content_block_start":
+        blocks[ev.index] =
+          ev.content_block.type === "tool_use"
+            ? { type: "tool_use", id: ev.content_block.id, name: ev.content_block.name, input: {}, _json: "" }
+            : { type: "text", text: "" };
+        break;
+      case "content_block_delta":
+        if (ev.delta.type === "text_delta") {
+          blocks[ev.index].text += ev.delta.text;
+          onText(ev.delta.text);
+        } else if (ev.delta.type === "input_json_delta") {
+          blocks[ev.index]._json += ev.delta.partial_json;
+        }
+        break;
+      case "content_block_stop": {
+        const b = blocks[ev.index];
+        if (b && b.type === "tool_use") {
+          try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; }
+          delete b._json;
+        }
+        break;
+      }
+      case "message_delta":
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        break;
+      case "error": {
+        const e = new Error(ev.error?.message || "stream error");
+        e.status = ev.error?.type === "overloaded_error" ? 529 : 500;
+        throw e;
+      }
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch { continue; }
+        handleEvent(ev);
+      }
+    }
+  }
+
+  return { content: blocks.filter(Boolean), stopReason };
+}
+
+function friendlyError(err) {
+  if (err.status === 401) return "Anthropic rejected that API key. Check it in Settings (it should start with sk-ant-…).";
+  if (err.status === 403) return "That API key doesn’t have permission for this model. Try another model in Settings.";
+  if (err.status === 404) return "Model not found — it may not be enabled for your account. Pick another model in Settings.";
+  if (err.status === 429) return "Rate limited by Anthropic." + (err.retryAfter ? ` Try again in ~${err.retryAfter}s.` : " Give it a moment and try again.");
+  if (err.status === 400) return "Anthropic rejected the request: " + (err.message || "invalid request.");
+  if (err.status === 529 || err.status >= 500) return "Anthropic’s API is briefly overloaded. Try again in a few seconds.";
+  if (err instanceof TypeError) return "Couldn’t reach api.anthropic.com — check your connection. (Nothing was sent anywhere else.)";
+  return "Something went wrong: " + (err.message || String(err));
+}
+
+/* ============================================================
+   Composer, chips, controls
+   ============================================================ */
+el.composer.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = el.input.value.trim();
+  if (!text || busy) return;
+  submitNeed(text);
+});
+
+el.chips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip && !busy) {
+    el.input.value = chip.textContent.trim();
+    submitNeed(chip.textContent.trim());
+  }
+});
+
+el.btnMute.addEventListener("click", () => {
+  const muted = !(store.get(LS.MUTE, "0") === "1");
+  store.set(LS.MUTE, muted ? "1" : "0");
+  applyMuteUI();
+  if (muted) tts.stop();
+});
+function applyMuteUI() {
+  const muted = store.get(LS.MUTE, "0") === "1";
+  el.btnMute.setAttribute("aria-pressed", String(muted));
+  el.btnMute.setAttribute("aria-label", muted ? "Unmute spoken summaries" : "Mute spoken summaries");
+  el.btnMute.title = muted ? "Unmute spoken summaries" : "Mute spoken summaries";
+  el.spkWaves.style.display = muted ? "none" : "";
+  el.spkSlash.style.display = muted ? "" : "none";
+}
+
+/* Esc stops an in-flight request */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && busy && abortCtl) { abortCtl.abort(); tts.stop(); }
+});
+
+/* ============================================================
+   Dialogs & settings
+   ============================================================ */
+function openSettings() { syncSettingsUI(); el.dlgSettings.showModal(); el.apiKey.focus(); }
+el.btnSettings.addEventListener("click", openSettings);
+el.modelHint.addEventListener("click", openSettings);
+el.btnPrivacy.addEventListener("click", () => el.dlgPrivacy.showModal());
+el.btnRepos.addEventListener("click", () => { renderRepoList(); el.dlgRepos.showModal(); });
+el.btnRepoAdd.addEventListener("click", addRepo);
+document.querySelectorAll("dialog [data-close]").forEach(b =>
+  b.addEventListener("click", (e) => e.target.closest("dialog").close()));
+[el.dlgSettings, el.dlgPrivacy, el.dlgRepos, el.dlgDetail, el.dlgCompare].forEach(d =>
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+
+el.apiKey.addEventListener("change", () => { setKey(el.apiKey.value.trim()); idleStatus(); });
+el.apiKey.addEventListener("input", () => { setKey(el.apiKey.value.trim()); });
+
+/* ---- optional key lock (seal at rest) ---- */
+function keyLockMsg(text, isErr) {
+  el.keyLockState.textContent = text;
+  el.keyLockState.style.color = isErr ? "#c0392b" : "";
+}
+function refreshSealLabel() {
+  if (!el.keyLockHelp) return;
+  if (KeySeal.real()) {
+    el.keyLockHelp.innerHTML = 'Locking seals the key with the real <b>XChaCha20-Poly1305 + Argon2id</b> core ' +
+      '(<code>postern-core</code>, wired through <code>postern-sdk</code>) — 64&nbsp;MiB, t=3, memory-hard. ' +
+      'localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means ' +
+      're-entering the key. <b>Without a lock, the key sits readable in this browser’s localStorage</b> — any ' +
+      'code or person with access to this browser profile can read it.';
+  } else {
+    el.keyLockHelp.innerHTML = 'Locking seals the key with <b>AES-256-GCM</b> under a key derived from your passphrase ' +
+      '(<b>PBKDF2-SHA-256, 310,000 it.</b> — a WebCrypto stand-in for the product’s <b>Argon2id</b>, the same construction as Chiave, our sign-in reference). ' +
+      'localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means ' +
+      're-entering the key. <b>Without a lock, the key sits readable in this browser’s localStorage</b> — any ' +
+      'code or person with access to this browser profile can read it. <em>(postern-sdk core not loaded here — honest stand-in.)</em>';
+  }
+}
+function syncKeyLockUI() {
+  const sealed = KeySeal.isSealed(), locked = KeySeal.isLocked();
+  refreshSealLabel();
+  el.apiKey.disabled = locked;
+  el.apiKey.value = locked ? "" : getKey();
+  el.apiKey.placeholder = locked ? "sealed — unlock below" : "sk-ant-…";
+  el.keyPass.style.display = (sealed && !locked) ? "none" : "";
+  el.btnKeyLock.textContent = locked ? "unlock" : sealed ? "remove lock" : "lock key";
+  if (locked) keyLockMsg("Sealed. localStorage holds only " + KeySeal.cipherLabel() + " ciphertext — enter your passphrase to unlock for this session.");
+  else if (sealed) keyLockMsg("Sealed and unlocked for this session. Edits re-seal automatically; the readable key lives only in this tab’s memory.");
+  else keyLockMsg("Not locked — the key sits readable in this browser’s localStorage. Set a passphrase to seal it.");
+}
+el.btnKeyLock.addEventListener("click", async () => {
+  if (KeySeal.isLocked()) {
+    const ok = await KeySeal.unlock(el.keyPass.value);
+    el.keyPass.value = "";
+    if (!ok) { syncKeyLockUI(); keyLockMsg("Wrong passphrase. Decryption is all-or-nothing — nothing was revealed.", true); return; }
+    syncKeyLockUI(); idleStatus();
+    return;
+  }
+  if (KeySeal.isSealed()) { // currently unlocked → remove the lock
+    if (!confirm("Remove the lock? Your API key will again be stored readable (plaintext) in this browser’s localStorage.")) return;
+    KeySeal.removeLock();
+    syncKeyLockUI();
+    return;
+  }
+  const key = el.apiKey.value.trim();
+  if (!key) { keyLockMsg("Add your API key above first — then lock it.", true); return; }
+  if (el.keyPass.value.length < 6) { keyLockMsg("Use at least 6 characters — it protects your key.", true); return; }
+  await KeySeal.lock(el.keyPass.value, key);
+  el.keyPass.value = "";
+  syncKeyLockUI();
+});
+el.btnShowKey.addEventListener("click", () => {
+  const isPw = el.apiKey.type === "password";
+  el.apiKey.type = isPw ? "text" : "password";
+  el.btnShowKey.textContent = isPw ? "hide" : "show";
+});
+el.modelSel.addEventListener("change", () => { store.set(LS.MODEL, el.modelSel.value); syncModelHint(); });
+el.voiceSel.addEventListener("change", () => store.set(LS.VOICE, el.voiceSel.value));
+el.rate.addEventListener("input", () => {
+  store.set(LS.RATE, el.rate.value);
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+});
+document.querySelectorAll('input[name="stt"]').forEach(r =>
+  r.addEventListener("change", () => { store.set(LS.STT, r.value); idleStatus(); }));
+
+el.btnErase.addEventListener("click", () => {
+  if (!confirm("Erase your API key and settings from this browser?")) return;
+  Object.values(LS).forEach(store.del); // includes the sealed-key ciphertext
+  KeySeal.forget();
+  history = [];
+  tts.stop();
+  if (abortCtl) abortCtl.abort();
+  hideNarration();
+  applySearch(EMPTY_FILTERS());
+  state.compare = [];
+  syncCompareBar();
+  syncSettingsUI();
+  syncModelHint();
+  applyMuteUI();
+  applyTheme();
+  el.dlgSettings.close();
+  setState("idle");
+  setStatus("Everything erased. Nothing about you exists anywhere anymore — there was never a server copy.");
+});
+
+function syncSettingsUI() {
+  syncKeyLockUI();
+  el.modelSel.value = getModel();
+  el.rate.value = store.get(LS.RATE, "1");
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+  const sttPref = store.get(LS.STT, "webspeech");
+  el.sttWeb.checked = sttPref === "webspeech";
+  el.sttLocal.checked = sttPref === "ondevice";
+  el.sttLocal.disabled = !OnDeviceWhisperEngine.available();
+  el.sttWeb.disabled = !WebSpeechEngine.available();
+  tts.loadVoices();
+}
+function syncModelHint() { el.modelHint.textContent = MODELS[getModel()] || getModel(); }
+
+/* ---------- theme ---------- */
+el.btnTheme.addEventListener("click", () => {
+  const cur = store.get(LS.THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS.THEME, next);
+  applyTheme();
+});
+function applyTheme() {
+  const t = store.get(LS.THEME, "auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = t;
+  el.btnTheme.textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  el.btnTheme.setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+
+/* ============================================================
+   Opportunistic refresh — pull a newer signed catalog.json from
+   THIS origin (connect-src 'self'). Silent by design: under file://
+   or a strict host the fetch fails and the embedded index stands.
+   The embedded copy is always the floor; the network can only add a
+   newer, still-honest (re-normalized, re-validated) index.
+   ============================================================ */
+async function refreshCatalogFromNetwork() {
+  try {
+    const res = await fetch("./catalog.json", { cache: "no-cache" });
+    if (!res.ok) return;
+    /* read the EXACT served bytes (text) so the signature check is over the
+       same bytes we parse — then JSON.parse the same string. */
+    const text = await res.text();
+    const bytes = new TextEncoder().encode(text);
+    const raw = JSON.parse(text);
+    const fresh = parseCatalog(raw);            // re-runs every honesty invariant
+    if (!fresh.length) return;
+
+    /* Verify the fetched bytes BEFORE adopting them. A TAMPERED network copy
+       (signature present but invalid) is rejected outright — the embedded
+       index, floored by this page's own CSP hash, stands. UNSIGNED /
+       UNVERIFIED never block rendering; they only set an honest banner. */
+    const trust = await resolveCatalogTrust(bytes);
+    if (trust.state === TRUST.TAMPERED) {
+      CATALOG_META.trust = trust;
+      renderTrustBanner();
+      return;                                   // do NOT adopt a bad-signature copy
+    }
+
+    const newer = (raw.generated || "") > (CATALOG_META.generated || "");
+    if (newer || fresh.length !== CATALOG.length) {
+      CATALOG = fresh;
+      CATALOG_META = { generated: raw.generated || "", index_signature: raw.index_signature || null, trust };
+      applySearch(state.filters, { silent: true });   // re-render with current filters
+    } else {
+      CATALOG_META.trust = trust;               // same catalog, refreshed trust verdict
+    }
+    renderTrustBanner();
+  } catch { /* offline / file:// / blocked — embedded catalog + UNSIGNED banner stand */ }
+}
+
+/* ============================================================
+   boot
+   ============================================================ */
+applyTheme();
+applyMuteUI();
+syncModelHint();
+tts.loadVoices();
+applySearch(EMPTY_FILTERS(), { silent: true });
+syncCompareBar();
+idleStatus();
+renderTrustBanner();          // honest initial state: UNSIGNED (embedded scaffold, nothing signed)
+refreshCatalogFromNetwork();  // may upgrade the banner to VERIFIED/TAMPERED once a signed release exists
+bootRepos();                  // fetch+verify every pinned third-party repo; never blocks first render
+document.documentElement.dataset.booted = "1"; // init completed without throwing
+</script>
+</body>
+</html>

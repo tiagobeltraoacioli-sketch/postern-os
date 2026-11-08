@@ -1,0 +1,466 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT OR Apache-2.0
+  SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+  Gramota — enterprise onboarding + KYC handoff. Reference prototype, UNAUDITED,
+  pre-production. "Gramota" is a PROPOSED name, pending trademark clearance.
+
+  Demonstrates controls that ENABLE compliance; is NOT compliance, not legal /
+  KYC-AML advice. A THIN front over the real license spine (/license/*): it holds
+  NO crypto. It walks tier -> DUNS -> attestation -> on-device KYC/LoA -> POSTs to
+  /license/master and renders the returned vendor-signed bundle, then hands the
+  org off to Consiglio for seats/devices.
+
+  PRIVACY RAIL: on-device OCR / LoA. Only the minimal verdict
+  { decision, assurance, loa, ref, checkedAt, ocrMatch?, fieldsMatched? } is sent
+  to the spine — never images, raw OCR, or PII beyond the DUNS the org supplies.
+  connect-src is 'self' ONLY (the same-origin /license/* endpoints); nothing else.
+
+  CSP NOTE: script-src / style-src are pinned to the sha256 hash of this file's
+  single inline style block and single inline script block (no 'unsafe-inline').
+  Editing either block's exact byte contents (including whitespace) invalidates
+  its hash and the page white-screens under CSP. Recompute with:
+  sha256sum of the exact text between the block's opening ">" and its closing
+  tag, base64-encoded, written as sha256-<base64> into the CSP meta above.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JPos6CgPw/0Bk4QsPIbQ7DCyCgtvbvBtyDlqJTTXQ9w='; style-src 'sha256-4GUVqGIaoHguBECXY4+U464ZCCqjL/NWuL1rshKHi8Q='; connect-src 'self'; img-src 'self' data:; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Gramota — enterprise onboarding · Postern Labs</title>
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#0d1014;--bg-glow:#10141b;--surface:#14181f;--surface-2:#1a2029;--surface-3:#212934;
+  --border:#29323e;--border-hi:#3a4552;--text:#e7e8ec;--text-dim:#a8adb5;--muted:#79818c;
+  --acc:#c79a4b;--acc-hi:#e0b869;--acc-dim:#8f6f34;--acc-ink:#140f04;
+  --ok:#63ab7c;--warn:#d08c2e;--err:#d96a63;--radius:14px;--shadow:0 18px 50px rgba(0,0,0,.45);
+}
+@media (prefers-color-scheme: light){:root:not([data-theme]){
+  --bg:#f0eff3;--bg-glow:#f6f5f0;--surface:#fbfaf7;--surface-2:#eceae2;--surface-3:#e3e0d5;
+  --border:#d5d0c4;--border-hi:#bdb7a8;--text:#20242b;--text-dim:#4f555e;--muted:#767d87;
+  --acc:#8a6a24;--acc-hi:#6f5418;--acc-dim:#b3a15a;--acc-ink:#fdfaf2;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(40,50,64,.14);
+}}
+:root[data-theme="light"]{
+  --bg:#f0eff3;--bg-glow:#f6f5f0;--surface:#fbfaf7;--surface-2:#eceae2;--surface-3:#e3e0d5;
+  --border:#d5d0c4;--border-hi:#bdb7a8;--text:#20242b;--text-dim:#4f555e;--muted:#767d87;
+  --acc:#8a6a24;--acc-hi:#6f5418;--acc-dim:#b3a15a;--acc-ink:#fdfaf2;
+  --ok:#2f7a4d;--warn:#9a6210;--err:#b1443d;--shadow:0 14px 40px rgba(40,50,64,.14);
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:var(--font-ui);background:radial-gradient(1100px 520px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--text);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px}
+.mono{font-family:var(--font-mono)}
+header.site{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface) 72%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
+.site-inner{display:flex;align-items:center;gap:12px;padding:12px 0}
+.seal{width:30px;height:30px;flex:none;color:var(--acc)}
+.wordmark{font-family:var(--font-mono);font-size:16px;font-weight:700;letter-spacing:.24em;color:var(--text)}
+.wordmark .tick{color:var(--acc)}
+.byline{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);padding-left:12px}
+.site-actions{margin-left:auto}
+.hbtn{background:transparent;border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim)}
+.hbtn:hover{border-color:var(--border-hi);color:var(--text)}
+.notice{border-bottom:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));background:color-mix(in srgb,var(--warn) 10%,var(--surface));font-size:12.5px;color:var(--text-dim)}
+.notice .wrap{padding:8px 20px}.notice strong{color:var(--warn)}
+main.wrap{padding:22px 20px 44px}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px;font-family:var(--font-mono);font-size:11px}
+.steps .st{padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+.steps .st.active{border-color:var(--acc);color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.steps .st.done{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,var(--border))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin:14px 0;box-shadow:var(--shadow)}
+h1{font-size:23px;margin:.1em 0 .3em}h2{font-size:17px;margin:.1em 0 .5em}
+.lead{color:var(--text-dim);font-size:13.5px;max-width:640px}
+.lead code,.mini code{color:var(--acc);font-family:var(--font-mono);font-size:12px}
+.field{display:flex;flex-direction:column;gap:5px;margin:10px 0}
+.field label{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:.04em;text-transform:uppercase}
+.field input,.field select,.field textarea{background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+.field textarea{min-height:60px;resize:vertical;font-family:var(--font-mono);font-size:12px}
+.field .hint{font-size:11.5px;color:var(--muted)}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>.field{flex:1 1 200px}
+.check{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text-dim);margin:8px 0}
+.check input{width:16px;height:16px;accent-color:var(--acc)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:11px;overflow:hidden;margin:2px 0}
+.seg button{background:var(--surface-2);border:0;padding:9px 16px;font-family:var(--font-mono);font-size:12.5px;color:var(--text-dim);border-right:1px solid var(--border)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink);font-weight:700}
+.btn-acc{background:var(--acc);color:var(--acc-ink);border:1px solid var(--acc);border-radius:10px;padding:9px 18px;font-weight:600}
+.btn-acc:hover{background:var(--acc-hi)}
+.btn-acc:disabled{opacity:.55;cursor:progress}
+.btn-ghost{background:transparent;border:1px solid var(--border);border-radius:10px;padding:9px 14px;color:var(--text-dim)}
+.btn-ghost:hover{border-color:var(--border-hi);color:var(--text)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.err{color:var(--err);font-size:12.5px;min-height:1.1em;margin:6px 0}
+.loa-ladder{display:grid;gap:8px;margin:10px 0}
+.rung{border:1px solid var(--border);border-radius:11px;padding:11px 13px;background:var(--surface-2)}
+.rung.done{border-color:color-mix(in srgb,var(--ok) 50%,var(--border));background:color-mix(in srgb,var(--ok) 7%,var(--surface-2))}
+.rung .rh{display:flex;align-items:center;gap:9px;font-size:13px}
+.rung .rh .lv{font-family:var(--font-mono);font-size:10.5px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,var(--border));border-radius:5px;padding:1px 7px}
+.rung .rh .st{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;color:var(--muted)}
+.rung.done .rh .st{color:var(--ok)}
+.rung .rbody{margin-top:9px}
+.verdict-out{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:9px;margin-top:8px;white-space:pre-wrap;word-break:break-word}
+.privacy-callout{border-left:3px solid var(--acc);padding:6px 0 6px 12px;font-size:12.5px;color:var(--text-dim);margin:10px 0}
+.bundlebox{font-family:var(--font-mono);font-size:11px;background:var(--surface-3);border:1px solid var(--border);border-radius:9px;padding:11px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:var(--text-dim)}
+.warnbox{border:1px solid color-mix(in srgb,var(--err) 55%,var(--border));background:color-mix(in srgb,var(--err) 9%,var(--surface));border-radius:11px;padding:12px 14px;font-size:12.5px;color:var(--text);margin:12px 0}
+.warnbox b{color:var(--err)}
+.okbox{border:1px solid color-mix(in srgb,var(--ok) 55%,var(--border));background:color-mix(in srgb,var(--ok) 9%,var(--surface));border-radius:11px;padding:12px 14px;font-size:12.5px;color:var(--text);margin:12px 0}
+.hidden{display:none}
+.kv{display:flex;flex-wrap:wrap;gap:5px 20px;font-size:13px;margin:8px 0}
+.kv b{color:var(--text)}.kv span{color:var(--text-dim)}
+footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:11px;padding:16px 20px;text-align:center;font-family:var(--font-mono);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap site-inner">
+  <svg class="seal" viewBox="0 0 40 40" fill="none" stroke="currentColor" aria-hidden="true">
+    <circle cx="20" cy="20" r="15" stroke-width="1.5"/><circle cx="20" cy="20" r="9" stroke-width="1.2"/>
+    <path d="M20 5 v6 M20 29 v6 M5 20 h6 M29 20 h6" stroke-width="1.2"/>
+  </svg>
+  <div class="wordmark">GRAMOTA</div>
+  <div class="byline">Postern Labs · enterprise onboarding (proposed name)</div>
+  <div class="site-actions"><button class="hbtn" id="themeBtn">theme</button></div>
+</div></header>
+
+<div class="notice"><div class="wrap">
+  <strong>Reference prototype — unaudited, pre-production. Demonstrates controls that ENABLE compliance; is NOT compliance, not legal or KYC/AML advice.</strong>
+  Billing is <strong>fiat only</strong>; the coin is never a billing instrument and is not a security. Personal editions are free forever and are not onboarded here.
+</div></div>
+
+<main class="wrap">
+  <h1>Onboard your organization</h1>
+  <p class="lead">Gramota is a thin front over Postern's real license spine. It carries <b>no crypto</b>: it verifies who you are on-device, then asks <code>/license/master</code> to mint a vendor-signed master bundle you hold yourself.</p>
+
+  <div class="steps" id="steps">
+    <span class="st" data-step="1">1 · tier</span>
+    <span class="st" data-step="2">2 · DUNS</span>
+    <span class="st" data-step="3">3 · attestation</span>
+    <span class="st" data-step="4">4 · KYC (on-device)</span>
+    <span class="st" data-step="5">5 · issue</span>
+    <span class="st" data-step="6">6 · seats</span>
+  </div>
+
+  <!-- STEP 1 — tier -->
+  <section class="card" id="s1">
+    <h2>Choose a tier</h2>
+    <p class="lead">The <b>corporate master</b> is for a DUNS-registered entity: unlimited seats for a free 6-month evaluation, verified offline. <b>Freemium</b> needs no onboarding — up to 3 desktops, no account.</p>
+    <div class="seg" id="tierSeg" role="group" aria-label="Tier">
+      <button type="button" data-tier="corporate-master" aria-pressed="true">corporate master</button>
+      <button type="button" data-tier="business-freemium" aria-pressed="false">freemium (no onboarding)</button>
+    </div>
+    <div id="freemiumNote" class="okbox hidden">Freemium needs nothing here — just install the desktop app and run. Up to 3 desktops, 2 years, no account, no login. Come back if you outgrow the seat cap.</div>
+    <div class="btnrow"><button class="btn-acc" id="s1next">Continue</button></div>
+  </section>
+
+  <!-- STEP 2 — DUNS -->
+  <section class="card hidden" id="s2">
+    <h2>Your entity</h2>
+    <p class="lead">A <b>D-U-N-S number</b> is a 9-digit business identifier. The spine's D&amp;B gate resolves it to a real entity; a garbage number is refused (422).</p>
+    <div class="row">
+      <div class="field"><label for="orgName">Legal entity name</label><input type="text" id="orgName" placeholder="Acme Robotics Inc" autocomplete="off"></div>
+      <div class="field"><label for="duns">D-U-N-S (9 digits)</label><input type="text" id="duns" inputmode="numeric" maxlength="9" placeholder="123456789" autocomplete="off"><span class="hint">Only the DUNS crosses the wire — never documents.</span></div>
+    </div>
+    <p class="err" id="s2err"></p>
+    <div class="btnrow"><button class="btn-ghost" data-back="1">Back</button><button class="btn-acc" id="s2next">Continue</button></div>
+  </section>
+
+  <!-- STEP 3 — attestation -->
+  <section class="card hidden" id="s3">
+    <h2>Attestation</h2>
+    <p class="lead">An authorized principal attests to the request. This is a declaration, not proof — the KYC ladder (next) is what raises assurance.</p>
+    <div class="row">
+      <div class="field"><label for="role">Your role</label>
+        <select id="role">
+          <option value="authorized-signatory">authorized signatory</option>
+          <option value="officer">officer / director</option>
+          <option value="it-admin">IT admin (delegated)</option>
+          <option value="counsel">counsel</option>
+        </select></div>
+    </div>
+    <div class="field"><label for="statement">Statement (optional)</label><textarea id="statement" placeholder="I am authorized to bind Acme Robotics Inc to this evaluation."></textarea></div>
+    <label class="check"><input type="checkbox" id="selfDeclared"> I attest the above is true and I am authorized to make it.</label>
+    <p class="err" id="s3err"></p>
+    <div class="btnrow"><button class="btn-ghost" data-back="2">Back</button><button class="btn-acc" id="s3next">Continue</button></div>
+  </section>
+
+  <!-- STEP 4 — KYC on-device -->
+  <section class="card hidden" id="s4">
+    <h2>KYC — on-device Level of Assurance</h2>
+    <p class="lead">Raise assurance without leaking anything. Each rung runs <b>on this device</b>; only a tiny non-PII <b>verdict</b> is attached to the issuance request.</p>
+    <div class="privacy-callout"><b>What crosses the wire:</b> <code>{ decision, assurance, loa, ref, checkedAt }</code> plus, on the OCR rung, <code>{ ocrMatch, fieldsMatched }</code>. <b>Never</b> document images, raw OCR text, names, or addresses. Network reach is CSP-pinned to <code>connect-src 'self'</code> — the same-origin <code>/license/*</code> endpoints only; no third-party origin is reachable.</div>
+    <div class="loa-ladder" id="ladder">
+      <div class="rung done" data-rung="0">
+        <div class="rh"><span class="lv">LoA 0</span> Self-declared attestation<span class="st">satisfied</span></div>
+      </div>
+      <div class="rung" data-rung="1">
+        <div class="rh"><span class="lv">LoA 1</span> Corporate-domain email proof<span class="st" id="st1">optional</span></div>
+        <div class="rbody">
+          <div class="row">
+            <div class="field"><label for="corpEmail">Work email</label><input type="text" id="corpEmail" placeholder="cfo@acme.com" autocomplete="off"></div>
+            <div class="field"><label for="corpDomain">Corporate domain</label><input type="text" id="corpDomain" placeholder="acme.com" autocomplete="off"></div>
+          </div>
+          <button class="btn-ghost" id="doEmail">Prove domain control</button>
+        </div>
+      </div>
+      <div class="rung" data-rung="2">
+        <div class="rh"><span class="lv">LoA 2</span> On-device OCR vs D&amp;B principal<span class="st" id="st2">optional</span></div>
+        <div class="rbody">
+          <p class="mini">Your device OCRs an incorporation/ID document and matches the extracted fields against the D&amp;B principal record <b>locally</b>. Enter what your on-device OCR read (a real build reads it from the camera/file; nothing here uploads a document).</p>
+          <div class="row">
+            <div class="field"><label for="ocrName">OCR: legal name</label><input type="text" id="ocrName" placeholder="Acme Robotics Inc" autocomplete="off"></div>
+            <div class="field"><label for="ocrPrincipal">OCR: principal</label><input type="text" id="ocrPrincipal" placeholder="Dana Cruz" autocomplete="off"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="dnbName">D&amp;B: legal name</label><input type="text" id="dnbName" placeholder="Acme Robotics Inc" autocomplete="off"></div>
+            <div class="field"><label for="dnbPrincipal">D&amp;B: principal</label><input type="text" id="dnbPrincipal" placeholder="Dana Cruz" autocomplete="off"></div>
+          </div>
+          <button class="btn-ghost" id="doOcr">Match on-device</button>
+        </div>
+      </div>
+    </div>
+    <div class="verdict-out" id="verdictOut">Current assurance: LoA 0 (self-declared). This is the minimal verdict that will accompany issuance.</div>
+    <div class="btnrow"><button class="btn-ghost" data-back="3">Back</button><button class="btn-acc" id="s4next">Continue to issue</button></div>
+  </section>
+
+  <!-- STEP 5 — issue -->
+  <section class="card hidden" id="s5">
+    <h2>Issue the master bundle</h2>
+    <p class="lead">This POSTs your request to <code>/license/master</code>. The vendor signs the master with its private key (which <b>never leaves the server</b>) and returns a bundle that includes <b>your</b> org master private key.</p>
+    <div class="kv" id="s5summary"></div>
+    <p class="err" id="s5err"></p>
+    <div class="btnrow"><button class="btn-ghost" data-back="4">Back</button><button class="btn-acc" id="s5issue">Request signed master</button></div>
+
+    <div id="issueResult" class="hidden">
+      <div class="warnbox"><b>Keep this private.</b> The bundle below contains <code>master_private_key_pkcs8</code> — your organization's signing key. It is returned <b>once</b> and is <b>never stored on the server</b>. Save it somewhere safe (a secret manager). Anyone with it can mint sub-accesses for your org. Gramota does not persist or transmit it.</div>
+      <div class="bundlebox" id="bundleBox"></div>
+      <div class="btnrow"><button class="btn-ghost" id="copyBundle">Copy bundle</button><button class="btn-acc" id="s5next">Continue to seats</button></div>
+    </div>
+  </section>
+
+  <!-- STEP 6 — seats / devices -->
+  <section class="card hidden" id="s6">
+    <h2>Seats &amp; devices — hand off to Consiglio</h2>
+    <p class="lead">Gramota's job ends at issuance. Minting per-user / per-device sub-tokens and enforcing dual-control, separation-of-duty and access layers is <b>Consiglio's</b> job — it holds your master key locally and never phones home.</p>
+    <div class="okbox">Master issued. Next: open the <b>Postern Business console</b> (<code>apps/postern-enterprise/console.html</code>) or <b>Ezekiel 1</b> (<code>apps/ezekiel1</code>), paste the bundle, and mint signed sub-accesses offline. Both verify the same <code>vendor → master → sub</code> Ed25519 chain.</div>
+    <div class="btnrow"><button class="btn-ghost" data-back="5">Back</button><button class="btn-acc" id="restart">Onboard another entity</button></div>
+  </section>
+</main>
+
+<footer class="site">Gramota (proposed) · thin front over /license/* · on-device OCR · minimal-verdict-only · connect-src 'self' only · no crypto in this page · fiat, not coin · unaudited reference prototype</footer>
+
+<script>
+"use strict";
+/* ============================================================================
+   Inline byte-compatible copy of apps/gramota-kyc/kyc-loa.mjs — the on-device
+   Level-of-Assurance ladder. It emits ONLY the minimal verdict; document images
+   and raw OCR never leave the device. Keep in sync with the .mjs source.
+   ============================================================================ */
+function makeKycLadder(){
+  var now = function(){ return new Date().toISOString(); };
+  var ref = function(){
+    var b = new Uint8Array(8); (globalThis.crypto||crypto).getRandomValues(b);
+    return "kyc-" + Array.from(b).map(function(x){ return x.toString(16).padStart(2,"0"); }).join("");
+  };
+  var norm = function(s){ return String(s==null?"":s).trim().toLowerCase().replace(/\s+/g," "); };
+  function selfDeclare(_ctx){ return {decision:"pass", assurance:"self-declared", loa:0, ref:ref(), checkedAt:now()}; }
+  function corpEmailProof(o){
+    var e = norm(o.email), d = norm(o.domain);
+    var okDomain = !!d && !!e && e.endsWith("@"+d) && !/@.*@/.test(e);
+    return okDomain
+      ? {decision:"pass", assurance:"corp-email", loa:1, ref:ref(), checkedAt:now()}
+      : {decision:"fail", assurance:"corp-email", loa:0, ref:ref(), checkedAt:now()};
+  }
+  function ocrMatch(o){
+    var of = o.ocrFields||{}, dr = o.dnbRecord||{};
+    var keys = Object.keys(of).filter(function(k){ return k in dr; });
+    var matched = 0;
+    keys.forEach(function(k){ if (norm(of[k])===norm(dr[k]) && norm(of[k])!=="") matched++; });
+    var total = keys.length, full = total>0 && matched===total;
+    return {decision:full?"pass":"fail", assurance:"ocr-vs-dnb", loa:full?2:1, ocrMatch:full, fieldsMatched:matched, ref:ref(), checkedAt:now()};
+  }
+  function idv(o){
+    var provider = o && o.provider;
+    if (!provider) return {decision:"fail", assurance:"idv-unconfigured", loa:2, ref:ref(), checkedAt:now()};
+    return {decision:"pass", assurance:"idv:"+String(provider), loa:3, ref:ref(), checkedAt:now()};
+  }
+  function maxLoa(){
+    return Array.prototype.slice.call(arguments).reduce(function(m,v){ return (v&&v.decision==="pass")?Math.max(m,v.loa):m; }, 0);
+  }
+  return {selfDeclare:selfDeclare, corpEmailProof:corpEmailProof, ocrMatch:ocrMatch, idv:idv, maxLoa:maxLoa};
+}
+
+/* ---- config ---- */
+var LICENSE_BASE = ""; // same-origin /license/* on the Pages project
+
+/* ---- state ---- */
+var KYC = makeKycLadder();
+var W = {
+  tier: "corporate-master",
+  orgName: "", duns: "",
+  role: "authorized-signatory", statement: "", selfDeclared: false,
+  verdicts: { self: null, email: null, ocr: null },
+  bundle: null,
+};
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+
+/* ---- step navigation ---- */
+var TOTAL = 6;
+function show(step){
+  for (var i=1;i<=TOTAL;i++){ $("s"+i).classList.toggle("hidden", i!==step); }
+  Array.prototype.forEach.call($("steps").children, function(el){
+    var n = parseInt(el.dataset.step,10);
+    el.classList.toggle("active", n===step);
+    el.classList.toggle("done", n<step);
+  });
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+document.addEventListener("click", function(e){
+  var b = e.target.closest("[data-back]"); if(!b) return;
+  show(parseInt(b.dataset.back,10));
+});
+
+/* ---- step 1 : tier ---- */
+$("tierSeg").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-tier]"); if(!b) return;
+  W.tier = b.dataset.tier;
+  Array.prototype.forEach.call($("tierSeg").children, function(x){ x.setAttribute("aria-pressed", String(x.dataset.tier===W.tier)); });
+  $("freemiumNote").classList.toggle("hidden", W.tier!=="business-freemium");
+});
+$("s1next").addEventListener("click", function(){
+  if (W.tier==="business-freemium"){ $("freemiumNote").classList.remove("hidden"); return; }
+  show(2);
+});
+
+/* ---- step 2 : DUNS ---- */
+$("s2next").addEventListener("click", function(){
+  $("s2err").textContent="";
+  W.orgName = $("orgName").value.trim();
+  W.duns = $("duns").value.trim();
+  if (!W.orgName){ $("s2err").textContent="Enter the legal entity name."; return; }
+  if (!/^\d{9}$/.test(W.duns)){ $("s2err").textContent="DUNS must be exactly 9 digits."; return; }
+  show(3);
+});
+
+/* ---- step 3 : attestation ---- */
+$("s3next").addEventListener("click", function(){
+  $("s3err").textContent="";
+  W.role = $("role").value;
+  W.statement = $("statement").value.trim();
+  W.selfDeclared = $("selfDeclared").checked;
+  if (!W.selfDeclared){ $("s3err").textContent="You must attest before continuing."; return; }
+  W.verdicts.self = KYC.selfDeclare({ orgName: W.orgName, duns: W.duns });
+  renderVerdict();
+  show(4);
+});
+
+/* ---- step 4 : KYC ladder ---- */
+function currentLoa(){
+  return KYC.maxLoa(W.verdicts.self, W.verdicts.email, W.verdicts.ocr);
+}
+function bestVerdict(){
+  // The verdict attached to issuance is the highest-LoA PASS available.
+  var all = [W.verdicts.ocr, W.verdicts.email, W.verdicts.self].filter(function(v){ return v && v.decision==="pass"; });
+  all.sort(function(a,b){ return b.loa - a.loa; });
+  return all[0] || W.verdicts.self;
+}
+function renderVerdict(){
+  var v = bestVerdict();
+  $("verdictOut").textContent = "Current assurance: LoA " + currentLoa() + "\nMinimal verdict attached to issuance:\n" + JSON.stringify(v, null, 2);
+}
+$("doEmail").addEventListener("click", function(){
+  var v = KYC.corpEmailProof({ email: $("corpEmail").value, domain: $("corpDomain").value });
+  W.verdicts.email = v;
+  $("st1").textContent = v.decision==="pass" ? "verified" : "failed";
+  document.querySelector('[data-rung="1"]').classList.toggle("done", v.decision==="pass");
+  renderVerdict();
+});
+$("doOcr").addEventListener("click", function(){
+  var v = KYC.ocrMatch({
+    ocrFields: { legalName: $("ocrName").value, principal: $("ocrPrincipal").value },
+    dnbRecord: { legalName: $("dnbName").value, principal: $("dnbPrincipal").value }
+  });
+  W.verdicts.ocr = v;
+  $("st2").textContent = v.ocrMatch ? "matched" : (v.fieldsMatched+" of 2");
+  document.querySelector('[data-rung="2"]').classList.toggle("done", v.decision==="pass");
+  renderVerdict();
+});
+$("s4next").addEventListener("click", function(){
+  renderSummary();
+  show(5);
+});
+
+/* ---- step 5 : issue ---- */
+function renderSummary(){
+  var v = bestVerdict();
+  $("s5summary").innerHTML =
+    '<div><b>Tier</b> <span>'+esc(W.tier)+'</span></div>'+
+    '<div><b>Entity</b> <span>'+esc(W.orgName)+'</span></div>'+
+    '<div><b>DUNS</b> <span class="mono">'+esc(W.duns)+'</span></div>'+
+    '<div><b>Role</b> <span>'+esc(W.role)+'</span></div>'+
+    '<div><b>Assurance</b> <span>LoA '+currentLoa()+' ('+esc(v.assurance)+')</span></div>';
+}
+$("s5issue").addEventListener("click", async function(){
+  $("s5err").textContent="";
+  var btn = $("s5issue"); btn.disabled = true; var prev = btn.textContent; btn.textContent = "Requesting…";
+  var v = bestVerdict();
+  // Only the minimal verdict crosses the wire (no images, no raw OCR, no PII beyond DUNS).
+  var kyc = { decision: v.decision, assurance: v.assurance, loa: currentLoa(), ref: v.ref, checkedAt: v.checkedAt };
+  if (v.ocrMatch !== undefined) { kyc.ocrMatch = v.ocrMatch; kyc.fieldsMatched = v.fieldsMatched; }
+  var body = {
+    tier: W.tier,
+    duns: W.duns,
+    role: W.role,
+    attestation: { role: W.role, self_declared: W.selfDeclared, statement: W.statement },
+    kyc: kyc // absent-key-safe extension; the spine's KYC seam consumes it when present
+  };
+  try {
+    var res = await fetch(LICENSE_BASE + "/license/master", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    var text = await res.text();
+    var json;
+    try { json = JSON.parse(text); } catch(_e){ json = null; }
+    if (!res.ok){
+      var reason = (json && (json.error || json.message)) || ("HTTP "+res.status);
+      $("s5err").textContent = "Issuance refused: " + reason + (res.status===422 ? " (the D&B gate did not resolve this DUNS to a real entity)" : "");
+      return;
+    }
+    if (!json || !json.master_token || !json.master_private_key_pkcs8){
+      $("s5err").textContent = "The spine responded but the bundle is incomplete. Is /license/master provisioned (VENDOR_PRIV_PKCS8_B64)?";
+      return;
+    }
+    W.bundle = json;
+    $("bundleBox").textContent = JSON.stringify(json, null, 2);
+    $("issueResult").classList.remove("hidden");
+    $("issueResult").scrollIntoView({behavior:"smooth",block:"nearest"});
+  } catch(e){
+    $("s5err").textContent = "Could not reach /license/master ("+(e && e.message ? e.message : "network error")+"). Serve this page from the same origin as the license functions.";
+  } finally {
+    btn.disabled = false; btn.textContent = prev;
+  }
+});
+$("copyBundle").addEventListener("click", function(){
+  try { navigator.clipboard.writeText($("bundleBox").textContent); } catch(_e){}
+});
+$("s5next").addEventListener("click", function(){ show(6); });
+$("restart").addEventListener("click", function(){ location.reload(); });
+
+/* theme */
+$("themeBtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", cur==="light"?"dark":"light");
+});
+
+show(1);
+</script>
+</body>
+</html>

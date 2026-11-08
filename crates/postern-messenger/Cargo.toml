@@ -1,0 +1,92 @@
+[package]
+name = "postern-messenger"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs messenger — the E2EE core (Megolm via vodozemac). The full Matrix client (matrix-rust-sdk) is the app layer; never Element (AGPL)."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_messenger"
+
+# The live-homeserver integration test only exists when the `matrix` feature
+# is on (and is additionally #[ignore]d — see tests/matrix_live.rs for setup).
+[[test]]
+name = "matrix_live"
+required-features = ["matrix"]
+
+[features]
+# `matrix` — the Phase-1 Matrix client slice (matrix-rust-sdk: login, sync,
+# E2EE send/receive with Olm per-device room-key distribution handled by the
+# SDK). OFF by default on purpose: matrix-sdk is a large dependency tree and
+# the default workspace build/test gate must stay lean and green. This is the
+# FEDERATED interop path; the DEFAULT path (`channel`/`store`/`transport`,
+# always built) is the Postern-native persistent Megolm channel.
+#   build: cargo build -p postern-messenger --features matrix
+#   test:  cargo test  -p postern-messenger --features matrix
+matrix = ["dep:matrix-sdk", "dep:tokio", "dep:postern-courier"]
+
+# `tor` — route the default channel's Megolm `Frame`s over an in-process Tor
+# circuit (`crate::tor`, via `postern-tor`/arti). OFF by default because arti is
+# heavy and EVERY Tor path in this workspace is feature-gated the same way. The
+# frame WIRE CODEC it uses is in the default build and unit-tested there; this
+# feature only adds the async socket plumbing.
+#   build: cargo build -p postern-messenger --features tor
+#   test:  cargo test  -p postern-messenger --features tor
+tor = ["dep:postern-tor", "dep:arti-client", "dep:tokio"]
+
+[dependencies]
+# vodozemac — the Matrix project's Rust Olm/Megolm implementation,
+# Apache-2.0, audited (Least Authority 2022). Used DIRECTLY by the default
+# `channel` path (the real, persistent Postern-native Megolm messaging core)
+# and the `megolm_reference` module; the `matrix` feature reaches the same
+# primitives THROUGH matrix-rust-sdk. NEVER Element (AGPL), NEVER libsignal
+# (AGPL).
+vodozemac = "0.10" # same version matrix-sdk-crypto uses — one copy in the lockfile
+thiserror = "2"
+zeroize = "1"    # wipe exported Megolm keys + the at-rest pickle key from RAM
+# serde/serde_json — the on-wire `Frame` envelope and the encrypted-at-rest
+# persisted session state (both default-path, no feature). Already in the
+# workspace lockfile.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# --- feature `tor` only (Megolm frames over Tor) ----------------------------
+# postern-tor (workspace crate): the in-process arti Tor client. The messenger
+# uses it CLIENT-side to carry Frames to a peer listener (ideally a .onion).
+postern-tor = { path = "../postern-tor", optional = true }
+# arti-client only to NAME `DataStream` in the `connect` constructor's return
+# type (0.44 unifies with postern-tor's — one arti in the lockfile). The
+# transport itself is generic over any tokio `AsyncRead + AsyncWrite` stream, so
+# it is round-trip-tested offline over an in-memory duplex; arti is not needed
+# for that test, only for the live connect.
+arti-client = { version = "0.44", default-features = false, features = ["tokio", "rustls"], optional = true }
+
+# --- feature `matrix` only (Phase 1 client slice) ---------------------------
+# matrix-rust-sdk (Apache-2.0): the vetted Matrix client. Its E2EE is
+# Olm/Megolm via vodozemac; `e2e-encryption` turns that on (TLS is rustls,
+# built in as of 0.18 — the old `rustls-tls` feature is gone).
+# `sqlite` pulls in matrix-sdk-sqlite (Apache-2.0) -> rusqlite (MIT) —
+# both permissive — and enables `Client::builder().sqlite_store(path,
+# passphrase)` so Olm/Megolm sessions, sync tokens, and decryption/replay
+# bookkeeping survive restart (see `MatrixMessenger::login_password_persistent`
+# in src/matrix.rs). This store is passphrase-encrypted by the SDK's own
+# sqlite-cipher layer; it is NOT yet wrapped by the Postern PQ vault — that
+# remains Phase-1 remaining work.
+matrix-sdk = { version = "0.18", default-features = false, features = ["e2e-encryption", "sqlite"], optional = true }
+# `io-util` added for the `tor` frame carrier's AsyncRead/AsyncWrite on the
+# arti stream; the other features serve the `matrix` slice. Feature unification
+# across `matrix`/`tor` is fine — one tokio in the lockfile.
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time", "io-util"], optional = true }
+# postern-courier (workspace crate, MIT OR Apache-2.0): the hybrid
+# X25519+ML-KEM-1024 payload seal, reused to PQ-seal a persisted
+# `matrix::SavedSession` at rest (`SavedSession::seal_to`/`open_sealed` —
+# see their HONEST CAVEATs in src/matrix.rs). Default features only: no
+# `onion-transport`, so no arti and no network — just the crypto seal.
+postern-courier = { path = "../postern-courier", optional = true }
+
+[dev-dependencies]
+# tempfile (MIT OR Apache-2.0, permissive): scratch directories for the
+# offline `login_password_persistent` sqlite-store test below (matrix
+# feature only — the crate is already in the workspace lockfile via other
+# members, this adds no new license to review).
+tempfile = "3"

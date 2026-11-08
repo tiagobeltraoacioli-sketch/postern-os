@@ -1,0 +1,1863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Chiave — sign in with your wallet · Postern Labs</title>
+<style>
+/* ============================================================
+   CHIAVE · Postern Labs
+   "chiave" — the key. Sign-In With Postern Wallet: the platform
+   login is your own wallet, not an email account.
+   Graphite/ink instrument panel with an iris accent
+   (Sotto wears brass, Vedetta steel blue; Chiave wears iris).
+   Fully local — this file makes ZERO network requests.
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink (neutrals = _design-system/tokens.css) */
+  --bg:        #0d1014;
+  --bg-glow:   #10141b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e8ec;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --acc:       #9d8ce0;   /* iris — Chiave's own accent */
+  --acc-hi:    #b6a8ef;
+  --acc-dim:   #6a5da3;
+  --acc-ink:   #120e1f;
+
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+
+:root[data-theme="light"] {
+  /* light neutrals = _design-system/tokens.css */
+  --bg:        #f0eff3;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #eceae2;
+  --surface-3: #e3e0d5;
+  --border:    #d5d0c4;
+  --border-hi: #bdb7a8;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --acc:       #5b4a9c;
+  --acc-hi:    #483a7e;
+  --acc-dim:   #8578b5;
+  --acc-ink:   #f8f6ff;
+
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(40,50,64,.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0eff3; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#eceae2;
+    --surface-3:#e3e0d5; --border:#d5d0c4; --border-hi:#bdb7a8;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --acc:#5b4a9c; --acc-hi:#483a7e; --acc-dim:#8578b5; --acc-ink:#f8f6ff;
+    --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(40,50,64,.14);
+  }
+}
+
+/* ---------- high contrast (prefers-contrast: more) ----------
+   Harden borders + text separation without changing the layout.
+   Purely local; no new origins, no new assets. */
+@media (prefers-contrast: more) {
+  :root {
+    --border:    #4a5666;
+    --border-hi: #66748a;
+    --text:      #f4f5f8;
+    --text-dim:  #c3c8d0;
+    --muted:     #9aa2ad;
+    --acc-hi:    #cabfff;
+  }
+  :root[data-theme="light"] {
+    --border:    #9a927e;
+    --border-hi: #6f6852;
+    --text:      #14171c;
+    --text-dim:  #363c45;
+    --muted:     #4d545e;
+    --acc:       #453578;
+    --acc-hi:    #332861;
+  }
+  :focus-visible {
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --border:#9a927e; --border-hi:#6f6852;
+    --text:#14171c; --text-dim:#363c45; --muted:#4d545e;
+    --acc:#453578; --acc-hi:#332861;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--acc); color: var(--acc-ink); }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 17px; font-weight: 700;
+  letter-spacing: .34em; text-indent: .34em;
+  color: var(--text);
+  user-select: none;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+  margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+
+/* ---------- hero / seal emblem ---------- */
+.hero { text-align: center; padding: 34px 0 6px; }
+.seal-stage { position: relative; width: 150px; height: 150px; margin: 0 auto; }
+.seal-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--border-hi) 70%, transparent);
+  opacity: .7;
+}
+.seal {
+  position: absolute; inset: 16px; border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  background:
+    radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--acc) 24%, transparent), transparent 58%),
+    linear-gradient(160deg, var(--surface-3), var(--surface));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 0 0 1px color-mix(in srgb, var(--acc) 10%, transparent),
+    0 0 40px color-mix(in srgb, var(--acc) 12%, transparent),
+    var(--shadow);
+  display: grid; place-items: center;
+}
+.seal svg { width: 46px; height: 46px; color: var(--acc); }
+@keyframes breathe { 0%,100% { transform: scale(1); opacity:.75 } 50% { transform: scale(1.03); opacity: 1 } }
+body[data-state="locked"] .seal-ring { animation: breathe 4.5s ease-in-out infinite; }
+body[data-state="session"] .seal { border-color: color-mix(in srgb, var(--ok) 55%, var(--border-hi)); }
+body[data-state="session"] .seal svg { color: var(--ok); }
+body[data-state="session"] .seal-ring { border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+.status-line {
+  min-height: 1.6em;
+  margin: 18px auto 0;
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 540px;
+}
+.status-line[data-tone="err"] { color: var(--err); }
+.status-line[data-tone="ok"]  { color: var(--ok); }
+
+/* ---------- cards / views ---------- */
+.view { margin: 22px 0 40px; }
+.card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.card h2 {
+  margin: 0 0 12px; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc);
+  font-weight: 700;
+}
+.card p.lead { margin: 0 0 14px; font-size: 14.5px; color: var(--text-dim); }
+
+.field { margin-bottom: 16px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field input[type="password"], .field input[type="text"], .field textarea {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+}
+.field textarea { font-family: var(--font-mono); font-size: 13px; min-height: 86px; resize: vertical; }
+.field input:focus, .field textarea:focus { border-color: var(--acc); outline: none; }
+
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 6%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--acc); }
+.radio-card .rc-t { font-size: 14.5px; font-weight: 600; }
+.radio-card .rc-d { font-size: 12.5px; color: var(--muted); }
+
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-acc:disabled { opacity: .45; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 10px; padding: 10px 16px; font-size: 14px;
+}
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text); }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+  font-size: 12.5px;
+}
+button.linkish:hover { color: var(--text-dim); }
+
+.err-line { color: var(--err); font-size: 13px; min-height: 1.4em; margin-top: 8px; }
+
+/* warning box — the recovery warning */
+.warnbox {
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+  border-radius: 10px; padding: 12px 14px; margin: 12px 0;
+  font-size: 13.5px; line-height: 1.55;
+}
+.warnbox strong { color: var(--warn); }
+
+/* honesty note strip — PQ stand-in labels */
+.standin {
+  border: 1px dashed var(--border-hi);
+  border-radius: 10px; padding: 9px 12px; margin-top: 14px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.6;
+  color: var(--muted);
+}
+.standin b { color: var(--acc); font-weight: 600; }
+
+/* mnemonic grid */
+.mnemonic {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  margin: 12px 0; padding: 0; list-style: none;
+  font-family: var(--font-mono); font-size: 13px;
+}
+.mnemonic li {
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); padding: 5px 8px;
+  display: flex; gap: 7px; align-items: baseline;
+}
+.mnemonic li .n { color: var(--muted); font-size: 10px; min-width: 2ch; text-align: right; }
+.mnemonic li .w { color: var(--text); }
+@media (max-width: 560px) { .mnemonic { grid-template-columns: repeat(3, 1fr); } .byline { display: none; } }
+
+.checkline { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; margin: 12px 0 4px; cursor: pointer; }
+.checkline input { margin-top: 3px; accent-color: var(--acc); }
+
+/* session identity */
+.who-fpr {
+  font-family: var(--font-mono); font-size: clamp(17px, 4.3vw, 22px); font-weight: 700;
+  letter-spacing: .04em; color: var(--acc); overflow-wrap: anywhere;
+}
+.who-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.kv { margin: 10px 0 0; font-size: 13px; }
+.kv dt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+.kv dd { margin: 3px 0 0; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+.verify-ok { color: var(--ok); font-size: 13.5px; margin-top: 12px; font-weight: 600; }
+.verify-ok .x { font-family: var(--font-mono); }
+
+details.sig summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 6px; }
+details.sig pre {
+  margin: 6px 0 0; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 130px; overflow-y: auto;
+}
+
+.danger-zone { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 14px; }
+
+/* honesty dialog */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  width: min(620px, calc(100vw - 36px));
+  max-height: min(84vh, 760px);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(6,8,10,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc);
+  font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+.pv-note { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 12px 0 16px; }
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; line-height: 1.4; color: var(--ok); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--acc); }
+table.standins { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 10px 0 6px; }
+table.standins th, table.standins td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+table.standins th { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+.tblwrap { overflow-x: auto; }
+
+/* footer */
+footer.site {
+  padding: 8px 0 26px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+.foot-lock { color: var(--acc); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+[hidden] { display: none !important; }
+</style>
+</head>
+<body data-state="setup">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Chiave">C<span class="tick">·</span>HIAVE</div>
+    <div class="byline">Postern Labs · sign in with your wallet</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnHonesty">How it works</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" aria-label="Wallet state">
+    <div class="seal-stage">
+      <div class="seal-ring" aria-hidden="true"></div>
+      <div class="seal" aria-hidden="true">
+        <svg viewBox="0 0 46 46" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="17" cy="17" r="8.5"/>
+          <circle cx="17" cy="17" r="2.6" fill="currentColor" stroke="none"/>
+          <path d="M23.5 23.5 L38 38"/>
+          <path d="M31 31 L35.5 26.5"/>
+          <path d="M35 35 L39.5 30.5"/>
+        </svg>
+      </div>
+    </div>
+    <p class="status-line" id="statusLine" aria-live="polite"></p>
+  </section>
+
+  <!-- ================= SETUP ================= -->
+  <section class="view" id="viewSetup" hidden>
+
+    <div class="card" id="setupChoose">
+      <h2>Set up this device</h2>
+      <p class="lead">Your Postern login <strong>is your wallet</strong> — a post-quantum keypair only you hold.
+      There is no email, no account server, and no password database anywhere.</p>
+      <label class="radio-card">
+        <input type="radio" name="setupMode" value="create" checked>
+        <div>
+          <div class="rc-t">Create a new wallet</div>
+          <div class="rc-d">Generates a fresh seed phrase — shown once, then never again.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="setupMode" value="restore">
+        <div>
+          <div class="rc-t">Restore from a seed phrase</div>
+          <div class="rc-d">You already have a 24-word phrase from a previous setup of this demo.</div>
+        </div>
+      </label>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnChooseNext">Continue</button>
+      </div>
+    </div>
+
+    <div class="card" id="setupBackup" hidden>
+      <h2>Your seed phrase — shown once</h2>
+      <div class="warnbox" role="alert">
+        <strong>This is your only recovery. Write these 24 words on paper, in order.</strong><br>
+        There is no email reset, no account, and no support desk that can recover this wallet —
+        no one else ever holds the secret. Forget your passphrase? These words restore everything.
+        Lose these words <em>and</em> the passphrase? The wallet is gone, permanently. That is the
+        self-custody bargain, stated plainly. (No copy button on purpose — a clipboard is not paper.)
+      </div>
+      <ol class="mnemonic" id="mnemonicGrid" aria-label="Your 24-word seed phrase"></ol>
+      <label class="checkline">
+        <input type="checkbox" id="ckWrote">
+        <span>I have written all 24 words down on paper, in order, and stored them somewhere safe.</span>
+      </label>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnBackupNext" disabled>Continue</button>
+        <button class="btn-ghost" id="btnRegen">Generate a different phrase</button>
+        <button class="linkish" id="btnBackupBack">back</button>
+      </div>
+    </div>
+
+    <div class="card" id="setupRestore" hidden>
+      <h2>Restore from seed phrase</h2>
+      <div class="field">
+        <label for="restoreWords">Your 24 words, separated by spaces</label>
+        <textarea id="restoreWords" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="word word word … (24 words)"></textarea>
+        <p class="fhelp">The phrase is checked locally (word list + checksum) and never leaves this page.</p>
+      </div>
+      <p class="err-line" id="restoreErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnRestoreNext">Continue</button>
+        <button class="linkish" id="btnRestoreBack">back</button>
+      </div>
+    </div>
+
+    <div class="card" id="setupPass" hidden>
+      <h2>Set your unlock passphrase</h2>
+      <p class="lead">The wallet secret is sealed on this device with <strong>AES-256-GCM</strong> under a key
+      derived from this passphrase. You will type it to sign in. It is <em>not</em> the seed phrase —
+      if you forget it, the 24 words restore everything; the passphrase only unlocks this device.</p>
+      <div class="field">
+        <label for="pass1">Unlock passphrase (min 8 characters)</label>
+        <input type="password" id="pass1" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="pass2">Repeat it</label>
+        <input type="password" id="pass2" autocomplete="new-password">
+      </div>
+      <p class="err-line" id="passErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnCreateWallet">Create &amp; seal wallet</button>
+        <button class="linkish" id="btnPassBack">back</button>
+      </div>
+      <p class="standin" id="standinKdf">Sealing at rest: AES-256-GCM, key from <b>PBKDF2-SHA-256 (310,000 it.)</b> —
+      a WebCrypto stand-in for the product's <b>Argon2id</b>, the
+      <code>postern-core</code> keyfile construction. Only ciphertext is stored.</p>
+    </div>
+
+    <div class="card" id="setupBio" hidden>
+      <h2>Biometric unlock — optional</h2>
+      <p class="lead">Add a fingerprint / face unlock <strong>as a convenience gate</strong>. It is not a new
+      root of trust and not a recovery method: the passphrase always remains, and only the seed phrase can
+      recover a lost wallet. In the real product the device TEE (StrongBox / Secure Enclave) releases the
+      wallet key only after the biometric check — and invalidates it if the biometric enrollment changes.</p>
+      <p class="err-line" id="bioSetupErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnBioEnrollSetup">Enable biometric unlock</button>
+        <button class="btn-ghost" id="btnBioSkip">Skip — passphrase only</button>
+      </div>
+      <p class="standin">Browser stand-in: <b>WebAuthn platform authenticator</b> (Touch&nbsp;ID / Windows&nbsp;Hello /
+      Android biometric) with the <b>PRF extension</b>, so the biometric assertion really does release the key
+      material that decrypts the sealed wallet copy — standing in for the TEE's biometric-gated key release.
+      No network call is involved.</p>
+    </div>
+
+  </section>
+
+  <!-- ================= LOCKED / LOGIN ================= -->
+  <section class="view" id="viewLocked" hidden>
+    <div class="card">
+      <h2>Sign in — unlock your wallet</h2>
+      <p class="lead" id="lockedIntro"></p>
+      <form id="loginForm">
+        <div class="field">
+          <label for="loginPass">Unlock passphrase</label>
+          <input type="password" id="loginPass" autocomplete="current-password">
+        </div>
+        <p class="err-line" id="loginErr" aria-live="assertive"></p>
+        <div class="btnrow">
+          <button type="submit" class="btn-acc" id="btnUnlock">Unlock &amp; sign in</button>
+          <button type="button" class="btn-ghost" id="btnBioUnlock" hidden>Unlock with biometrics</button>
+        </div>
+      </form>
+      <p class="standin" id="panicNote" hidden><b>Panic Lock engaged:</b> biometric unlock has been disabled.
+      Sign in with your passphrase, then re-enable biometrics deliberately if you choose.</p>
+      <div class="danger-zone">
+        <button class="linkish" id="btnEraseLocked">erase everything on this device</button>
+        <p class="fhelp" style="margin:6px 0 0">Erasing deletes the sealed wallet from this browser. Without your
+        24-word seed phrase there is no way back — there is no server copy.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SESSION ================= -->
+  <section class="view" id="viewSession" hidden>
+
+    <div class="card">
+      <h2>Signed in</h2>
+      <div class="who-fpr" id="whoFpr"></div>
+      <div class="who-sub">the fingerprint of your <strong>login</strong> public key (m/login) — your platform identity.
+      The spending key (m/spend) was never derived during this sign-in.</div>
+      <dl class="kv">
+        <dt>Session challenge — single-use nonce, 2-minute expiry, bound to this page's origin; signed locally and verified <em>before</em> the session was granted</dt>
+        <dd id="chJson"></dd>
+        <dt>Signature <span id="sigAlg"></span></dt>
+        <dd>
+          <details class="sig"><summary id="sigSummary">show signature</summary><pre id="sigB64"></pre></details>
+        </dd>
+      </dl>
+      <p class="verify-ok" id="verifyLine" role="status"></p>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnNewChallenge">Sign a new challenge</button>
+        <button class="btn-ghost" id="btnLock">Lock</button>
+        <button class="btn-danger" id="btnPanic" title="Instantly re-lock and disable biometric unlock. Nothing is destroyed.">Panic Lock</button>
+      </div>
+      <p class="standin" id="standinPq">Signing key: <b id="algLabel"></b> via WebCrypto — a <b>classical stand-in</b> for the
+      wallet's hybrid <b>Falcon-1024&nbsp;‖&nbsp;ML-DSA-65</b> post-quantum key held in the device TEE.
+      The flow — seed → passphrase-sealed at rest → local unlock → derive m/login → sign challenge → session —
+      is the real design; only the primitive differs in a browser.</p>
+    </div>
+
+    <!-- ADDITIVE handoff: wallet-as-login → Consiglio / Ezekiel1 (no Chiave internals changed) -->
+    <div class="card" id="cardHandoff">
+      <h2>Handoff to Consiglio / Ezekiel1 — wallet-as-login receipt</h2>
+      <p class="lead">Mint a <strong>login receipt</strong> the master admin carries into
+        <strong>Ezekiel1</strong> (and that Consiglio can re-verify). Your unlocked wallet key signs the
+        <strong>Consiglio transcript</strong> — <code style="font-family:var(--font-mono)">consiglio:wallet-login:v1</code>
+        over <code>{org_id, user_id, nonce_hex, issued_at}</code> — binding the intended <strong>role</strong>
+        and Bell–LaPadula <strong>clearance</strong> to your wallet signature. Nothing leaves this device by
+        network; copy the JSON out of band. Consiglio's real hybrid-PQ verifier is authoritative — the
+        Ezekiel1-side check is a labelled offline stand-in.</p>
+      <div class="field">
+        <label for="hoOrg">Organisation id</label>
+        <input type="text" id="hoOrg" autocomplete="off" spellcheck="false" placeholder="acme">
+      </div>
+      <div class="field">
+        <label for="hoUser">User id</label>
+        <input type="text" id="hoUser" autocomplete="off" spellcheck="false" placeholder="admin">
+      </div>
+      <div class="field">
+        <label for="hoRole">Role (master-access officer)</label>
+        <select id="hoRole">
+          <option value="it-admin">it-admin</option>
+          <option value="compliance-officer">compliance-officer</option>
+          <option value="engineer">engineer</option>
+          <option value="finance-analyst">finance-analyst</option>
+          <option value="counsel">counsel</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="hoClear">Bell–LaPadula clearance (u8)</label>
+        <input type="text" id="hoClear" autocomplete="off" inputmode="numeric" placeholder="3" value="3">
+      </div>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnHandoff">Generate login receipt</button>
+        <button class="btn-ghost" id="btnHandoffCopy" hidden>Copy</button>
+      </div>
+      <p class="err-line" id="hoErr" aria-live="polite"></p>
+      <div class="field" style="margin-top:10px;">
+        <label for="hoOut">Login receipt (JSON) — paste into Ezekiel1 · B·0b</label>
+        <textarea id="hoOut" readonly rows="8" spellcheck="false" style="font-family:var(--font-mono); font-size:12px;"></textarea>
+      </div>
+      <p class="standin">Reference wiring for the Chiave ↔ Consiglio seam. In production the wallet signs the
+        crate's domain-separated transcript with the hybrid <b>Falcon-1024 ‖ ML-DSA-65</b> key and
+        <code>console-auth.verifyLogin()</code> mints the session; here the classical login key signs the same
+        field set as an honest stand-in. <b>role</b> and <b>clearance</b> are <em>attested</em> here but the
+        authoritative binding is Consiglio's dual-controlled enrollment.</p>
+    </div>
+
+    <div class="card">
+      <h2>App secrets — unlocked by login</h2>
+      <p class="lead">The same identity seals app secrets in the Vault (key derived on <code style="font-family:var(--font-mono)">postern:vault:v1</code>,
+      a separate domain from login and spend). Because you signed in, they are open. Lock, and they return to ciphertext.</p>
+      <div class="field">
+        <label for="vaultSecret">Anthropic API key (example app secret — for Sotto)</label>
+        <input type="text" id="vaultSecret" autocomplete="off" spellcheck="false" placeholder="sk-ant-… (any demo value)">
+        <p class="fhelp" id="vaultHelp"></p>
+      </div>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnVaultSave">Seal in vault</button>
+      </div>
+    </div>
+
+    <div class="card" id="cardTerminals">
+      <h2>Paired terminals — phone-as-signer</h2>
+      <p class="lead">Every laptop this wallet has paired with — each pinned by a 6-digit <strong>SAS</strong> at first
+      contact. Revoke one to drop its reconnect-without-SAS trust; <strong>panic-revoke</strong> evicts them all at
+      once. Revoke is <strong>monotonic</strong>: the sealed record is deleted, never un-revoked.</p>
+      <div id="termList" class="ledger" style="margin:12px 0"></div>
+      <p class="err-line" id="termErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnPairDemo">Pair a demo terminal</button>
+        <button class="btn-danger" id="btnPanicRevoke">Panic-revoke all</button>
+      </div>
+      <p class="standin">Reference UI for <code>integration/pairing</code>’s sealed <code>PairingRecord</code> model
+      (<code>PairedTerminals</code>): persist-on-pair, <b>monotonic revoke</b> (the sealed blob is deleted — there is
+      no un-revoke), and <b>panic-revoke-all</b> (the <code>postern-panic</code> re-lock hook that drops every
+      reconnect channel). Here the records live in this browser’s localStorage as a labeled stand-in; in the product
+      each is <b>StrongBox / Secure-Enclave-wrapped on the phone</b>, and the wallet key never crosses the wire —
+      the desktop is a terminal that holds nothing.</p>
+    </div>
+
+    <div class="card" id="cardBio">
+      <h2>Biometric unlock</h2>
+      <p class="lead" id="bioStatus"></p>
+      <p class="err-line" id="bioErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnBioEnroll" hidden>Enable biometric unlock</button>
+        <button class="btn-ghost" id="btnBioRemove" hidden>Disable biometric unlock</button>
+      </div>
+      <p class="standin">A biometric is a <b>convenience gate</b> in front of the sealed wallet key — never a
+      replacement for the passphrase, never a recovery method. A coerced finger is easier to take than a spoken
+      passphrase, which is why <b>Panic Lock disables the biometric path</b>. Real product: StrongBox /
+      Secure Enclave with enrollment-change invalidation; here: WebAuthn platform authenticator + PRF, labeled above.</p>
+    </div>
+
+    <div class="card">
+      <div class="danger-zone" style="border-top:0; margin-top:0; padding-top:0">
+        <span style="display:block; font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim); margin-bottom:7px">Erase everything</span>
+        <p class="fhelp" style="margin:0 0 10px">Deletes the sealed wallet, the vault, and the biometric enrollment from this
+        browser. Your 24-word seed phrase is then the only way to recreate this identity — there is no server copy.</p>
+        <button class="btn-danger" id="btnErase">Erase wallet, vault &amp; biometrics</button>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<footer class="site wrap"><span class="foot-lock">●</span> fully local — this page makes zero network requests · no account · no server · your key, your login</footer>
+
+<!-- ================= HONESTY ================= -->
+<dialog id="dlgHonesty" aria-labelledby="honestyTitle">
+  <div class="dlg-head">
+    <h2 id="honestyTitle">How it works — honestly</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">
+      Chiave is the reference flow for <strong>Sign-In With Postern Wallet</strong>: the platform login is your own
+      post-quantum wallet, not an email account. This page is one static file.
+      <strong>It makes zero network requests — no CDN, no fonts, no APIs, no telemetry.</strong>
+      Everything below happens inside this tab.
+    </p>
+
+    <div class="ledger">
+      <div class="ledger-row">
+        <div class="mark">●</div>
+        <div>
+          <h3>Your seed phrase — shown once, kept nowhere</h3>
+          <p>Generated locally, displayed once for you to write down, then erased from the page. It is the
+          <strong>only recovery</strong>: no email reset, no support recovery, ever. A forgotten passphrase is
+          recoverable from the seed; a lost seed is permanent loss.</p>
+        </div>
+      </div>
+      <div class="ledger-row">
+        <div class="mark">●</div>
+        <div>
+          <h3>Your wallet at rest — ciphertext only</h3>
+          <p>Sealed with <code>AES-256-GCM</code> under a key derived from your passphrase
+          (<code>PBKDF2-SHA-256, 310,000 it.</code> — stand-in for Argon2id). localStorage holds only the
+          ciphertext, the KDF salt, and your login <em>public</em> key — the same shape as the
+          <code>bloch-crypto</code> encrypted keyfile. A wrong passphrase fails the GCM tag: all-or-nothing,
+          no partial unlock.</p>
+        </div>
+      </div>
+      <div class="ledger-row">
+        <div class="mark">●</div>
+        <div>
+          <h3>Signing in — a local ceremony, run with RP discipline</h3>
+          <p>Passphrase → KDF → decrypt → derive the <code>m/login</code> identity key (domain-separated from
+          <code>m/spend</code>, so logging in never touches the funds key) → the verifier issues a challenge —
+          a <strong>single-use</strong> random nonce with a <strong>2-minute expiry</strong>, bound to this
+          page's <strong>origin</strong> — the wallet signs its canonical bytes, and the session is granted
+          <strong>only after</strong> the signature verifies against the enrolled public key. A captured
+          challenge/signature pair can never be replayed, and a challenge minted for another origin never
+          verifies here. No server is consulted because none exists; this page plays the RP role itself, and
+          that verifier is the reference for the real login manager.</p>
+        </div>
+      </div>
+      <div class="ledger-row">
+        <div class="mark">●</div>
+        <div>
+          <h3>Biometrics — a gate, not a key</h3>
+          <p>Optional WebAuthn platform authenticator (Touch&nbsp;ID / Windows&nbsp;Hello) with the PRF extension:
+          the assertion releases key material that decrypts a second sealed copy of the wallet. The passphrase
+          always remains; biometrics can never recover a lost seed. <strong>Panic Lock disables the biometric
+          path</strong> — a coerced finger then opens nothing.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="pv-note"><strong>Stand-ins, labeled (the flow is the real thing; the primitives differ in a browser):</strong></p>
+    <div class="tblwrap">
+    <table class="standins">
+      <tr><th>In this demo</th><th>In the product</th></tr>
+      <tr><td>Ed25519 (or ECDSA P-256) via WebCrypto</td><td>Hybrid <strong>Falcon-1024 ‖ ML-DSA-65</strong> in the device TEE, non-exportable</td></tr>
+      <tr><td>PBKDF2-SHA-256, 310,000 iterations</td><td><strong>Argon2id</strong> (64 MiB, t=3) — memory-hard, as in <code>bloch-crypto</code></td></tr>
+      <tr><td>SHA-256 domain tags (<code>postern:login:v1</code>, <code>postern:vault:v1</code>)</td><td>SHA3-256 domain tags — the <code>bloch-crypto</code> diversifier pattern</td></tr>
+      <tr><td>256-word demo wordlist, 24 words + checksum (184-bit entropy)</td><td>BIP39 English, 2048 words, 24 words (256-bit) — <code>SeedPhrase</code></td></tr>
+      <tr><td>WebAuthn platform authenticator + PRF</td><td>StrongBox / Secure Enclave biometric-gated key release, enrollment-change invalidation</td></tr>
+      <tr><td>Stand-in keypair generated at setup, sealed alongside the seed</td><td>ML-DSA login anchor derived <em>deterministically</em> from the seed (stable fingerprint across restores); Falcon half re-enrolled and cross-signed</td></tr>
+    </table>
+    </div>
+
+    <p class="pv-note">
+      <strong>What we won't claim:</strong> a browser cannot guarantee memory zeroization or hardware key
+      protection — that is exactly why the real product keeps the wallet key in the TEE and does this in Rust
+      (<code>zeroize</code>). What this page does do: the signed-in session keeps only <em>non-extractable</em>
+      WebCrypto handles, dropping the seed and private-key material as soon as those handles are derived, and
+      re-asks for your passphrase if biometric enrollment later needs the secret again. And coercion of a passphrase is not solved by any login design: that is
+      <strong>Panic Lock</strong>'s job (<code>postern-panic</code>) — instant re-lock to ciphertext, nothing
+      destroyed. Design of record: <code>docs/specs/POSTERN-IDENTITY.md</code>.
+    </p>
+    <p style="text-align:right; margin: 14px 0 0">
+      <button class="btn-acc" data-close>Understood</button>
+    </p>
+  </div>
+</dialog>
+
+<!-- ================= RE-CONFIRM PASSPHRASE (biometric enrollment) ================= -->
+<dialog id="dlgRePass" aria-labelledby="rePassTitle">
+  <div class="dlg-head">
+    <h2 id="rePassTitle">Confirm your passphrase</h2>
+    <button class="x" id="rePassCancel" aria-label="Cancel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <form id="rePassForm">
+      <p class="pv-note" style="margin-top:0">Enrolling biometrics needs the sealed wallet secret, which this
+      session deliberately does not hold — it kept only the derived signing and vault handles. Your passphrase
+      re-opens the seal once; the secret is used for enrollment and dropped again.</p>
+      <div class="field">
+        <label for="rePassInput">Unlock passphrase</label>
+        <input type="password" id="rePassInput" autocomplete="current-password">
+      </div>
+      <p class="err-line" id="rePassErr" aria-live="assertive"></p>
+      <div class="btnrow">
+        <button type="submit" class="btn-acc">Continue</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script id="pid-core">
+"use strict";
+/* ============================================================
+   CHIAVE — crypto core (DOM-free; testable in Node ≥ 18)
+   Zero network. WebCrypto only.
+   ============================================================ */
+const PID = (() => {
+  const te = new TextEncoder();
+  const td = new TextDecoder();
+  const subtle = () => crypto.subtle;
+
+  /* ---- bytes ---- */
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => {
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  const unhex = (s) => {
+    const m = typeof s === "string" ? s.match(/.{2}/g) : null;
+    if (!m || m.length * 2 !== s.length) throw new Error("corrupt payload: not a hex string");
+    return new Uint8Array(m.map(h => parseInt(h, 16)));
+  };
+  const concat = (...arrs) => {
+    const total = arrs.reduce((n, a) => n + a.length, 0);
+    const out = new Uint8Array(total);
+    let o = 0;
+    for (const a of arrs) { out.set(a, o); o += a.length; }
+    return out;
+  };
+  const rand = (n) => crypto.getRandomValues(new Uint8Array(n));
+
+  /* ---- canonical JSON: sorted keys, so signer and verifier see identical
+     bytes even after an RP reconstructs the object (same helper as Sarto) ---- */
+  function stableStringify(v) {
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+    return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + stableStringify(v[k])).join(",") + "}";
+  }
+
+  /* ---- demo wordlist — 256 words ----
+     A stand-in for the standard BIP39 English list (2048 words) used by
+     bloch_crypto::SeedPhrase. 24 words here = 23 bytes entropy + 1 checksum
+     byte (184-bit); the product uses BIP39 24 words (256-bit). */
+  const WORDS = (
+    "able acid acorn actor adobe adopt agent agile aisle alarm album alert alley alloy almond alpha " +
+    "amber ample anchor angle ankle antler apple apron arch arena argon armor arrow aspen atlas attic " +
+    "audio august aunt avid axis bacon badge bagel baker bamboo banjo barley barn basil basin baton " +
+    "beach beacon bead beam bean beard beaver bell belt bench berry bike birch bison blade blaze " +
+    "blend bloom blue board boat bolt bonus book boot border bottle bowl brass brave bread brick " +
+    "bridge brisk bronze brook broom brush bucket budget bugle bulb bundle bunker burlap butter cabin cable " +
+    "cactus camel canal candle canoe canvas canyon carbon cargo carpet carrot castle cedar cellar chair chalk " +
+    "chapel charm chart cheese cherry chess chest chief chilly chime choir chorus cider cinema circle citrus " +
+    "civic clay cliff clock cloud clover coach coast cobalt cocoa coffee coin colony comet compass copper " +
+    "coral cotton cousin cove crab cradle crane crater crayon cream creek crew cricket crisp crown crystal " +
+    "cubic curtain cycle daisy dawn debate decade decor deer delta denim depot desert desk dial diesel " +
+    "dinner dolphin dome donkey door dough dove dozen dragon drift drum dusk eagle early earth easel " +
+    "echo eight elbow elder ember emblem empire enamel energy engine envoy equal ethic evening exact fable " +
+    "falcon family fancy farm feather fern ferry fiber fiddle field fifty finch flag flame flavor fleet " +
+    "flint flora flour flute foam forest fossil fox frame fresh frost fruit galaxy garden garlic gate " +
+    "gecko gentle giant ginger glacier glade globe gloss golden goose granite grape gravel green grove guitar"
+  ).split(" ");
+
+  /* ---- mnemonic: 23 entropy bytes + 1 checksum byte → 24 words ---- */
+  async function checksumByte(entropy23) {
+    const d = await subtle().digest("SHA-256", entropy23);
+    return new Uint8Array(d)[0];
+  }
+  async function mnemonicNew() {
+    const ent = rand(23);
+    const ck = await checksumByte(ent);
+    const bytes = concat(ent, new Uint8Array([ck]));
+    return [...bytes].map(b => WORDS[b]).join(" ");
+  }
+  async function mnemonicParse(input) {
+    const words = input.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length !== 24) return { err: `Expected 24 words, got ${words.length}.` };
+    const bytes = new Uint8Array(24);
+    for (let i = 0; i < 24; i++) {
+      const idx = WORDS.indexOf(words[i]);
+      if (idx === -1) return { err: `Word ${i + 1} ("${words[i]}") is not in the word list.` };
+      bytes[i] = idx;
+    }
+    const ck = await checksumByte(bytes.slice(0, 23));
+    if (ck !== bytes[23]) return { err: "Checksum failed — one or more words are wrong or out of order." };
+    return { phrase: words.join(" ") };
+  }
+  /* BIP39-style seed stretch: PBKDF2-SHA-512, 2048 rounds → 64 bytes
+     (mirrors SeedPhrase::to_seed_bytes). */
+  async function mnemonicToSeed(phrase) {
+    const base = await subtle().importKey("raw", te.encode(phrase), "PBKDF2", false, ["deriveBits"]);
+    const bits = await subtle().deriveBits(
+      { name: "PBKDF2", hash: "SHA-512", salt: te.encode("chiave-demo-mnemonic-v1"), iterations: 2048 },
+      base, 512);
+    return new Uint8Array(bits);
+  }
+
+  /* ---- domain-separated sub-seeds (m/login vs m/spend vs vault) ----
+     SHA-256(tag ‖ seed) — stand-in for bloch-crypto's SHA3-256 diversifier. */
+  async function subSeed(seed, tag) {
+    const d = await subtle().digest("SHA-256", concat(te.encode(tag), seed));
+    return new Uint8Array(d);
+  }
+
+  /* ---- passphrase KDF + AEAD seal (the at-rest keyfile) ---- */
+  const KDF_ITER = 310000;
+  /* Clamp KDF iterations read from a STORED blob. Anything that can write
+     localStorage could otherwise rewrite kdf.iter to 1 and have the next
+     legitimate unlock run an essentially unhardened PBKDF2 over the real
+     passphrase (KDF-parameter downgrade). Floor = our own constant; the
+     cap only bounds a denial-of-service value. */
+  const kdfIter = (n) => Math.min(Math.max(Math.floor(Number(n) || 0), KDF_ITER), KDF_ITER * 10);
+  async function passKey(passphrase, salt, iterations) {
+    const base = await subtle().importKey("raw", te.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+    return subtle().deriveKey(
+      { name: "PBKDF2", hash: "SHA-256", salt, iterations },
+      base,
+      { name: "AES-GCM", length: 256 },
+      false,               // non-extractable
+      ["encrypt", "decrypt"]);
+  }
+  async function sealJSON(key, obj, aad) {
+    const iv = rand(12);   // fresh IV per write, always
+    const ct = await subtle().encrypt(
+      { name: "AES-GCM", iv, additionalData: te.encode(aad) },
+      key, te.encode(JSON.stringify(obj)));
+    return { iv: b64(iv), ct: b64(ct) };
+  }
+  async function openJSON(key, ivB64, ctB64, aad) {
+    const pt = await subtle().decrypt(
+      { name: "AES-GCM", iv: unb64(ivB64), additionalData: te.encode(aad) },
+      key, unb64(ctB64));  // throws on a wrong key — all-or-nothing, no partial plaintext
+    return JSON.parse(td.decode(pt));
+  }
+  async function rawAesKey(bytes32) {
+    return subtle().importKey("raw", bytes32, "AES-GCM", false, ["encrypt", "decrypt"]);
+  }
+
+  /* ---- login keypair — CLASSICAL STAND-IN for Falcon-1024 ‖ ML-DSA-65 ----
+     WebCrypto cannot generate a keypair from a seed, so the stand-in pair is
+     generated at setup and sealed alongside the seed. The real product
+     derives the ML-DSA anchor deterministically from the seed
+     (generate_keypair_from_seed) — stable fingerprint across restores. */
+  async function genLoginKeypair() {
+    try {
+      const kp = await subtle().generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+      return {
+        alg: "Ed25519",
+        priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)),
+        pub: b64(await subtle().exportKey("raw", kp.publicKey)),
+      };
+    } catch {
+      const kp = await subtle().generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+      return {
+        alg: "ECDSA-P256",
+        priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)),
+        pub: b64(await subtle().exportKey("raw", kp.publicKey)),
+      };
+    }
+  }
+  const algParams = (alg) => alg === "Ed25519" ? { name: "Ed25519" } : { name: "ECDSA", namedCurve: "P-256" };
+  const sigParams = (alg) => alg === "Ed25519" ? { name: "Ed25519" } : { name: "ECDSA", hash: "SHA-256" };
+  const importSigner = (alg, privB64) => subtle().importKey("pkcs8", unb64(privB64), algParams(alg), false, ["sign"]);
+  const importVerifier = (alg, pubB64) => subtle().importKey("raw", unb64(pubB64), algParams(alg), false, ["verify"]);
+  const sign = async (alg, key, bytes) => b64(await subtle().sign(sigParams(alg), key, bytes));
+  const verify = (alg, key, bytes, sigB64) => subtle().verify(sigParams(alg), key, unb64(sigB64), bytes);
+
+  /* ---- identity fingerprint: SHA-256(pubkey), first 8 bytes ---- */
+  async function fingerprint(pubB64) {
+    const d = new Uint8Array(await subtle().digest("SHA-256", unb64(pubB64)));
+    const h = hex(d.slice(0, 8)).toUpperCase();
+    return `PL-${h.slice(0, 4)}-${h.slice(4, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}`;
+  }
+
+  /* ---- the login challenge-response, with WebAuthn-grade ceremony discipline.
+     This is the REFERENCE for anyone implementing the server/RP side, so the
+     verifier enforces what a real RP must enforce:
+       · nonce single-use — consumed on first verify attempt, pass or fail,
+         so a captured {challenge, signature} pair can never verify twice;
+       · short expiry — measured against the VERIFIER's own record of when it
+         issued the nonce, never the timestamp the client echoes back;
+       · origin (audience) binding — the challenge names the RP origin it was
+         minted for and only verifies there, so a phishing page proxying
+         challenges gets signatures that are worthless anywhere else;
+       · canonical bytes (sorted-key JSON + domain-separation prefix), so a
+         reconstructed object verifies byte-identically;
+       · and the caller's contract: verify() must pass BEFORE any session is
+         granted. */
+  const CH_KIND = "postern:login:v1";
+  const CH_TTL_MS = 120000; // 2 minutes — same order as WebAuthn's default timeout
+  const challengeBytes = (ch) => te.encode(CH_KIND + "\n" + stableStringify(ch));
+  function createVerifier(expectedOrigin, opts = {}) {
+    const ttl = opts.ttlMs || CH_TTL_MS;
+    const now = opts.now || (() => Date.now());
+    const pending = new Map(); // nonce → { issuedMs } — the verifier's own book, single-use
+    return {
+      expectedOrigin,
+      issue() {
+        const t = now();
+        for (const [n, rec] of pending) if (t - rec.issuedMs > ttl) pending.delete(n); // prune stale
+        const ch = { v: CH_KIND, nonce: hex(rand(32)), issued: new Date(t).toISOString(), origin: expectedOrigin };
+        pending.set(ch.nonce, { issuedMs: t });
+        return ch;
+      },
+      async verify(enrolled, ch, sigB64) {
+        // 1. nonce known and single-use: consumed NOW, pass or fail — no replay, no retry oracle
+        const rec = ch && pending.get(ch.nonce);
+        if (!rec) return { ok: false, reason: "unknown or already-used nonce — replay refused" };
+        pending.delete(ch.nonce);
+        if (ch.v !== CH_KIND) return { ok: false, reason: "unknown challenge kind" };
+        // 2. expiry, against the verifier's own issue record (the echoed 'issued' is informative only)
+        if (now() - rec.issuedMs > ttl) return { ok: false, reason: "challenge expired (" + (ttl / 1000) + "s limit)" };
+        // 3. origin/audience binding: the signed challenge must name THIS verifier's origin
+        if (ch.origin !== expectedOrigin) return { ok: false, reason: "origin mismatch — challenge was not minted for this page" };
+        // 4. only now, the signature — against the ENROLLED public key
+        let good = false;
+        try {
+          const key = await importVerifier(enrolled.alg, enrolled.pub);
+          good = await verify(enrolled.alg, key, challengeBytes(ch), sigB64);
+        } catch { good = false; }
+        return good
+          ? { ok: true, reason: "signature valid against the enrolled login key; nonce fresh, single-use, origin-bound" }
+          : { ok: false, reason: "signature invalid against the enrolled login key" };
+      },
+    };
+  }
+
+  return {
+    te, td, b64, unb64, hex, unhex, concat, rand, stableStringify,
+    WORDS, mnemonicNew, mnemonicParse, mnemonicToSeed,
+    subSeed, KDF_ITER, kdfIter, passKey, sealJSON, openJSON, rawAesKey,
+    genLoginKeypair, importSigner, importVerifier, sign, verify,
+    fingerprint, CH_KIND, CH_TTL_MS, challengeBytes, createVerifier,
+  };
+})();
+if (typeof globalThis !== "undefined") globalThis.PID = PID;
+</script>
+
+<script id="pid-seam">
+"use strict";
+/* ============================================================
+   CHIAVE — SEAM to postern-sdk (the ONE wiring seam, item 0).
+   Probes globalThis.PosternSDK, which a Postern host shell (Tauri /
+   mobile WebView / relaxed-CSP build) installs from the wasm core
+   (crates/postern-sdk/wasm). When PRESENT: the wallet-at-rest seal
+   uses the REAL Argon2id(64 MiB,t=3) + XChaCha20-Poly1305 core,
+   killing stand-in S2; the label flips to say so. When ABSENT — the
+   default in a plain browser tab under this page's strict CSP — every
+   call falls back to the labeled classical stand-in in PID, and the
+   honest "classical stand-in" labels stay. PQ signing (S1) is NOT in
+   the wasm build (bloch-crypto is PQClean C), so it stays the labeled
+   WebCrypto stand-in until the native shell provides it. Nothing here
+   makes a network request.
+   ============================================================ */
+const PSEAM = (() => {
+  const KDF_STANDIN = "PBKDF2-SHA-256";
+  const KDF_REAL = "Argon2id-postern-sdk";
+  function sdk() { return (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null; }
+  function kdfReal() { const s = sdk(); return !!(s && s.kdf && s.kdf.available); }
+  function pqReal() { const s = sdk(); return !!(s && s.pq && s.pq.available); }
+
+  /* Seal a JS object at rest under a passphrase → { kdf, cipher } in the
+     on-disk shape, tagged with which primitive produced it so open()
+     dispatches correctly even if the seam appears/disappears later. */
+  async function sealAtRest(passphrase, obj, aad) {
+    const s = sdk();
+    if (kdfReal()) {
+      const salt = s.kdf.generateSalt();
+      const key = s.kdf.deriveKey(PID.te.encode(passphrase), salt);
+      try {
+        const blob = s.kdf.seal(key, PID.te.encode(aad), PID.te.encode(JSON.stringify(obj)));
+        return {
+          kdf: { algo: KDF_REAL, label: s.kdf.label, salt: PID.b64(salt) },
+          cipher: { algo: "XChaCha20-Poly1305", blob: PID.b64(blob) },
+        };
+      } finally { try { key.free(); } catch {} }
+    }
+    // classical stand-in — identical bytes to the original PBKDF2 flow
+    const salt = PID.rand(16);
+    const key = await PID.passKey(passphrase, salt, PID.KDF_ITER);
+    const { iv, ct } = await PID.sealJSON(key, obj, aad);
+    return {
+      kdf: { algo: KDF_STANDIN, iter: PID.KDF_ITER, salt: PID.b64(salt) },
+      cipher: { algo: "AES-256-GCM", iv, ct },
+    };
+  }
+
+  /* Open a wallet blob under a passphrase; dispatch on the stored kdf.algo. */
+  async function openAtRest(passphrase, blob, aad) {
+    if (blob && blob.kdf && blob.kdf.algo === KDF_REAL) {
+      const s = sdk();
+      if (!kdfReal()) throw new Error("sealed with the real postern-sdk core, not loaded here — open in the Postern shell");
+      const key = s.kdf.deriveKey(PID.te.encode(passphrase), PID.unb64(blob.kdf.salt));
+      try {
+        const pt = s.kdf.open(key, PID.te.encode(aad), PID.unb64(blob.cipher.blob));
+        return JSON.parse(PID.td.decode(pt));
+      } finally { try { key.free(); } catch {} }
+    }
+    // classical stand-in path — KDF-downgrade clamp preserved
+    const key = await PID.passKey(passphrase, PID.unb64(blob.kdf.salt), PID.kdfIter(blob.kdf.iter));
+    return PID.openJSON(key, blob.cipher.iv, blob.cipher.ct, aad);
+  }
+
+  function status() {
+    const s = sdk();
+    return {
+      seam: !!s,
+      kdf: kdfReal(),
+      pq: pqReal(),
+      kdfLabel: kdfReal()
+        ? ((s.kdf.label || "Argon2id") + " — REAL, via postern-sdk")
+        : "PBKDF2-SHA-256 (310,000 it.) — classical stand-in for Argon2id",
+      pqLabel: pqReal()
+        ? "Falcon-1024 ‖ ML-DSA-65 — REAL, via postern-sdk"
+        : "WebCrypto — classical stand-in for Falcon-1024 ‖ ML-DSA-65",
+      pqReason: (s && s.pq && s.pq.reason) ? s.pq.reason : "",
+    };
+  }
+
+  return { sealAtRest, openAtRest, kdfReal, pqReal, status, KDF_REAL, KDF_STANDIN };
+})();
+if (typeof globalThis !== "undefined") globalThis.PSEAM = PSEAM;
+</script>
+
+<script id="pid-ui">
+"use strict";
+/* ============================================================
+   CHIAVE — UI wiring. States: setup | locked | session
+   ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const LS = {
+  WALLET: "chiave.wallet",
+  BIO:    "chiave.bio",
+  VAULT:  "chiave.vault",
+  PANIC:  "chiave.panic",
+  THEME:  "chiave.theme",
+  TERMINALS: "chiave.terminals",
+};
+const AAD_WALLET = "postern.login.v1";
+const AAD_BIO    = "postern.login.bio.v1";
+const AAD_VAULT  = "postern.vault.v1";
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+const el = {
+  body: document.body,
+  status: $("#statusLine"),
+  viewSetup: $("#viewSetup"), viewLocked: $("#viewLocked"), viewSession: $("#viewSession"),
+  setupChoose: $("#setupChoose"), setupBackup: $("#setupBackup"),
+  setupRestore: $("#setupRestore"), setupPass: $("#setupPass"), setupBio: $("#setupBio"),
+  btnChooseNext: $("#btnChooseNext"),
+  mnemonicGrid: $("#mnemonicGrid"), ckWrote: $("#ckWrote"),
+  btnBackupNext: $("#btnBackupNext"), btnRegen: $("#btnRegen"), btnBackupBack: $("#btnBackupBack"),
+  restoreWords: $("#restoreWords"), restoreErr: $("#restoreErr"),
+  btnRestoreNext: $("#btnRestoreNext"), btnRestoreBack: $("#btnRestoreBack"),
+  pass1: $("#pass1"), pass2: $("#pass2"), passErr: $("#passErr"),
+  btnCreateWallet: $("#btnCreateWallet"), btnPassBack: $("#btnPassBack"),
+  bioSetupErr: $("#bioSetupErr"), btnBioEnrollSetup: $("#btnBioEnrollSetup"), btnBioSkip: $("#btnBioSkip"),
+  lockedIntro: $("#lockedIntro"), loginForm: $("#loginForm"), loginPass: $("#loginPass"),
+  loginErr: $("#loginErr"), btnUnlock: $("#btnUnlock"), btnBioUnlock: $("#btnBioUnlock"),
+  panicNote: $("#panicNote"), btnEraseLocked: $("#btnEraseLocked"),
+  whoFpr: $("#whoFpr"), chJson: $("#chJson"), sigAlg: $("#sigAlg"), sigB64: $("#sigB64"),
+  verifyLine: $("#verifyLine"), algLabel: $("#algLabel"),
+  btnNewChallenge: $("#btnNewChallenge"), btnLock: $("#btnLock"), btnPanic: $("#btnPanic"),
+  vaultSecret: $("#vaultSecret"), vaultHelp: $("#vaultHelp"), btnVaultSave: $("#btnVaultSave"),
+  bioStatus: $("#bioStatus"), bioErr: $("#bioErr"),
+  btnBioEnroll: $("#btnBioEnroll"), btnBioRemove: $("#btnBioRemove"),
+  termList: $("#termList"), termErr: $("#termErr"),
+  btnPairDemo: $("#btnPairDemo"), btnPanicRevoke: $("#btnPanicRevoke"),
+  btnErase: $("#btnErase"),
+  standinKdf: $("#standinKdf"), standinPq: $("#standinPq"),
+  btnHonesty: $("#btnHonesty"), dlgHonesty: $("#dlgHonesty"), btnTheme: $("#btnTheme"),
+  dlgRePass: $("#dlgRePass"), rePassForm: $("#rePassForm"), rePassInput: $("#rePassInput"),
+  rePassErr: $("#rePassErr"), rePassCancel: $("#rePassCancel"),
+};
+
+/* ---------- in-memory session state (evicted on lock) ----------
+   The session deliberately holds NO seed and NO private-key encoding — only
+   non-extractable CryptoKey handles (signer, vaultKey) plus public data.
+   A browser can't zeroize, but it can drop secret references early. */
+let session = null;        // { signer, fpr, vaultKey, alg, pub }
+let setupDraft = null;     // { phrase } during setup only
+let failedAttempts = 0;
+
+/* The in-page verifier plays the RP / login-manager role (the same role a
+   lock screen or PAM module plays): single-use nonces, 2-minute expiry,
+   origin-bound challenges, and NO session before verify() passes.
+   On file:// the browser reports origin "null" — a real origin only exists
+   when served (localhost/https); the binding is enforced either way. */
+const verifier = PID.createVerifier(location.origin);
+
+/* ---------- state machine ---------- */
+function setStatus(text, tone) {
+  el.status.textContent = text;
+  if (tone) el.status.dataset.tone = tone; else delete el.status.dataset.tone;
+}
+function walletBlob() {
+  try { return JSON.parse(store.get(LS.WALLET, "null")); } catch { return null; }
+}
+function bioBlob() {
+  try { return JSON.parse(store.get(LS.BIO, "null")); } catch { return null; }
+}
+function show(state) {
+  el.body.dataset.state = state;
+  el.viewSetup.hidden = state !== "setup";
+  el.viewLocked.hidden = state !== "locked";
+  el.viewSession.hidden = state !== "session";
+}
+function toSetup() {
+  session = null; setupDraft = null;
+  show("setup");
+  el.setupChoose.hidden = false;
+  el.setupBackup.hidden = el.setupRestore.hidden = el.setupPass.hidden = el.setupBio.hidden = true;
+  setStatus("No wallet on this device yet. Create one, or restore from your seed phrase.");
+}
+async function toLocked(note, tone) {
+  session = null; setupDraft = null;
+  const blob = walletBlob();
+  if (!blob) { toSetup(); return; }
+  show("locked");
+  const fpr = blob.meta && blob.meta.fpr ? blob.meta.fpr : "(unknown)";
+  const created = blob.meta && blob.meta.created ? new Date(blob.meta.created).toLocaleDateString() : "";
+  el.lockedIntro.innerHTML = "Wallet <strong>" + escapeHtml(fpr) + "</strong>" +
+    (created ? " (created " + escapeHtml(created) + ")" : "") +
+    " is sealed on this device. Unlock it locally to sign in — nothing is sent anywhere.";
+  el.loginErr.textContent = "";
+  el.loginPass.value = "";
+  el.panicNote.hidden = store.get(LS.PANIC) !== "1";
+  const bio = bioBlob();
+  el.btnBioUnlock.hidden = !(bio && await bioAvailable());
+  setStatus(note || "Wallet sealed. Enter your passphrase to sign in — everything happens on this device.", tone);
+  el.loginPass.focus();
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------- setup: choose ---------- */
+el.btnChooseNext.addEventListener("click", async () => {
+  const mode = document.querySelector('input[name="setupMode"]:checked').value;
+  el.setupChoose.hidden = true;
+  if (mode === "create") {
+    await renderMnemonic();
+    el.setupBackup.hidden = false;
+    setStatus("Write the words down — they are shown once.");
+  } else {
+    el.setupRestore.hidden = false;
+    el.restoreWords.focus();
+  }
+});
+
+async function renderMnemonic() {
+  const phrase = await PID.mnemonicNew();
+  setupDraft = { phrase };
+  el.mnemonicGrid.innerHTML = "";
+  phrase.split(" ").forEach((w, i) => {
+    const li = document.createElement("li");
+    const n = document.createElement("span"); n.className = "n"; n.textContent = String(i + 1);
+    const word = document.createElement("span"); word.className = "w"; word.textContent = w;
+    li.append(n, word);
+    el.mnemonicGrid.appendChild(li);
+  });
+  el.ckWrote.checked = false;
+  el.btnBackupNext.disabled = true;
+}
+el.ckWrote.addEventListener("change", () => { el.btnBackupNext.disabled = !el.ckWrote.checked; });
+el.btnRegen.addEventListener("click", renderMnemonic);
+el.btnBackupBack.addEventListener("click", toSetup);
+el.btnBackupNext.addEventListener("click", () => {
+  el.setupBackup.hidden = true;
+  el.mnemonicGrid.innerHTML = "";        // the phrase leaves the DOM here
+  el.setupPass.hidden = false;
+  el.pass1.focus();
+  setStatus("Now set the passphrase that seals the wallet on this device.");
+});
+
+/* ---------- setup: restore ---------- */
+el.btnRestoreBack.addEventListener("click", toSetup);
+el.btnRestoreNext.addEventListener("click", async () => {
+  const res = await PID.mnemonicParse(el.restoreWords.value);
+  if (res.err) { el.restoreErr.textContent = res.err; return; }
+  el.restoreErr.textContent = "";
+  setupDraft = { phrase: res.phrase };
+  el.restoreWords.value = "";
+  el.setupRestore.hidden = true;
+  el.setupPass.hidden = false;
+  el.pass1.focus();
+  setStatus("Phrase verified locally. Now set this device's unlock passphrase.");
+});
+
+/* ---------- setup: passphrase → seal ---------- */
+el.btnPassBack.addEventListener("click", toSetup);
+el.btnCreateWallet.addEventListener("click", async () => {
+  const p1 = el.pass1.value, p2 = el.pass2.value;
+  if (p1.length < 8) { el.passErr.textContent = "Use at least 8 characters — this passphrase guards your whole identity on this device."; return; }
+  if (p1 !== p2) { el.passErr.textContent = "The passphrases don't match."; return; }
+  if (!setupDraft || !setupDraft.phrase) { el.passErr.textContent = "Setup state was lost — start over."; return; }
+  el.passErr.textContent = "";
+  el.btnCreateWallet.disabled = true;
+  try {
+    const seed = await PID.mnemonicToSeed(setupDraft.phrase);
+    const kp = await PID.genLoginKeypair();     // classical stand-in — see the label below
+    const payload = { seed: PID.hex(seed), alg: kp.alg, priv: kp.priv, pub: kp.pub };
+    // At-rest seal goes through the postern-sdk SEAM: real Argon2id when a host
+    // shell has installed the core, the labeled PBKDF2 stand-in otherwise.
+    const sealed = await PSEAM.sealAtRest(p1, payload, AAD_WALLET);
+    const fpr = await PID.fingerprint(kp.pub);
+    // Same shape as the bloch-crypto encrypted keyfile: kdf + cipher + public meta.
+    store.set(LS.WALLET, JSON.stringify({
+      v: 1,
+      kdf: sealed.kdf,
+      cipher: sealed.cipher,
+      meta: { alg: kp.alg, pub: kp.pub, fpr, created: new Date().toISOString() },
+    }));
+    store.del(LS.PANIC);
+    el.pass1.value = el.pass2.value = "";
+    setupDraft = { payload };                  // kept only to offer biometric enrollment
+    el.setupPass.hidden = true;
+    if (await bioAvailable()) {
+      el.setupBio.hidden = false;
+      el.bioSetupErr.textContent = "";
+      setStatus("Wallet sealed. One optional step: biometric unlock.", "ok");
+    } else {
+      setupDraft = null;
+      await toLocked("Wallet created and sealed. Now sign in with your passphrase.", "ok");
+    }
+  } catch (e) {
+    el.passErr.textContent = "Couldn't seal the wallet: " + e.message;
+  } finally {
+    el.btnCreateWallet.disabled = false;
+  }
+});
+
+/* ---------- setup: optional biometric ---------- */
+el.btnBioSkip.addEventListener("click", async () => {
+  setupDraft = null;
+  await toLocked("Wallet created and sealed. Now sign in with your passphrase.", "ok");
+});
+el.btnBioEnrollSetup.addEventListener("click", async () => {
+  if (!setupDraft || !setupDraft.payload) return;
+  el.btnBioEnrollSetup.disabled = true;
+  const ok = await bioEnroll(setupDraft.payload, el.bioSetupErr);
+  el.btnBioEnrollSetup.disabled = false;
+  if (ok) {
+    setupDraft = null;
+    await toLocked("Wallet sealed, biometrics enrolled. Sign in with either — the passphrase always works.", "ok");
+  }
+});
+
+/* ---------- login: passphrase ---------- */
+el.loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const blob = walletBlob();
+  if (!blob) { toSetup(); return; }
+  el.btnUnlock.disabled = true;
+  el.loginErr.textContent = "";
+  try {
+    // Open through the SEAM: real Argon2id-sealed wallets open with the core;
+    // stand-in wallets keep the PBKDF2 path with its KDF-downgrade clamp.
+    const payload = await PSEAM.openAtRest(el.loginPass.value, blob, AAD_WALLET);
+    el.loginPass.value = "";
+    failedAttempts = 0;
+    await startSession(payload);
+  } catch {
+    failedAttempts++;
+    // honest failure: the GCM tag failed — nothing was decrypted, nothing leaked
+    const wait = Math.min(600 * failedAttempts, 3000);
+    el.loginErr.textContent = "Wrong passphrase. Decryption is all-or-nothing — no partial unlock, nothing leaked."
+      + (failedAttempts > 1 ? ` (attempt ${failedAttempts})` : "");
+    await new Promise(r => setTimeout(r, wait));
+  } finally {
+    el.btnUnlock.disabled = false;
+  }
+});
+
+/* ---------- the signed-in session ---------- */
+/* One ceremony round: verifier issues a challenge (single-use nonce, expiry,
+   origin-bound) → wallet signs → verifier checks against the ENROLLED public
+   key from the wallet's public meta — the same role a lock screen / PAM
+   module plays. The caller decides nothing before the verdict. */
+async function runCeremony(signer, alg) {
+  const ch = verifier.issue();
+  const sigB64 = await PID.sign(alg, signer, PID.challengeBytes(ch));
+  const meta = (walletBlob() || {}).meta || {};
+  const verdict = await verifier.verify({ alg: meta.alg, pub: meta.pub }, ch, sigB64);
+  return { ch, sigB64, verdict };
+}
+function renderCeremony(ch, sigB64, verdict) {
+  el.chJson.textContent = JSON.stringify(ch, null, 1).replace(/\n\s*/g, " ");
+  el.sigB64.textContent = sigB64;
+  el.verifyLine.textContent = verdict.ok
+    ? "✓ verified BEFORE the session was granted — " + verdict.reason
+    : "✗ verification FAILED — session refused: " + verdict.reason;
+  el.verifyLine.style.color = verdict.ok ? "var(--ok)" : "var(--err)";
+}
+
+async function startSession(payload) {
+  // 1. Derive every handle the session needs…
+  const alg = payload.alg, pub = payload.pub;
+  const signer = await PID.importSigner(alg, payload.priv);   // non-extractable
+  const fpr = await PID.fingerprint(pub);
+  const seed = PID.unhex(payload.seed);
+  // m/login was used for identity; the vault key comes from its own domain.
+  // m/spend ("bloch:diversifier:v1") is deliberately NEVER derived here.
+  const vaultSeed = await PID.subSeed(seed, "postern:vault:v1");
+  const vaultKey = await PID.rawAesKey(vaultSeed);            // non-extractable
+  // 2. …then drop the secrets. Strings can't be zeroized in JS, but the
+  // references go now instead of living for the whole session (the byte
+  // arrays we do control are wiped). Biometric enrollment later re-prompts
+  // for the passphrase rather than keeping the payload around.
+  seed.fill(0); vaultSeed.fill(0);
+  payload.seed = null; payload.priv = null;
+
+  // 3. VERIFY BEFORE GRANTING: no session state flips until the ceremony passes.
+  const { ch, sigB64, verdict } = await runCeremony(signer, alg);
+  if (!verdict.ok) {
+    await toLocked("Sign-in refused — " + verdict.reason, "err");
+    return;
+  }
+  session = { signer, fpr, vaultKey, alg, pub };
+  show("session");
+  refreshHonestyLabels();   // re-render the primitive labels (and re-point #algLabel)
+  el.whoFpr.textContent = "Signed in as " + fpr;
+  el.algLabel.textContent = alg;
+  el.sigAlg.textContent = "(" + alg + " — classical stand-in)";
+  renderCeremony(ch, sigB64, verdict);
+  setStatus("Signed in. The key never left this machine.", "ok");
+  await refreshVaultCard();
+  await refreshBioCard();
+  renderTerminals();
+}
+
+async function signFreshChallenge() {
+  if (!session) return;
+  const { ch, sigB64, verdict } = await runCeremony(session.signer, session.alg);
+  renderCeremony(ch, sigB64, verdict);
+  if (!verdict.ok) {
+    // an in-session verification failure means the enrolled key no longer
+    // matches this wallet (e.g. tampered meta) — honest response: lock.
+    await toLocked("Challenge verification failed in-session — locked as a precaution: " + verdict.reason, "err");
+  }
+}
+el.btnNewChallenge.addEventListener("click", signFreshChallenge);
+
+/* ---------- ADDITIVE: Consiglio / Ezekiel1 login-receipt handoff ----------
+   Signs the Consiglio transcript (consiglio:wallet-login:v1 over
+   {org_id,user_id,nonce_hex,issued_at}) with the unlocked wallet key. Reuses
+   PID.sign + the in-memory session signer; changes no Chiave internals. */
+const CONSIGLIO_LOGIN_DOMAIN = "consiglio:wallet-login:v1";
+async function generateConsiglioReceipt() {
+  const errEl = document.getElementById("hoErr");
+  const outEl = document.getElementById("hoOut");
+  const copyBtn = document.getElementById("btnHandoffCopy");
+  errEl.textContent = "";
+  if (!session) { errEl.textContent = "Sign in first — a live wallet session is required."; return; }
+  const orgId = document.getElementById("hoOrg").value.trim();
+  const userId = document.getElementById("hoUser").value.trim();
+  const role = document.getElementById("hoRole").value;
+  const clearance = parseInt(document.getElementById("hoClear").value.trim(), 10);
+  if (!orgId || !userId) { errEl.textContent = "Organisation id and user id are required."; return; }
+  if (!Number.isInteger(clearance) || clearance < 0 || clearance > 255) { errEl.textContent = "Clearance must be an integer 0–255 (u8)."; return; }
+  const nonceHex = PID.hex(PID.rand(32));               // 64 hex chars, matches Consiglio nonce width
+  const issuedAt = Math.floor(Date.now() / 1000);
+  // role/clearance MUST be inside the signed transcript, not just alongside it —
+  // the card copy above promises they are "bound to your wallet signature"; if they
+  // sat outside challengeBytes(), anyone relaying the JSON could edit role/clearance
+  // in transit without invalidating signatureB64. Signing over them is what makes
+  // Consiglio's re-verify actually catch a tampered role/clearance pair.
+  const transcript = PID.te.encode(CONSIGLIO_LOGIN_DOMAIN + "\n" +
+    PID.stableStringify({ org_id: orgId, user_id: userId, role, clearance, nonce_hex: nonceHex, issued_at: issuedAt }));
+  let sigB64;
+  try { sigB64 = await PID.sign(session.alg, session.signer, transcript); }
+  catch (e) { errEl.textContent = "Signing failed: " + (e && e.message ? e.message : e); return; }
+  const receipt = {
+    kind: "postern:consiglio:login-handoff:v1",
+    domain: CONSIGLIO_LOGIN_DOMAIN,
+    orgId, userId, role, clearance,
+    alg: session.alg,
+    publicKeyB64: session.pub,
+    fpr: session.fpr,
+    nonceHex, issuedAt, expiresAt: issuedAt + 3600,
+    signatureB64: sigB64,
+    note: "Reference stand-in. Consiglio's hybrid-PQ verifier is authoritative; role/clearance are attested, bound by Consiglio enrollment.",
+  };
+  outEl.value = JSON.stringify(receipt, null, 2);
+  copyBtn.hidden = false;
+  setStatus("Login receipt minted — carry it to Ezekiel1 (B·0b). Nothing left this device.", "ok");
+}
+document.getElementById("btnHandoff").addEventListener("click", generateConsiglioReceipt);
+document.getElementById("btnHandoffCopy").addEventListener("click", async () => {
+  const outEl = document.getElementById("hoOut");
+  try { await navigator.clipboard.writeText(outEl.value); setStatus("Receipt copied to clipboard.", "ok"); }
+  catch { outEl.select(); document.execCommand && document.execCommand("copy"); }
+});
+
+/* ---------- lock / panic / erase ---------- */
+el.btnLock.addEventListener("click", async () => {
+  await toLocked("Locked. Keys evicted from this tab's memory; only ciphertext remains at rest.");
+});
+el.btnPanic.addEventListener("click", async () => {
+  // Panic Lock (postern-panic): instant re-lock; nothing destroyed.
+  // It ALSO disables biometric unlock — a coerced finger then opens nothing.
+  store.del(LS.BIO);
+  store.set(LS.PANIC, "1");
+  await toLocked("PANIC LOCK. Everything is sealed ciphertext again — nothing destroyed. Biometric unlock is disabled; passphrase only.", "err");
+});
+async function eraseAll() {
+  if (!confirm("Erase the sealed wallet, vault, and biometric enrollment from this browser?\n\nWithout your 24-word seed phrase there is NO way back — there is no server copy.")) return;
+  [LS.WALLET, LS.BIO, LS.VAULT, LS.PANIC, LS.TERMINALS].forEach(store.del);
+  session = null;
+  toSetup();
+  setStatus("Erased. Nothing about this wallet remains in the browser.", "ok");
+}
+el.btnErase.addEventListener("click", eraseAll);
+el.btnEraseLocked.addEventListener("click", eraseAll);
+
+/* ---------- vault: app secrets unlocked by login ---------- */
+function vaultBlobStored() {
+  try { return JSON.parse(store.get(LS.VAULT, "null")); } catch { return null; }
+}
+async function refreshVaultCard() {
+  if (!session) return;
+  const vb = vaultBlobStored();
+  if (!vb) {
+    el.vaultSecret.value = "";
+    el.vaultHelp.textContent = "Nothing sealed yet. Store a demo secret — it is encrypted under a key derived from your wallet, so signing in is what unlocks it.";
+    return;
+  }
+  try {
+    const data = await PID.openJSON(session.vaultKey, vb.iv, vb.ct, AAD_VAULT);
+    el.vaultSecret.value = data["anthropic-api-key"] || "";
+    el.vaultHelp.textContent = "Opened by your login — this value was AES-256-GCM ciphertext until you signed in. Lock, and it seals again.";
+  } catch {
+    el.vaultHelp.textContent = "A sealed vault exists but doesn't open under this wallet (it was sealed by a different seed). Save to replace it.";
+  }
+}
+el.btnVaultSave.addEventListener("click", async () => {
+  if (!session) return;
+  const sealed = await PID.sealJSON(session.vaultKey, { "anthropic-api-key": el.vaultSecret.value }, AAD_VAULT);
+  store.set(LS.VAULT, JSON.stringify({ v: 1, iv: sealed.iv, ct: sealed.ct }));
+  el.vaultHelp.textContent = "Sealed. localStorage now holds only ciphertext; your next sign-in reopens it.";
+});
+
+/* ============================================================
+   Biometric unlock — WebAuthn platform authenticator + PRF.
+   HONESTY: a browser stand-in for the TEE's biometric-gated key
+   release (StrongBox + BiometricPrompt / Secure Enclave +
+   kSecAccessControlBiometryCurrentSet). The PRF output really is
+   the key material here — the gate is cryptographic, not theater.
+   WebAuthn platform calls make no network requests.
+   ============================================================ */
+const BIO_PRF_INPUT = PID.te.encode("postern:bio:prf:v1");
+
+async function bioAvailable() {
+  try {
+    return !!(window.isSecureContext &&
+      window.PublicKeyCredential &&
+      await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  } catch { return false; }
+}
+async function bioWrapKeyFromPrf(prfOut) {
+  const raw = await crypto.subtle.digest("SHA-256",
+    PID.concat(new Uint8Array(prfOut), PID.te.encode("postern:bio:wrap:v1")));
+  return PID.rawAesKey(new Uint8Array(raw));
+}
+function bioFriendlyError(e) {
+  if (e && e.name === "NotAllowedError") return "Biometric check cancelled or not recognized — nothing was unlocked.";
+  if (e && e.name === "SecurityError") return "WebAuthn needs a real origin (serve this file from localhost); unavailable from file://.";
+  return "Biometric step failed: " + (e && e.message ? e.message : String(e));
+}
+
+/* Enroll: create a platform credential, evaluate PRF, seal a second copy of
+   the wallet payload under the PRF-derived key. The passphrase copy is
+   untouched — it ALWAYS remains the fallback. */
+async function bioEnroll(payload, errEl) {
+  errEl.textContent = "";
+  try {
+    if (!await bioAvailable()) { errEl.textContent = "No platform authenticator available on this device/browser."; return false; }
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: PID.rand(32),
+        rp: { name: "Chiave — Postern Login" },
+        user: { id: PID.rand(16), name: "postern-wallet", displayName: "Postern Wallet" },
+        pubKeyCredParams: [{ type: "public-key", alg: -8 }, { type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+        extensions: { prf: {} },
+        timeout: 60000,
+      },
+    });
+    // PRF output comes from an assertion; run one now (a second biometric tap).
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: PID.rand(32),
+        allowCredentials: [{ type: "public-key", id: cred.rawId }],
+        userVerification: "required",
+        extensions: { prf: { eval: { first: BIO_PRF_INPUT } } },
+        timeout: 60000,
+      },
+    });
+    const prf = assertion.getClientExtensionResults().prf;
+    if (!prf || !prf.results || !prf.results.first) {
+      errEl.textContent = "This authenticator doesn't support the PRF extension, so a biometric cannot actually release key material here. Being honest: no fake gate. Passphrase unlock stands.";
+      return false;
+    }
+    const wrapKey = await bioWrapKeyFromPrf(prf.results.first);
+    const { iv, ct } = await PID.sealJSON(wrapKey, payload, AAD_BIO);
+    store.set(LS.BIO, JSON.stringify({ v: 1, credId: PID.b64(cred.rawId), iv, ct }));
+    store.del(LS.PANIC);
+    return true;
+  } catch (e) {
+    errEl.textContent = bioFriendlyError(e);
+    return false;
+  }
+}
+
+/* Unlock with biometrics: assertion → PRF → key → decrypt the sealed copy. */
+el.btnBioUnlock.addEventListener("click", async () => {
+  const bio = bioBlob();
+  if (!bio) { el.btnBioUnlock.hidden = true; return; }
+  el.loginErr.textContent = "";
+  el.btnBioUnlock.disabled = true;
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: PID.rand(32),
+        allowCredentials: [{ type: "public-key", id: PID.unb64(bio.credId) }],
+        userVerification: "required",
+        extensions: { prf: { eval: { first: BIO_PRF_INPUT } } },
+        timeout: 60000,
+      },
+    });
+    const prf = assertion.getClientExtensionResults().prf;
+    if (!prf || !prf.results || !prf.results.first) throw new Error("PRF result missing");
+    const wrapKey = await bioWrapKeyFromPrf(prf.results.first);
+    const payload = await PID.openJSON(wrapKey, bio.iv, bio.ct, AAD_BIO);
+    await startSession(payload);
+  } catch (e) {
+    el.loginErr.textContent = bioFriendlyError(e);
+  } finally {
+    el.btnBioUnlock.disabled = false;
+  }
+});
+
+/* Session-view biometric card */
+async function refreshBioCard() {
+  const avail = await bioAvailable();
+  const enrolled = !!bioBlob();
+  el.bioErr.textContent = "";
+  el.btnBioEnroll.hidden = !(avail && !enrolled);
+  el.btnBioRemove.hidden = !enrolled;
+  if (!avail && !enrolled) {
+    el.bioStatus.textContent = "No user-verifying platform authenticator is available in this browser/context, so biometric unlock is honestly unavailable here. The passphrase path is unaffected.";
+  } else if (enrolled) {
+    el.bioStatus.textContent = "Biometric unlock is enabled — a convenience gate in front of the sealed wallet. Your passphrase still works and remains the fallback; the seed phrase remains the only recovery.";
+  } else {
+    el.bioStatus.textContent = "Enable fingerprint / face unlock for this wallet. Enrolling does not weaken or delete the passphrase.";
+  }
+}
+/* Enrolling from an open session: the session deliberately no longer holds
+   the seed or private key, so the sealed wallet is re-opened ONCE with the
+   passphrase, used for enrollment, and dropped again. One extra prompt buys
+   a much smaller secret-residency window. */
+let rePassResolve = null;
+function askRePass() {
+  el.rePassInput.value = "";
+  el.rePassErr.textContent = "";
+  el.dlgRePass.showModal();
+  el.rePassInput.focus();
+  return new Promise((resolve) => { rePassResolve = resolve; });
+}
+el.rePassForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const p = el.rePassInput.value;
+  el.rePassInput.value = "";
+  el.dlgRePass.close();
+  const r = rePassResolve; rePassResolve = null;
+  if (r) r(p);
+});
+el.rePassCancel.addEventListener("click", () => {
+  el.dlgRePass.close();
+  const r = rePassResolve; rePassResolve = null;
+  if (r) r(null);
+});
+el.dlgRePass.addEventListener("cancel", () => {
+  const r = rePassResolve; rePassResolve = null;
+  if (r) r(null);
+});
+
+el.btnBioEnroll.addEventListener("click", async () => {
+  if (!session) return;
+  const pass = await askRePass();
+  if (pass == null) return;
+  el.btnBioEnroll.disabled = true;
+  try {
+    const blob = walletBlob();
+    const payload = await PSEAM.openAtRest(pass, blob, AAD_WALLET);
+    const ok = await bioEnroll(payload, el.bioErr);
+    payload.seed = null; payload.priv = null; // used once, dropped again
+    if (ok) await refreshBioCard();
+  } catch {
+    el.bioErr.textContent = "Wrong passphrase — nothing was unlocked; biometrics unchanged.";
+  } finally {
+    el.btnBioEnroll.disabled = false;
+  }
+});
+el.btnBioRemove.addEventListener("click", async () => {
+  store.del(LS.BIO);
+  await refreshBioCard();
+});
+
+/* ============================================================
+   Paired terminals — the reference UI for integration/pairing's
+   sealed PairingRecord model (PairedTerminals). localStorage stands
+   in for the phone's StrongBox/SE-sealed records. Mirrors the Rust
+   model: persist-on-pair (add), monotonic revoke (delete — no
+   un-revoke), panic-revoke-all (postern-panic hook). No network.
+   ============================================================ */
+const TERM = (() => {
+  const NICKS = ["Tiago’s ThinkPad", "Studio iMac", "Loaner laptop", "Office desktop", "Travel netbook"];
+  function all() { try { return JSON.parse(store.get(LS.TERMINALS, "[]")) || []; } catch { return []; } }
+  function save(list) { store.set(LS.TERMINALS, JSON.stringify(list)); }
+  async function fpr(pinBytes) {
+    // Short display fingerprint of the pinned peer key — mirrors
+    // PairedTerminals::peer_fpr (SHA-256(peer_identity_pub), first 8 bytes).
+    const d = new Uint8Array(await crypto.subtle.digest("SHA-256", pinBytes));
+    const h = PID.hex(d.slice(0, 8)).toUpperCase();
+    return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}`;
+  }
+  async function pairDemo() {
+    const list = all();
+    const pin = PID.rand(32);                                   // stand-in peer identity pin
+    const binding = PID.rand(8);                                // stand-in channel binding
+    list.push({
+      id: PID.hex(binding),                                     // channel-binding-derived id
+      nickname: NICKS[list.length % NICKS.length],
+      role: "Terminal",                                         // this device is the phone (Custodian); the peer is a Terminal
+      pin_fpr: await fpr(pin),
+      grant: "single-tap logins only — never transfers",
+      created: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+    });
+    save(list);
+  }
+  function revoke(id) {
+    // Monotonic: the record is DELETED, not flagged — there is no un-revoke.
+    save(all().filter(t => t.id !== id));
+  }
+  function panicRevokeAll() {
+    const n = all().length;
+    store.del(LS.TERMINALS);
+    return n;
+  }
+  return { all, pairDemo, revoke, panicRevokeAll };
+})();
+
+function renderTerminals() {
+  const list = TERM.all();
+  el.termErr.textContent = "";
+  if (!list.length) {
+    el.termList.innerHTML = '<div class="ledger-row"><div class="mark" style="color:var(--muted)">○</div>' +
+      '<div><h3>No paired terminals</h3><p>Pair a demo terminal to see the sealed-record model — nickname, pinned-key fingerprint, grant scope — and the one-tap revoke.</p></div></div>';
+    return;
+  }
+  el.termList.innerHTML = list.map(t => {
+    const created = new Date(t.created).toLocaleDateString();
+    return '<div class="ledger-row"><div class="mark" style="color:var(--acc)">▣</div><div>' +
+      '<h3>' + escapeHtml(t.nickname) + ' <span style="color:var(--muted);font-weight:400">· ' + escapeHtml(t.role) + '</span></h3>' +
+      '<p>pin <code>PL-' + escapeHtml(t.pin_fpr) + '</code> · paired ' + escapeHtml(created) +
+      ' · grant: <em>' + escapeHtml(t.grant) + '</em></p>' +
+      '<p style="margin-top:6px"><button class="linkish termRevoke" data-id="' + escapeHtml(t.id) + '">revoke this terminal</button></p>' +
+      '</div></div>';
+  }).join("");
+  el.termList.querySelectorAll(".termRevoke").forEach(b =>
+    b.addEventListener("click", () => {
+      TERM.revoke(b.dataset.id);
+      renderTerminals();
+      setStatus("Terminal revoked — its sealed record is deleted; it must re-pair with a fresh SAS.", "ok");
+    }));
+}
+el.btnPairDemo.addEventListener("click", async () => {
+  await TERM.pairDemo();
+  renderTerminals();
+});
+el.btnPanicRevoke.addEventListener("click", () => {
+  const n = TERM.panicRevokeAll();
+  renderTerminals();
+  setStatus("PANIC-REVOKE: " + n + " terminal" + (n === 1 ? "" : "s") +
+    " evicted. Every reconnect channel is dropped — this is the postern-panic hook.", "err");
+});
+
+/* ---------- honesty dialog + theme ---------- */
+el.btnHonesty.addEventListener("click", () => el.dlgHonesty.showModal());
+document.querySelectorAll("[data-close]").forEach(b =>
+  b.addEventListener("click", () => b.closest("dialog").close()));
+
+function applyTheme(t) {
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+}
+el.btnTheme.addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const next = cur === "light" ? "dark" : "light";
+  store.set(LS.THEME, next);
+  applyTheme(next);
+});
+applyTheme(store.get(LS.THEME));
+
+/* ---------- honesty labels: flip when the postern-sdk SEAM is live ----------
+   Purely additive to the static labels. In a plain browser tab (this page's
+   strict CSP forbids fetching wasm) the SEAM is absent and the labels keep
+   their "classical stand-in" text. Inside a Postern host shell that installs
+   globalThis.PosternSDK, the KDF label flips to the real Argon2id core. */
+function refreshHonestyLabels() {
+  const st = PSEAM.status();
+  if (el.standinKdf) {
+    if (st.kdf) {
+      el.standinKdf.innerHTML = 'Sealing at rest: <b>' + escapeHtml(st.kdfLabel) +
+        '</b> — the real <code>postern-core</code> Argon2id + XChaCha20-Poly1305 seal, wired through <code>postern-sdk</code>. Only ciphertext is stored.';
+    } else {
+      el.standinKdf.innerHTML = 'Sealing at rest: AES-256-GCM, key from <b>PBKDF2-SHA-256 (310,000 it.)</b> — ' +
+        'a WebCrypto stand-in for the product’s <b>Argon2id</b>, the <code>postern-core</code> keyfile construction. ' +
+        'Only ciphertext is stored. <em>(postern-sdk core not loaded here — honest stand-in.)</em>';
+    }
+  }
+  if (el.standinPq) {
+    // PQ is never available in the wasm build; keep the honest stand-in text and
+    // surface the reason the seam reports when present.
+    const suffix = (st.seam && !st.pq && st.pqReason)
+      ? ' <em>(postern-sdk reports: ' + escapeHtml(st.pqReason) + ')</em>'
+      : '';
+    el.standinPq.innerHTML = 'Signing key: <b id="algLabel">' + escapeHtml((session && session.alg) || '') +
+      '</b> via WebCrypto — a <b>classical stand-in</b> for the wallet’s hybrid ' +
+      '<b>Falcon-1024 ‖ ML-DSA-65</b> post-quantum key held in the device TEE. ' +
+      'The flow — seed → passphrase-sealed at rest → local unlock → derive m/login → sign challenge → session — ' +
+      'is the real design; only the primitive differs in a browser.' + suffix;
+    // el.algLabel was replaced above; re-point the cached handle.
+    el.algLabel = $("#algLabel");
+  }
+}
+
+/* ---------- boot ---------- */
+(async function boot() {
+  refreshHonestyLabels();
+  if (walletBlob()) await toLocked();
+  else toSetup();
+  document.body.dataset.booted = "1";
+})();
+</script>
+</body>
+</html>

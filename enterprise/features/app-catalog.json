@@ -1,0 +1,94 @@
+{
+  "schema": "postern.enterprise.app-catalog/1",
+  "license": "MIT OR Apache-2.0",
+  "copyright": "2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs",
+  "status": "design / reference prototype — unaudited, pre-production",
+  "boundary": "Every app below is personal-free: free, unrestricted, needs no license. The enterpriseFeatures on each app are ADDITIVE org-managed capabilities layered on top; they never gate the base app. Business-edition surfaces (e.g. the Consiglio admin console) are the only licensed items, and they never reach a personal app's data.",
+  "apps": [
+    {
+      "id": "izbushka",
+      "name": "Izbushka",
+      "tagline": "the hut on chicken legs — scoped, expiring capability grants",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "fleet-grant-policy", "name": "Org default grant policy (fleet)", "additive": true, "default": false, "requiresLicense": true },
+        { "id": "grant-audit-export", "name": "Export grant history to org audit chain", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "sotto",
+      "name": "Sotto",
+      "tagline": "a quiet voice assistant",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "managed-model-endpoint", "name": "Org-managed model endpoint / key", "additive": true, "default": false, "requiresLicense": true },
+        { "id": "retention-policy", "name": "Org transcript retention default", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "vedetta",
+      "name": "Vedetta",
+      "tagline": "a quiet lookout on the markets",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "shared-watchlists", "name": "Org shared watchlists (read-only push)", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "tolmach",
+      "name": "Tolmach",
+      "tagline": "interpreter & minutes",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "minutes-retention", "name": "Org minutes retention default", "additive": true, "default": false, "requiresLicense": true },
+        { "id": "glossary-push", "name": "Org glossary / terminology push", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "store",
+      "name": "Postern Store",
+      "tagline": "say what you need — curated app store",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "org-allowlist", "name": "Org app allow/deny list (advisory)", "additive": true, "default": false, "requiresLicense": true },
+        { "id": "private-channel", "name": "Private org distribution channel", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "chiave",
+      "name": "Chiave",
+      "tagline": "sign in with your wallet",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "sso-bridge", "name": "Org SSO / directory bridge", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "sarto",
+      "name": "Sarto",
+      "tagline": "set up your Postern (onboarding)",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "zero-touch", "name": "Zero-touch org enrollment profile", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "ezekiel1",
+      "name": "Ezekiel 1",
+      "tagline": "access-layer governance",
+      "tier": "personal-free",
+      "enterpriseFeatures": [
+        { "id": "fleet-policy", "name": "Fleet-wide access-layer policy", "additive": true, "default": false, "requiresLicense": true }
+      ]
+    },
+    {
+      "id": "consiglio",
+      "name": "Consiglio (admin console)",
+      "tagline": "the council — enterprise admin console (Business edition only)",
+      "tier": "business",
+      "enterpriseFeatures": [
+        { "id": "console", "name": "Admin console core", "additive": true, "default": true, "requiresLicense": true }
+      ]
+    }
+  ]
+}

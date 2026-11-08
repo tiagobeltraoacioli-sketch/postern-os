@@ -1,0 +1,4 @@
+chain_len=3
+cert[0].bytes=760
+cert[1].bytes=636
+cert[2].bytes=655

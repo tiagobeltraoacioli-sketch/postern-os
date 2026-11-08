@@ -1,0 +1,15 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# post-upgrade for the postern-flavor package (Postern for postmarketOS).
+# Re-apply the phosh schema defaults after an upgrade; do NOT re-enable services
+# (respect a user who deliberately disabled them). OpenRC-native.
+#
+# HONESTY / UNBOOTED: community, NON-attestable tier. Syntax-checked (sh -n)
+# only; never run on a device. This is NOT "Postern OS".
+set -e
+
+if command -v glib-compile-schemas >/dev/null 2>&1; then
+	glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+fi
+
+exit 0

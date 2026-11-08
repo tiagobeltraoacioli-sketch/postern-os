@@ -1,0 +1,73 @@
+# =============================================================================
+# public/_redirects — canonicalization for the Cloudflare Pages project
+# serving BOTH posternlabs.com AND posternpool.com.
+#
+# Cloudflare _redirects notes:
+#   - Format:  <source>  <destination>  <status>   (one rule per line)
+#   - A source that includes a scheme+host matches on the incoming hostname,
+#     which is what lets us fold "www" into the apex per-domain.
+#   - :splat carries only the PATH through to a FIXED, hard-coded destination
+#     host. There is NO user-controlled host in any destination, so these
+#     cannot be abused as an open redirect.
+#   - Cloudflare Pages already forces http -> https on its own; no rule needed.
+#   - Both apexes are kept DISTINCT on purpose — posternpool.com is NOT folded
+#     into posternlabs.com. We only collapse each domain's "www" onto its apex.
+# =============================================================================
+
+# www -> apex (301 permanent), per domain, path preserved.
+https://www.posternlabs.com/*   https://posternlabs.com/:splat   301
+https://www.posternpool.com/*   https://posternpool.com/:splat   301
+
+# Bare short URL -> canonical Gramota app path. Anyone who types or is handed
+# the short form /gramota should land on the real app at /apps/gramota/ (which
+# serves <title>Gramota — enterprise onboarding · Postern Labs</title>) instead
+# of falling through to index.html with a misleading 200. Path-only, fixed
+# destination, no user-controlled host: not an open redirect.
+/gramota    /apps/gramota/   301
+
+
+# -----------------------------------------------------------------------------
+# Deploy-time caveats (these rules are inert / harmless until the conditions
+# are met, so they cannot break anything if unmet):
+#   - Each "www" host must actually be attached to the Pages project as a
+#     custom domain (or CNAME'd to it) for its redirect to ever fire.
+#   - If you instead prefer apex -> www as canonical, swap the two sides.
+#   - Intentionally NOT added: any rewrite of posternpool.com's "/" to the pool
+#     page. Same project => posternpool.com/ currently serves index.html (the
+#     Labs home). If pool.com should land on /pool/ or /pool.html, that's a
+#     content-routing decision for the site owner — add e.g.
+#       https://posternpool.com/   /pool.html   200
+#     deliberately, not as a security change.
+# -----------------------------------------------------------------------------
+
+# NOTE: the old "/pool -> / 301" and "/pool.html -> / 301" rules were REMOVED
+# (2026-07-15) — there is now a real Pool page (site/pool.html -> /pool.html and
+# /pool/). Redirecting them to home broke the nav's Pool button.
+
+# The React wallet PWA at /apps/mobile-wallet-pwa/ was UNPUBLISHED (2026-07-18):
+# it rendered six screens but never imported the WASM crypto core, so it could
+# neither create a wallet nor import a bloch-cli keystore. Send its traffic to
+# the wallet that actually works — same PQ core, 9 passing interop tests.
+/apps/mobile-wallet-pwa/*  /apps/mobile-wallet/  301
+/apps/mobile-wallet-pwa    /apps/mobile-wallet/  301
+
+# The Windows .msi was WITHDRAWN (2026-07-18): it was built from a partial branch
+# and its Swap pane badges itself "live" over an L2 that does not exist. It cannot
+# be rebuilt next to the macOS one — Tauri does not cross-bundle and no Windows CI
+# runner is provisioned. Without this rule the path falls through to the SPA
+# fallback and answers 200 with HTML for a URL ending in .msi; send people to the
+# downloads page, which explains the withdrawal and points at building from source.
+/Postern-Desktop-Windows-x64.msi  /downloads.html  302
+/dl/Postern-Desktop-Windows-x64.msi  /downloads.html  302
+
+# PosternDex / Swap withdrawn 2026-07-18 — see attic/swap-posterndex/README.md.
+# The code is finished; the network it targets is not (chain_id 700771
+# unregistered, WBLCH never deployed, no pools, custodial v1 bridge vault).
+/posterndex.html  /products.html  302
+/posterndex       /products.html  302
+
+# The standalone wallet PWA was folded into the full Postern app (2026-07-19):
+# /apps/postern/ carries the wallet as one of its panes plus node/vault/backup.
+# One mobile app instead of two overlapping ones.
+/apps/mobile-wallet/*  /apps/postern/  301
+/apps/mobile-wallet    /apps/postern/  301

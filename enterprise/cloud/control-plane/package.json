@@ -1,0 +1,31 @@
+{
+  "name": "@postern/cloud-control-plane",
+  "version": "0.0.0-prototype",
+  "private": true,
+  "type": "module",
+  "description": "Postern CLOUD control plane — multi-tenant managed-node orchestration (reference prototype, unaudited, no real infra). Business/Enterprise only.",
+  "license": "MIT OR Apache-2.0",
+  "author": "Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "src",
+    "self-check.mjs",
+    "README.md",
+    "NOTICE",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "scripts": {
+    "check": "node --check src/index.mjs && node --check src/tenant.mjs && node --check src/isolation.mjs && node --check src/orchestrator.mjs && node --check src/license-binding.mjs && node --check src/health-api.mjs && node --check src/privacy.mjs && node --check self-check.mjs",
+    "test": "node self-check.mjs",
+    "self-check": "node self-check.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

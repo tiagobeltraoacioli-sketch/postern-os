@@ -1,0 +1,137 @@
+# Postern Courier — live Arti onion-drop round-trip evidence — FIRST LIVE RUN
+# UNAUDITED reference-prototype end to end. A passing round-trip is a PLUMBING
+# proof ONLY. It is NOT an anonymity claim, NOT a security claim. The onion
+# address crypto is CLASSICAL Tor (the ML-KEM-1024+X25519 hybrid protects the
+# PAYLOAD, not circuit metadata). Payload size and timing remain observable
+# (length-revealing AEAD, no padding). The wire frame carries no auth/replay
+# protection of its own; the recipient gets those only at the payload layer
+# (ML-DSA sender_auth + ReplayGuard), both equally UNAUDITED. Authenticate the
+# recipient key and the sender verifying key out-of-band or an active MITM
+# reads/forges everything.
+#
+# SCOPE OF THIS EVIDENCE: this is the first time the double-gated live onion
+# round-trip was actually run and transcribed for this crate. BOTH round-trips
+# have now SUCCEEDED live on this host — the bare-seal drop (RUN 1) and the
+# ML-DSA-signed, verified-receive drop (RUN 2). Each published a real ephemeral
+# .onion, a real Tor circuit carried a real sealed drop end-to-end, and the
+# recipient recovered the original plaintext (RUN 2 additionally verified the
+# sender signature FIRST, passed the replay guard, then opened). RUN 1's first
+# combined invocation also transcribed an honest FAILED attempt of the signed
+# variant (it timed out on its retry budget that run) — kept verbatim below,
+# never trimmed, because that is the honest record and shows the network-timing
+# nature of the proof.
+
+host        : Darwin 23.6.0 x86_64 (macOS 14.8.7, MacBook Pro — dev workstation, not CI)
+git_rev     : 880d415f6112bc5e68fba8b96c3a1a4c59a8feef (branch base) + this branch's courier changes
+toolchain   : rustc 1.94.1 (e408947bf 2026-03-25) / cargo 1.94.1
+arti        : arti-client 0.44 (in-process; NO system tor daemon is present or needed on this host)
+tor_egress  : reachable — arti bootstrapped and published ephemeral onion descriptors from this network
+gate        : DOUBLE-gated — #[ignore] AND POSTERN_LIVE_TOR=1; neither ever runs in CI. Diff weakens no gate.
+
+# ── HOST BREAKAGE FOUND + FIXED (does NOT weaken any gate or claim) ──
+# The very first live run (2026-07-16T04:51:51Z) did not reach Tor at all: it
+# panicked in rustls before any circuit, because arti's TLS (futures-rustls)
+# enables no crypto-provider feature and leaves the choice to the application,
+# and nothing in this crate had installed one:
+error_verbatim: Could not automatically determine the process-level CryptoProvider from Rustls crate features. Call CryptoProvider::install_default() before this point to select a provider manually, or make sure exactly one of the 'aws-lc-rs' and 'ring' features is enabled.
+fix_1       : add `rustls` (features ["ring","std"]) under the `onion-transport` feature ONLY, and a
+              `transport::ensure_rustls_crypto_provider()` helper (installs the ring provider,
+              idempotent — first caller wins) called before the first bootstrap in both live tests
+              and both example bootstrap sites. `ring` is permissive (ISC/MIT-style); no GPL, no
+              network fetch of any binary. Cargo.lock gained exactly one line ("rustls" under
+              postern-courier); no new package was added to the tree.
+fix_2       : after rustls was fixed, the first real round-trip attempt showed the sender reporting
+              "served" while the recipient received nothing — `Sender::deliver_once{,_signed}`
+              returned as soon as the local write flushed, and consuming the Sender tore the whole
+              onion service down, discarding in-flight cells. Added `drain_until_peer_eof` (bounded
+              by DEFAULT_DROP_TIMEOUT, outcome ignored) so the service stays up until the peer
+              half-closes. This is a teardown-ordering fix, NOT an ACK — peer EOF proves nothing was
+              received/verified, and a hostile peer can hold the stream open (documented in code).
+fix_3       : the live tests and example now do bounded runbook-style RETRIES on both sides (a single
+              120 s window per side is not enough while a fresh HS descriptor propagates), and the
+              example additionally retries a transient re-publish failure. No gate touched.
+
+# ══════════════════════════════════════════════════════════════════════════
+# RUN (2026-07-16T05:56:41Z → 06:03:57Z) — the transcribed live round-trip
+#   POSTERN_LIVE_TOR=1 cargo test -p postern-courier --features onion-transport \
+#     --test live_tor_drop -- --ignored --nocapture --test-threads=1
+# ══════════════════════════════════════════════════════════════════════════
+# VERBATIM:
+#
+#     running 2 tests
+#     test live_onion_drop_via_seam ... seam drop published at 6bib3yj2ripaksotnfxqrfbdliqrdpfk5p7khfvn5ytdlb5xlu3k67id.onion (waiting for descriptor to propagate)…
+#     fetch attempt 1/5: transport over onion drop failed; descriptor propagation takes minutes
+#     ok
+#     test live_onion_signed_drop_via_seam ... signed seam drop published at fxrdydhiuqio2begqwmgvgkos3b5wycywqff7gdhajx7pr2xvsqb5ryd.onion (waiting for descriptor to propagate)…
+#     signed fetch attempt 1/5: transport over onion drop failed; descriptor propagation takes minutes
+#     signed fetch attempt 2/5: transport over onion drop failed; descriptor propagation takes minutes
+#     signed fetch attempt 3/5: transport over onion drop failed; descriptor propagation takes minutes
+#     signed fetch attempt 4/5: transport over onion drop failed; descriptor propagation takes minutes
+#     signed fetch attempt 5/5: transport over onion drop failed; descriptor propagation takes minutes
+#
+#     thread 'live_onion_signed_drop_via_seam' (5793855) panicked at crates/postern-courier/tests/live_tor_drop.rs:304:10:
+#     fetch_signed_via: Transport
+#     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+#     FAILED
+#
+#     failures:
+#         live_onion_signed_drop_via_seam
+#
+#     test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 433.46s
+#
+# ── What PASSED (the real proof) ──
+# live_onion_drop_via_seam = ok. A fresh ephemeral onion service was published
+# at 6bib3yj2ripaksotnfxqrfbdliqrdpfk5p7khfvn5ytdlb5xlu3k67id.onion; a
+# circuit-isolated recipient client (sender_tor.for_identity()) fetched the
+# sealed drop over a REAL Tor circuit — through the generic DropSender/
+# DropFetcher seam, not the concrete API — after the descriptor propagated
+# (one retry), and `open(&rcpt.secret, &fetched)` returned the ORIGINAL
+# plaintext (asserted equal). That is a genuine end-to-end live onion
+# round-trip: publish → real circuit → fetch → open. Plumbing proven; nothing
+# more (see the honest-limits header).
+#
+# ── What did NOT complete on this run (transcribed honestly, not faked) ──
+# live_onion_signed_drop_via_seam = FAILED. It published its own onion
+# (fxrdydhiuqio2begqwmgvgkos3b5wycywqff7gdhajx7pr2xvsqb5ryd.onion) but its five
+# bounded fetch retries all returned the coarse CourierError::Transport while
+# the descriptor had not become fetchable in time, and the test panicked at
+# fetch_signed_via rather than claim a round-trip. The signed path is the SAME
+# onion transport as the bare path that just succeeded, plus one in-payload
+# ML-DSA signature that plays NO role in moving bytes — so this is a
+# descriptor-propagation timing outcome on this host/network, not a transport
+# defect. It is recorded here as an honest failed attempt; RUN 2 below then
+# completed the signed round-trip live on a luckier propagation window.
+
+# ══════════════════════════════════════════════════════════════════════════
+# RUN 2 (2026-07-16T06:04:37Z → 06:06:54Z) — the SIGNED round-trip, live PASS
+#   POSTERN_LIVE_TOR=1 cargo test -p postern-courier --features onion-transport \
+#     --test live_tor_drop live_onion_signed_drop_via_seam -- --ignored --nocapture --test-threads=1
+# ══════════════════════════════════════════════════════════════════════════
+# VERBATIM:
+#
+#     running 1 test
+#     test live_onion_signed_drop_via_seam ... signed seam drop published at fxrdydhiuqio2begqwmgvgkos3b5wycywqff7gdhajx7pr2xvsqb5ryd.onion (waiting for descriptor to propagate)…
+#     signed fetch attempt 1/5: transport over onion drop failed; descriptor propagation takes minutes
+#     ok
+#
+#     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 134.87s
+#
+# ── What PASSED (the signed proof) ──
+# live_onion_signed_drop_via_seam = ok. A fresh ephemeral onion service was
+# published (fxrdydhiuqio2begqwmgvgkos3b5wycywqff7gdhajx7pr2xvsqb5ryd.onion —
+# the same address as RUN 1, since the nickname is fixed and arti's on-disk
+# keystore persisted the service key: documented behavior, now observed live).
+# After one propagation retry, a circuit-isolated recipient fetched the SIGNED
+# drop over a REAL Tor circuit through the SignedDropFetcher seam, and the full
+# `receive_verified_now` pipeline ran: sender ML-DSA-87 signature verified
+# FIRST, a fresh default-window ReplayGuard passed, then the hybrid seal opened
+# to the ORIGINAL plaintext (asserted equal). This is a genuine end-to-end live
+# signed onion round-trip. Plumbing + the verified-receive ordering proven;
+# nothing more — the honest-limits header still holds verbatim (UNAUDITED,
+# classical onion crypto, length-revealing AEAD, NOT anonymity, NOT security).
+#
+# ── Honest note on flakiness (kept, not hidden) ──
+# The signed round-trip needed two runs to catch a propagation window: it
+# FAILED its retry budget in RUN 1 and PASSED in RUN 2, same code, same host.
+# The proof is real but network-timing-dependent, which is exactly why these
+# tests are #[ignore] + POSTERN_LIVE_TOR-gated and never CI gates.

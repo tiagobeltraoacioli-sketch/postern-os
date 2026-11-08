@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  NoporIS — persona MECHANISM app shell. DESIGN ONLY · UNAUDITED.
+
+  A self-enrolled Device Policy Controller that provisions ONE Android managed profile
+  (stock Android permits exactly one) as a chosen persona FLAVOR: clean (== Porog,
+  hardened) or Google-Play (the LESS-private side — it phones home to Google; separation,
+  not privacy). No root, no OS replacement. Attests the phone, not the persona. A rooted
+  host defeats the separation. This is an app on stock Android — NEVER "Postern OS."
+
+  This app REUSES the shared DPC (android-common); it declares its OWN receiver so it can
+  own the single managed-profile slot, but it does not fork the provisioning/lifecycle.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Managed-profile provisioning lives entirely in platform APIs; no dangerous
+         runtime permissions are requested by the persona shell itself. The Google-Play
+         flavor enables Play/GMS *system apps already on the device* inside the profile
+         (enableSystemApp) — it does NOT bundle or redistribute GMS. -->
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+
+        <!-- The "two worlds" entry point. Runs in the PERSONAL profile to (a) resolve the
+             single managed-profile slot, (b) pick a flavor, (c) trigger provisioning, then
+             hand off inside the new profile via admin-extras (the flavor tag). -->
+        <activity
+            android:name=".provision.PersonaProvisioningActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- NoporIS's Device Policy Controller. Becomes PROFILE OWNER of the persona's
+             managed profile. Subclasses the shared BaseDeviceAdminReceiver; its enrollment
+             body dispatches on the chosen flavor. BIND_DEVICE_ADMIN ensures only the
+             system can bind it. -->
+        <receiver
+            android:name=".dpc.NoporIsDeviceAdminReceiver"
+            android:description="@string/dpc_description"
+            android:label="@string/dpc_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <!-- Fired when the managed profile has been created and this app is its
+                     profile owner; the shared skeleton's onProfileProvisioningComplete
+                     runs here and calls our flavor-aware onProfileEnrolled(). -->
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The SINGLE cross-profile bearer for a NoporIS crossing (noporis-02 §1). Bound
+             explicitly by package/class from the far side; exactly one method
+             (deliverCrossing) carrying an OPAQUE sealed frame. No ContentProvider URI
+             grants, no implicit intents — a crossing is a discrete, logged method call.
+             The bearer holds NO authority: it screens fail-closed and defers every
+             decision to the sealed receiver (open-frame → CrossingGuard → ConsentRecord →
+             GateConsent → kill-switch). Deny-by-default until a live receiver is wired.
+
+             UNTESTED-until-VM: the actual managed↔personal cross-profile bind is provided
+             in production by the AndroidX Connected Apps @CrossProfile layer (build/VM
+             side) or the DPC's cross-profile-connection allowlist — provable only on a
+             work-profile emulator/device. exported=true is required so the peer profile
+             can bind it; a signature/DPC-scoped guard is added when the bind is wired. -->
+        <service
+            android:name=".bridge.CrossProfileBrokerService"
+            android:exported="true" />
+
+    </application>
+</manifest>

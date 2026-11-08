@@ -1,0 +1,33 @@
+# tpm2/fixtures/pcr16_swtpm_single_extend.txt
+#
+# REAL fixture captured from `swtpm` 0.10.1 (IBM/stefanberger's software TPM
+# emulator — https://github.com/stefanberger/swtpm) — a SOFTWARE TPM, NOT
+# hardware evidence. See ../README.md for the honest label this fixture
+# carries and what it does / does not prove.
+#
+# Captured 2026-07-13 on the Bucket-B Dev-C host by talking RAW TPM2 command
+# bytes (TCG TPM2 wire format) directly to swtpm's data socket — tpm2-tools
+# is not packaged for Homebrew on macOS, so no tpm2-tools was used or is
+# claimed to have been used. The exact commands:
+#
+#   swtpm socket --tpm2 --tpmstate dir=<tmp> \
+#       --server type=tcp,port=32321 --ctrl type=tcp,port=32322 \
+#       --flags not-need-init,startup-clear
+#
+# then a minimal Python harness sent TPM2_PCR_Read (0x0000017E) and
+# TPM2_PCR_Extend (0x00000182, TPM_RS_PW empty-password session) for PCR 16
+# (SHA-256 bank), TCG's freely-resettable "debug" PCR — chosen so repeat runs
+# never depend on a prior boot's measurement state.
+#
+# This proves: this REAL software TPM's PCR_new == SHA-256(PCR_old ||
+# event_digest) — the TCG TPM2 Part 1 §19.3 PCR-extend algorithm — for one
+# extend operation. It does NOT prove anything about real silicon (a software
+# emulator has no hardware root of trust) and does NOT include a signed
+# TPM2_Quote (no attestation key was created — see ../README.md "What is
+# scoped OUT this bucket").
+
+pcr_index=16
+hash_alg=sha256
+initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
+event_digest=471e65802619fe65ac2fe57bc94bc23a2daf54b40ab7a3fc4bc665f9209986de
+final_pcr=4c765ffc0595f9500ac4f86ebd2147ee5910b1c2d51d89d6d26b5e624d23f5c1

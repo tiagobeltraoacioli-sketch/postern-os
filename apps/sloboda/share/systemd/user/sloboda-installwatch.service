@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Sloboda — host launcher sync (install-watch) · USER systemd unit
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  HONESTY: NON-ATTESTABLE escape-hatch tier — "Postern for postmarketOS —
+#     community edition". NOT "Porog" and NEVER "Postern OS". This unit only
+#     mirrors installed Android apps as host .desktop launchers; each launcher
+#     re-enters the wrapper (`sloboda app <pkg>`), which consults the consent
+#     projection and REFUSES while the kill-switch is engaged / consent absent —
+#     no launcher path bypasses the gate. Entering Android = data leaves the
+#     sealed base; Play Integrity STRONG fails; NOT covered by the Postern Seal;
+#     UNTESTED (no Waydroid in the build sandbox); personal use is free; not
+#     legal advice.
+#
+#  USER scope on purpose: it writes the per-user launcher dir
+#  ($XDG_DATA_HOME/applications) with NO root. Install with:
+#     mkdir -p ~/.config/systemd/user
+#     cp sloboda-installwatch.service ~/.config/systemd/user/
+#     systemctl --user enable --now sloboda-installwatch.service
+#  Adjust ExecStart to wherever `sloboda-installwatch` is installed.
+# ─────────────────────────────────────────────────────────────────────────────
+[Unit]
+Description=Sloboda — host launcher sync (non-attestable Android tier)
+Documentation=man:sloboda(1)
+# Best-effort ordering after a graphical session so the shell grid is live to
+# re-index; it is a harmless no-op while the container is down (app list empty).
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# Stable entrypoint → `sloboda install-watch`. %h expands to the user's home.
+ExecStart=%h/.local/bin/sloboda-installwatch
+Restart=on-failure
+RestartSec=5
+# It reads a consent projection and writes only per-user .desktop files.
+# No new privilege is needed or wanted.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

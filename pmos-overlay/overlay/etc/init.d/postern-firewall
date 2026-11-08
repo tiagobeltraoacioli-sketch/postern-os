@@ -1,0 +1,43 @@
+#!/sbin/openrc-run
+# Postern for postmarketOS -- default firewall (nftables).
+#
+# HONESTY / UNBOOTED: community, NON-attestable tier. Syntax-checked (sh -n)
+# only; the nft ruleset itself has NOT been loaded by a real `nft` (not present
+# on the authoring host). See overlay/README.md.
+#
+# Loads a minimal default-deny inbound ruleset from /etc/nftables.d/postern.nft.
+# Depends on the `nftables` Alpine package (provides /sbin/nft). Kept separate
+# from Alpine's stock `nftables` service so we never clobber a user's own
+# /etc/nftables.nft.
+
+name="Postern firewall"
+description="Default-deny nftables ruleset for Postern for postmarketOS"
+
+: "${postern_ruleset:=/etc/nftables.d/postern.nft}"
+
+command="/sbin/nft"
+
+depend() {
+	need localmount
+	before net postern-tor postern-node
+}
+
+start() {
+	ebegin "Loading Postern firewall ruleset"
+	nft -f "$postern_ruleset"
+	eend $? "Failed to load $postern_ruleset"
+}
+
+stop() {
+	ebegin "Flushing Postern firewall ruleset"
+	# Flushing to an empty (accept-all) table is the safe stop for a phone:
+	# we never leave a half-applied deny in place.
+	nft flush ruleset
+	eend $? "Failed to flush nftables ruleset"
+}
+
+status() {
+	nft list table inet postern >/dev/null 2>&1 && \
+		einfo "Postern firewall: loaded" || \
+		einfo "Postern firewall: not loaded"
+}

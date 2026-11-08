@@ -1,0 +1,44 @@
+# bloch-tokens — neutral, re-homeable reference implementation of the
+# Bloch token-envelope standard (an OFF-consensus convention layered on top
+# of ordinary Bloch transactions).
+#
+# HONESTY / NEUTRALITY (non-negotiable, mirrored in the crate docs):
+#   * ZERO consensus change. This crate never touches node, PoW, or
+#     validation rules — it only defines a byte convention that anyone can
+#     read back out of the chain. It is NOT a fork and NOT a new rule.
+#   * Bloch stays ownerless. Anyone can run their own indexer over this
+#     standard; no party (Postern included) is privileged.
+#   * BLCH, the base coin, is untouched. This standard issues OTHER tokens;
+#     it never wraps BLCH, and it carries no revenue/burn/promoter mechanism.
+#   * Design scaffold: unaudited, pre-mainnet. A token's securities status
+#     is its issuer's responsibility, not Bloch's.
+#
+# Standalone-workspace pattern (same as integration/*): its own empty
+# [workspace] table so it builds and tests offline with ZERO dependencies,
+# outside the frozen root members list.
+[package]
+name = "bloch-tokens"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "DESIGN SCAFFOLD — unaudited, pre-mainnet, not an offering. Neutral reference implementation of the Bloch off-consensus token-envelope standard (TKV0): wire encode/decode, deterministic token state machine, and reproducible reorg-safe indexer. Zero consensus change (read-only over the documented node RPC); anyone can run it; BLCH is untouched."
+
+# Deliberately empty: this crate is its own workspace root (re-homeable,
+# offline-buildable, zero deps).
+[workspace]
+
+[features]
+# DEFAULT stays zero-dependency and offline-buildable: the wire layer, state
+# machine, reproducible indexer, and the MockChain source need NOTHING off the
+# std library. `rpc-client` is the ONLY seam that reaches the network — it wires
+# `stream::rpc::RpcBlockSource` (a real, read-only JSON-RPC BlockSource) to a
+# live node, pulling in just `serde_json` for parsing. HTTP is hand-rolled over
+# std TcpStream; there is no async runtime and no HTTP crate. Still off-consensus
+# and read-only: it only calls the public getblockcount/getblockhash/
+# getblockbyheight reads. One indexer among many; unaudited.
+default = []
+rpc-client = ["dep:serde_json"]
+
+[dependencies]
+serde_json = { version = "1", optional = true }

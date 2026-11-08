@@ -1,0 +1,73 @@
+--- a/functions/license/master.js	2026-07-13 12:02:52
++++ b/functions/license/master.js	2026-07-13 12:03:14
+@@ -74,8 +74,14 @@
+  * @returns {Promise<{status:"verified"|"not-found"|"unavailable", legalName?:string, country?:string, reason?:string}>}
+  *   - "verified"    → the DUNS resolves to a real legal entity (gate: proceed).
+  *   - "not-found"   → D&B answered but the DUNS is not a real entity (gate: refuse).
+- *   - "unavailable" → D&B not configured / auth/5xx/network error (gate: fallback).
++ *   - "unavailable" → D&B not configured / auth/5xx/network/timeout error (gate: fallback).
+  */
++// F2 fix (Bucket D, docs/bucketD/PARTITION.md §4): every DNB fetch is now bounded
++// by an AbortController timeout (env.DNB_TIMEOUT_MS, default 8s) so a slow/hanging
++// D&B response cannot block the request indefinitely on this code's own terms.
++// A timeout maps to the SAME fail-open-to-format-only outcome as any other outage.
++const DNB_TIMEOUT_MS_DEFAULT = 8000;
++
+ export async function verifyDunsWithDnB(duns, env, fetchImpl = fetch) {
+   const clientId = env && env.DNB_CLIENT_ID;
+   const clientSecret = env && env.DNB_CLIENT_SECRET;
+@@ -83,22 +89,38 @@
+   if (!staticBearer && !(clientId && clientSecret)) {
+     return { status: "unavailable", reason: "dnb-not-configured" };
+   }
++  const timeoutMs = Number(env && env.DNB_TIMEOUT_MS) > 0 ? Number(env.DNB_TIMEOUT_MS) : DNB_TIMEOUT_MS_DEFAULT;
+   try {
+     let bearer = staticBearer;
+     if (!bearer) {
+       const auth = "Basic " + btoa(`${clientId}:${clientSecret}`);
+-      const tokRes = await fetchImpl(DNB_AUTH_URL, {
+-        method: "POST",
+-        headers: { authorization: auth, "content-type": "application/x-www-form-urlencoded" },
+-        body: "grant_type=client_credentials",
+-      });
++      const ac = new AbortController();
++      const timer = setTimeout(() => ac.abort(), timeoutMs);
++      let tokRes;
++      try {
++        tokRes = await fetchImpl(DNB_AUTH_URL, {
++          method: "POST",
++          headers: { authorization: auth, "content-type": "application/x-www-form-urlencoded" },
++          body: "grant_type=client_credentials",
++          signal: ac.signal,
++        });
++      } finally {
++        clearTimeout(timer);
++      }
+       if (!tokRes.ok) return { status: "unavailable", reason: `dnb-auth-http-${tokRes.status}` };
+       const tokJson = await tokRes.json();
+       bearer = tokJson && (tokJson.access_token || tokJson.accessToken);
+       if (!bearer) return { status: "unavailable", reason: "dnb-auth-no-token" };
+     }
+     const url = `${DNB_DATA_URL}/${encodeURIComponent(duns)}?blockIDs=companyinfo_L1_v1`;
+-    const res = await fetchImpl(url, { headers: { authorization: "Bearer " + bearer } });
++    const ac2 = new AbortController();
++    const timer2 = setTimeout(() => ac2.abort(), timeoutMs);
++    let res;
++    try {
++      res = await fetchImpl(url, { headers: { authorization: "Bearer " + bearer }, signal: ac2.signal });
++    } finally {
++      clearTimeout(timer2);
++    }
+     if (res.status === 404) return { status: "not-found", reason: "dnb-duns-not-found" };
+     if (!res.ok) return { status: "unavailable", reason: `dnb-data-http-${res.status}` };
+     const data = await res.json();
+@@ -112,6 +134,9 @@
+         : "",
+     };
+   } catch (e) {
++    if (e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")))) {
++      return { status: "unavailable", reason: "dnb-timeout" };
++    }
+     return { status: "unavailable", reason: "dnb-network-error" };
+   }
+ }

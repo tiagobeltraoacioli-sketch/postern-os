@@ -1,0 +1,85 @@
+# postern-backup-net — the REAL wiring crate for the Postern → Filecoin backup
+# path. This is the crate `data/postern-data` (bloch-data) repeatedly points to
+# as "structurally out of this crate's honesty scope": where the zero-dep
+# scaffold's seams get plugged into real primitives.
+#
+# HONESTY (non-negotiable, mirrored in the crate docs and README):
+#   * REAL confidentiality, UNAUDITED, still NOT a complete backup system. This
+#     crate ships ONE real thing so far: `PosternSealer`, a concrete
+#     `bloch_data::seal::{Sealer,Opener}` adapter over the canonical Postern
+#     seal (`postern-core`: XChaCha20-Poly1305 v2, key-committing,
+#     context-bound, Argon2id-derived key). Unlike `bloch-data`'s in-crate
+#     `MockSealer` (a ZERO-confidentiality test fixture that frames plaintext
+#     verbatim), this adapter genuinely ENCRYPTS: the sealed blob is
+#     indistinguishable from random and never contains the plaintext.
+#   * REAL integrity now too (UNAUDITED): this crate enables bloch-data's
+#     `hash` feature and wires the genuine `SHAKE-256/256` manifest_root +
+#     per-blob shake256 (bloch_data::hash::Shake256Hasher) through the pipeline
+#     — the DATA0 anchor's new_root recomputes byte-identically and a fetched
+#     blob is re-hashed (key-independent) BEFORE the keyed AEAD open.
+#   * OUT OF SCOPE here (still slots): the ML-DSA-65‖Falcon-1024 PQ signer that
+#     fills `Package::{pk,sig}` and the live Storacha/Lighthouse network client.
+#     The end-to-end pipeline test lands on
+#     `bloch_data::backend::DirBackend` (the REAL durable on-disk spool), NOT on
+#     a live Filecoin provider. "designed != built != booted": this crate proves
+#     real client-side confidentiality end-to-end over the durable spool, and
+#     nothing about the PQ overlay or the live network path.
+#   * Bloch stays ownerless / zero consensus change. This crate is pure
+#     client-side cryptography over the off-consensus DATA0 backup convention;
+#     it never touches consensus.
+#
+# Standalone-workspace pattern (same as `data/postern-data`,
+# `l2/bloch-l2-anchor`, `crates/bloch-tokens`): its own empty [workspace] table
+# so it builds and tests outside the frozen root members list. It path-depends
+# on `bloch-data` (the scaffold seams) and `postern-core` (the real seal), both
+# as external packages.
+[package]
+name = "postern-backup-net"
+version = "0.0.0-unaudited"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "UNAUDITED wiring crate for the Postern → Filecoin backup path. Ships the REAL PosternSealer adapter (bloch_data::seal::{Sealer,Opener} over postern-core XChaCha20-Poly1305 v2 + Argon2id) — genuine client-side confidentiality, unlike bloch-data's MockSealer — and wires the REAL SHAKE-256/256 manifest_root + per-blob shake256 (bloch-data `hash` feature) through the pipeline. The PQ signer and the live provider client remain out of scope."
+
+# Deliberately empty: this crate is its own workspace root (re-homeable,
+# offline-buildable outside the frozen root members list).
+[workspace]
+
+[dependencies]
+# The zero-dep scaffold seams this crate plugs real primitives into:
+# `seal::{Sealer,Opener,SealError}`, the PBM0/PBP0 codecs, and the DirBackend.
+# The `hash` feature is enabled so this crate wires the REAL `SHAKE-256/256`
+# integrity primitive (`bloch_data::hash::Shake256Hasher`, over the `sha3`
+# crate) through the backup pipeline: the DATA0 anchor's `manifest_root` and
+# every ManifestEntry's per-blob `shake256` are now genuine SHAKE-256/256, not
+# the `MockHasher` slot. (The PQ signer that fills `pk`/`sig` and the live
+# provider client remain out of scope — see the crate docs.)
+bloch-data = { path = "../postern-data", features = ["hash"] }
+# The canonical Postern seal (XChaCha20-Poly1305 v2, key-committing,
+# context-bound) and the memory-hard Argon2id KDF. This is where the REAL
+# crypto lives; this crate never re-implements any of it.
+postern-core = { path = "../../crates/postern-core" }
+# The REAL hybrid post-quantum signer/verifier — ML-DSA-65 ‖ Falcon-1024
+# (suite 0x0001), the SAME crate the node, CLI and mobile wallet use. This is
+# the authenticity leg the wiring crate is now responsible for: it fills the
+# PBP0 package's `pk`/`sig` slots (the DATA0 anchor transcript signature) and
+# verifies BOTH lattice halves against the vault pubkey. `default-features off`
+# keeps the terminal CLI (clap/rpassword) and the networked WalletClient
+# (reqwest) out — exactly as `apps/mobile-wallet/wasm` depends on it. It lives
+# in the sibling BlochSISPoW-project checkout (an external package, like the
+# desktop/mobile wallets reference it); this crate never re-implements any of
+# its crypto. UNAUDITED.
+bloch-crypto = { path = "../../../BlochSISPoW-project/crates/bloch-crypto", default-features = false }
+# Key material is held in a self-zeroizing buffer (same 1.x line the rest of the
+# workspace, and postern-core itself, pins).
+zeroize = { version = "1", features = ["derive"] }
+
+# Match the node's vendored, wasm-aware `pqcrypto-internals` fork — the SAME
+# `[patch.crates-io]` `apps/mobile-wallet/wasm` applies. `bloch-crypto`'s
+# deterministic seeded keygen (`generate_keypair_from_seed`, used for
+# reproducible vault keys) calls the fork's `with_seeded_rng` / `SeededRngGuard`
+# Rust API, which the upstream crates.io `pqcrypto-internals` does not expose.
+# A dependency crate's own `[patch]` is ignored by Cargo, so it must be
+# re-declared here at this standalone workspace's root.
+[patch.crates-io]
+pqcrypto-internals = { path = "../../../BlochSISPoW-project/crates/pqcrypto-internals" }

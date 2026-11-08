@@ -1,0 +1,63 @@
+{
+  "_license": "SPDX-License-Identifier: MIT OR Apache-2.0",
+  "_status": "DESIGN ONLY, not yet staffed. Reference-prototype, UNAUDITED. Attests nothing.",
+  "_honesty": "Badge rules for NoporIS. A badge is a claim; on stock Android an attestation claim is never true, so it is never rendered. The Google-Play persona is badged 'less private', never a padlock it has not earned. Any renderer MUST fail closed: if a claim is not proven true here, do not draw the badge.",
+  "schema": "noporis.badge-rules",
+  "schemaVersion": 1,
+  "mode": "strict",
+  "invariants": [
+    "Attestation is shown ONLY where it is genuinely true. On stock Android it is never true, so no persona ever receives a padlock / 'attested' / 'verified' / 'secure' / 'sealed' badge.",
+    "The Google-Play persona is badged 'less private', never a padlock it hasn't earned.",
+    "Fail closed: an unknown or absent proof renders NO positive badge, only the honest negative one.",
+    "No badge implies NoporIS is an OS, a Seal, Porog, or hardware-backed isolation. It is an unprivileged app on stock Android.",
+    "Play Integrity STRONG fails on both personas by design; no badge may imply it passes."
+  ],
+  "forbiddenBadges": {
+    "note": "These must NEVER be rendered for any persona on any NoporIS surface, because they would be false on stock Android.",
+    "labels": ["attested", "verified", "secure", "hardware-backed", "sealed", "padlock", "private (of the Google persona)", "STRONG integrity"]
+  },
+  "personas": {
+    "clean": {
+      "label": {
+        "VANILLA": "sandboxed · Google-free",
+        "MICROG": "sandboxed · less Google",
+        "GAPPS": "sandboxed · less private"
+      },
+      "tone": {
+        "VANILLA": "neutral",
+        "MICROG": "neutral",
+        "GAPPS": "caution"
+      },
+      "attestation": "none",
+      "padlock": false,
+      "explain": "The clean persona is sandboxed by Android's work-profile mechanism (Android's isolation, not Postern's). Sandboxed is not secure, private, or attested. The badge states the system-type trade-off only; it never claims attestation."
+    },
+    "google": {
+      "label": "less private",
+      "tone": "warn",
+      "attestation": "none",
+      "padlock": false,
+      "explain": "The Google-Play persona runs Google Play Services and phones home to Google. It is the less-private, non-attestable side by construction. It is ALWAYS badged 'less private' and NEVER a padlock. NoporIS sells separation + convenience here, not privacy."
+    }
+  },
+  "attestationRule": {
+    "showWhen": "claim.proven === true",
+    "provenOnStockAndroid": false,
+    "reason": "There is no measured-boot roothash of a persona. Play Integrity / key attestation measure the whole device (bootloader lock, verified boot, TEE), not a persona — they attest the phone, not the workspace. A rooted / unlocked / compromised host defeats the separation. Therefore no attestation badge is ever true here and none is drawn.",
+    "onUnknown": "render-negative-only"
+  },
+  "bridgeBadges": {
+    "default": "OFF",
+    "rule": "Cross-persona bridges (clipboard, contacts, files) render OFF unless the consent-gate state is the literal 'enabled'. NoporIS cannot open a bridge itself; the badge reflects state it only reads. Anything but 'enabled' renders OFF.",
+    "onWhenOpen": "open · you opened this"
+  },
+  "standingDisclaimers": [
+    "reference-prototype",
+    "UNAUDITED",
+    "non-attestable",
+    "not Postern OS",
+    "coin worthless / not a security",
+    "personal use free",
+    "not legal advice — DPO/counsel is the authority"
+  ]
+}

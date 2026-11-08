@@ -1,0 +1,13 @@
+# Configuration for the postern-node OpenRC service.
+# Override any of these here; the init script reads them at start time.
+
+# Path to the node TOML config and its data directory (0700, postern-owned).
+postern_config="/etc/postern/node.toml"
+postern_datadir="/var/lib/postern/node"
+
+# SOCKS proxy the node routes outbound traffic through. Must match the
+# proxy.socks_listen port in /etc/postern/arti.toml (default 9150) on loopback.
+postern_socks="127.0.0.1:9150"
+
+# Restart the node if it dies.
+supervise_daemon_args="--respawn-delay 5 --respawn-max 0"

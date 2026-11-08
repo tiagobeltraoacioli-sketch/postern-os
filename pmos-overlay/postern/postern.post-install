@@ -1,0 +1,37 @@
+#!/bin/sh
+# post-install for the `postern` meta package (Postern for postmarketOS).
+#
+# Two jobs, both OpenRC-native (pmOS uses OpenRC, NOT systemd):
+#   1. Enable the Tor service at boot so the app suite can route through it.
+#      The `tor` apk (a dependency of this meta package) ships /etc/init.d/tor
+#      and its own `tor` user — we only add it to the default runlevel.
+#   2. Print the honesty notice once. The full first-run text ships in
+#      /usr/share/doc/postern-apps/first-run.md (installed by postern-apps).
+#
+# No dedicated Postern user or service is created: this overlay ships no
+# Postern daemon (the wallet is a per-user CLI). See the APKBUILD header.
+
+set -e
+
+# 1) Enable Tor at boot. Guarded so it is a no-op in a minimal build chroot
+#    that has no OpenRC tooling (rc-update absent). `|| true` keeps a failure
+#    to enable from aborting the whole apk install.
+if command -v rc-update >/dev/null 2>&1; then
+	rc-update add tor default 2>/dev/null || true
+fi
+
+# 2) Honesty notice.
+cat >&2 <<EOF
+
+  Postern for postmarketOS (community edition) installed.
+
+  This is Postern SOFTWARE on postmarketOS. It is NOT "Postern OS":
+  no reproducible build, no attestation, no verity-sealed image.
+  Your wallet keys are stored in software (no hardware-backed keystore).
+  Details: /usr/share/doc/postern-apps/first-run.md
+
+  Tor was enabled at boot; start it now with:  rc-service tor start
+
+EOF
+
+exit 0

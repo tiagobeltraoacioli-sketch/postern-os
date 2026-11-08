@@ -1,0 +1,46 @@
+# bloch-l2-sequencer — SCAFFOLD, UNAUDITED, not a working L2.
+#
+# Pure ordering/fee logic for the (designed, unbuilt) Bloch EVM L2 sequencer:
+# two-lane FIFO mempool ordering, block assembly with mandatory-first deposit
+# txs (OP-style 0x7E), batch sealing, EIP-1559 basefee math, and a REAL
+# post-quantum ML-DSA-65 (FIPS 204) disclosed-operator inclusion-receipt
+# signature (behind a trait; the same PQ primitive as the BFT/FFG crates, NO
+# BLS). No network, no execution, no proving, no anchoring.
+#
+# Grounded in docs/specs/BLOCH-L2-EVM-DESIGN.md (§1 chain params, §4 sequencer
+# & mempool policy, §5 deposit tx). Single disclosed operator design.
+#
+# Standalone-workspace pattern (same as crates/bloch-tokens): its own empty
+# [workspace] table so it builds and tests offline. One crypto dependency
+# (ml-dsa) for post-quantum receipt signing; the ordering/fee logic stays
+# dep-free.
+# Outside the frozen root members list.
+[package]
+name = "bloch-l2-sequencer"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "SCAFFOLD, UNAUDITED, not a working L2 — single disclosed operator design; this crate is the ordering/fee logic of the Bloch L2 sequencer (two-lane FIFO mempool, 0x7E deposit txs, batch sealing, EIP-1559 basefee math) plus real post-quantum ML-DSA-65 (FIPS 204) disclosed-operator inclusion-receipt signing behind a trait. No network, no execution, no proving, no anchoring."
+
+# Deliberately empty: this crate is its own workspace root (re-homeable,
+# offline-buildable). It now carries exactly one crypto dependency for real
+# inclusion-receipt signing; everything else (ordering/fee logic) stays dep-free.
+[workspace]
+
+[dependencies]
+# Real disclosed-sequencer-key signing (UNAUDITED reference use), post-quantum:
+# the RustCrypto `ml-dsa` crate — a real FIPS-204 ML-DSA-65 implementation, the
+# SAME primitive the bft/postern-bft-finality and ffg crates use (NO BLS, NO
+# classical curve). Default features disabled + only `alloc` so keys/signatures
+# are plain bytes; keys are constructed from explicit 32-byte seeds for
+# deterministic, offline signing. UNAUDITED, pre-1.0 (0.1.1) — wiring a real
+# primitive is not a security claim. Behind the ReceiptSigScheme trait.
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc"] }
+# Single deliberate dependency for deterministic zstd batch compression so
+# `batch_data_hash` commits to the COMPRESSED bytes, matching §4 of
+# docs/specs/BLOCH-L2-EVM-DESIGN.md and the L2V0 BATCH envelope. Pinned to an
+# exact version because the golden vector in src/batch.rs is bound to this
+# libzstd (1.5.7, bundled by zstd-sys); exact COMPRESSED bytes are only
+# guaranteed within an encoder version, so a sequencer/verifier pair must pin it.
+zstd = "=0.13.3"

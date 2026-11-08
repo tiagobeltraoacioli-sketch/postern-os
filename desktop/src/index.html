@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Postern</title>
+  <!-- Postern PWA — installable shell. These relative URLs resolve at the
+       published same-origin path (/apps/postern/, assembled by
+       assemble-public.sh from desktop/pwa/). Under the Tauri desktop app they
+       404 harmlessly: the native app needs no manifest or service worker. -->
+  <meta name="theme-color" content="#0a0e13" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="brand" title="Postern Labs">
+        <button class="nav-toggle" id="navToggle" aria-label="Show or hide the menu" aria-expanded="true" title="Menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <svg class="brand-seal" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2 L21 7 v10 L12 22 L3 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 7 L16.5 9.5 v5 L12 17 L7.5 14.5 v-5 Z" fill="currentColor" opacity=".85"/>
+        </svg>
+        <div class="brand-name">
+          <strong>POSTERN</strong>
+          <span>LABS · DESKTOP</span>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav" aria-label="Modules"></nav>
+
+      <div class="sidebar-foot">
+        <button class="panic-btn" id="globalPanic" title="Panic Lock — instantly seal the vault and evict keys from memory. Nothing is destroyed.">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 16H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r=".4" fill="currentColor" stroke="currentColor"/></svg>
+          Panic Lock
+        </button>
+        <div class="honesty" title="Postern is an UNAUDITED public beta — no third-party security audit has been completed; do not rely on it for life-safety. It hardens your setup (sealed vault, in-process Tor circuits, post-quantum payloads) but it does NOT make you anonymous: endpoint traffic analysis and metadata (who talks to whom, when) remain possible.">
+          <span class="honesty-badge">UNAUDITED · PUBLIC BETA</span>
+          <span class="honesty-note">Hardened, not anonymous</span>
+        </div>
+        <div class="sidebar-meta" id="envBadge"></div>
+      </div>
+    </aside>
+
+    <!-- ── Main column ─────────────────────────────────────────────────── -->
+    <div class="main-col">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="moduleTitle">—</h1>
+          <p id="moduleDesc"></p>
+        </div>
+        <div class="topbar-status">
+          <button class="chip chip-node" id="chipNode" title="Node status — open Node module">
+            <span class="dot" id="chipNodeDot"></span><span id="chipNodeText">node off</span>
+          </button>
+          <button class="chip chip-tor" id="chipTor" title="Tor circuit status">
+            <span class="dot" id="chipTorDot"></span><span id="chipTorText">tor idle</span>
+          </button>
+          <button class="chip chip-seal" id="chipSeal" title="Postern Seal — device attestation status. Click to open the Seal Companion.">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L21 7 v10 L12 22 L3 17 V7 Z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <span id="chipSealText">SEAL · UNVERIFIED</span>
+          </button>
+          <button class="chip chip-icon" id="themeToggle" title="Toggle light / dark" aria-label="Toggle theme">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="content" id="content" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <!-- panic flash overlay -->
+  <div class="panic-overlay" id="panicOverlay" hidden>
+    <div class="panic-overlay-box">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L21 7 v10 L12 22 L3 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="10.5" width="6" height="5.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.5V9a1.8 1.8 0 013.6 0v1.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+      <strong>VAULT SEALED</strong>
+      <span>Keys evicted from memory. Ciphertext at rest — nothing destroyed.</span>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="ui.js"></script>
+  <script src="vendor/qrcode.js"></script>
+  <!-- Browser backend — the THIRD backend behind api.js's seam, next to Tauri and
+       the labelled preview engines. LOAD ORDER IS LOAD-BEARING: registry.js
+       defines window.PosternBrowser, core.js and rpc.js and wallet.js register
+       into it, and api.js reads it while deciding what isReal() may claim. All
+       four must precede api.js. Under Tauri these are inert (the registry is
+       only consulted when window.__TAURI__ is absent); in a browser they are what
+       makes the wallet real instead of preview. panes.test.mjs asserts this
+       ordering so it cannot rot into a comment.
+
+       rpc.js MUST precede wallet.js: wallet.js gates its two SEND registrations on
+       reg.has("rpc"), so the reverse order (as first written) silently produced a
+       wallet that could sign but never broadcast. -->
+  <script src="browser/registry.js"></script>
+  <script src="browser/core.js"></script>
+  <script src="browser/rpc.js"></script>
+  <script src="browser/wallet.js"></script>
+  <script src="api.js"></script>
+  <script src="modules/node.js"></script>
+  <script src="modules/wallet.js"></script>
+  <script src="modules/pair.js"></script>
+  <script src="modules/explorer.js"></script>
+  <script src="modules/terem.js"></script>
+  <script src="modules/vault.js"></script>
+  <script src="modules/panic.js"></script>
+  <script src="modules/backup.js"></script>
+  <script src="modules/keys.js"></script>
+  <script src="modules/courier.js"></script>
+  <script src="modules/messenger.js"></script>
+  <script src="modules/vestnik.js"></script>
+  <script src="modules/hygiene.js"></script>
+  <script src="modules/quarantine.js"></script>
+  <script src="modules/seal.js"></script>
+  <script src="main.js"></script>
+  <script>
+    // PWA service-worker registration — offline app shell + precached WASM
+    // core. Only when actually served over http(s) (the published
+    // /apps/postern/ lane); never under Tauri, which has no SW and needs none.
+    // The relative "sw.js" resolves against this document's URL, so the SW
+    // scope is exactly the served app path.
+    if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").then(function (reg) {
+          // Ask for an update check on every load. skipWaiting in sw.js means a
+          // new worker activates in the background — but the OPEN page keeps
+          // being served by the OLD one until something reloads it. Without this
+          // an installed user could sit on a stale shell indefinitely (which is
+          // exactly why the mobile nav button did not appear after it shipped).
+          reg.update();
+        }).catch(function () {
+          /* sw.js not published at this origin (e.g. bare dev server) — the
+             app still works, it just isn't installable/offline-capable. */
+        });
+        // When a new worker takes control, reload ONCE so the page picks up the
+        // fresh shell. The guard prevents an infinite reload loop.
+        var refreshed = false;
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          if (refreshed) return;
+          refreshed = true;
+          location.reload();
+        });
+      });
+    }
+  </script>
+</body>
+</html>

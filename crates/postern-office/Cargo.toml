@@ -1,0 +1,29 @@
+[package]
+name = "postern-office"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Office — the Postern-branded desktop shell (codename \"Svitok\") over UNMODIFIED-LibreOffice aggregation (shell/theme/templates only; the engine is never forked or patched). Documents are sealed at rest with the canonical Postern seal (postern-core AEAD, XChaCha20-Poly1305 v2, key-committing). There IS an unavoidable plaintext-while-editing window in a secured scratch — minimized (tmpfs/no-swap/secure-delete/panic-lock eviction) and labelled truthfully, NEVER 'zero plaintext'. This crate ships the panic-lock eviction (postern-panic denial-of-access re-lock) for the office session. UNAUDITED reference-prototype; NOT a finished Office competitor."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_office"
+
+[features]
+# `soffice-live` (DEFAULT OFF): compiles the real out-of-process LibreOffice
+# editor adapter in `editor.rs`. LibreOffice is NOT present in this build/CI
+# environment and MUST NOT be forked — it is an external, user-installed
+# binary spawned behind the injected editor seam, exactly the way
+# postern-quarantine spawns `soffice --headless`. The offline tests never
+# touch it; a live edit needs a human at a GUI, so the adapter is an honest
+# SCAFFOLD, exercised only under the `#[ignore]`d live test.
+soffice-live = []
+
+[dependencies]
+# The seal is postern-core's canonical Postern AEAD (XChaCha20-Poly1305 v2,
+# key-committing, context-bound) — the SAME seal postern-vault / postern-panic
+# build on. No crypto is invented here: a document at rest is one sealed blob.
+postern-core = { path = "../postern-core" }
+# `Zeroizing<[u8; 32]>` holds the session key so it is wiped on every drop
+# path — the panic eviction, session teardown, or a state swap.
+zeroize = "1"
+thiserror = "2"

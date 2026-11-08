@@ -1,0 +1,211 @@
+[package]
+name = "postern-seal-companion"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs Seal Companion — the user-facing attestation verifier. Self-audit your own device + peer-verify another Postern device before trusting it; feature `sev-snp` adds real AMD SEV-SNP report verification chained to the AMD root."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_seal_companion"
+
+# The SEV-SNP hardware-root vector tests only exist when the `sev-snp`
+# feature is on (same pattern as postern-messenger's `matrix` live test).
+[[test]]
+name = "snp_vectors"
+required-features = ["sev-snp"]
+
+# The VLEK endorsement path, proven against a REAL AWS SEV-SNP report captured
+# from a genuine c6a.large guest (Milan, us-east-2). AWS endorses with a VLEK,
+# not a VCEK — this vector is why the crate pins AMD's SEV-VLEK ASVK. Fixtures
+# are vendored under testdata/ (aws_snp_report_milan.bin / aws_vlek_milan.der /
+# aws_snp_nonce_milan.hex); see snp.rs.
+[[test]]
+name = "snp_real_aws"
+required-features = ["sev-snp"]
+
+# The confidential-VM Seal-gate endpoint (guest side, os/cloud.nix §4.1).
+# Real report requests need Linux + /dev/sev-guest; on other OSes it prints
+# an honest error and exits.
+[[bin]]
+name = "postern-seal-gate"
+path = "src/bin/seal_gate.rs"
+required-features = ["sev-snp"]
+
+# AMD-KDS CRL freshness/revocation vectors for the SEV-SNP verifier (offline,
+# against a SYNTHETIC AMD-style CRL — real AMD KDS CRLs are fetched out of band;
+# see snp.rs). Only meaningful with the SEV-SNP verifier compiled in.
+[[test]]
+name = "snp_crl"
+required-features = ["sev-snp"]
+
+# Intel PCS/DCAP TD-quote collateral-chain vectors for the TDX verifier
+# (offline, against a SYNTHETIC self-consistent DCAP chain — the crypto is real,
+# the anchor is a test root, never Intel's pinned root; see tdx.rs).
+[[test]]
+name = "tdx_collateral"
+required-features = ["tdx-verify"]
+
+# The Android Key-Attestation ACCEPTANCE vectors, locked end to end: loads the
+# vendored testdata/mobile/{leaf,intermediate,root,leaf_tampered,leaf_expired,
+# wrong_root}.der off disk and asserts Genuine on the good chain + the three
+# named Mismatch rejections — the exact contract the postern-seal-verify-mobile
+# CLI acceptance drives. Guards the checked-in vectors (every other mobile test
+# synthesizes its chain in-process, so these files were previously unguarded).
+# Only meaningful with the mobile-attest verifier compiled in.
+[[test]]
+name = "mobile_acceptance_vectors"
+required-features = ["mobile-attest"]
+
+# The verifier CLI (client side of the §4.1 handshake) — what the runbook
+# (docs/specs/POSTERN-CLOUD-CONFIDENTIAL.md) drives against a real CVM.
+[[bin]]
+name = "postern-seal-verify"
+path = "src/bin/seal_verify.rs"
+required-features = ["sev-snp"]
+
+# The Android Key-Attestation verifier CLI (mobile provider): drives the real
+# `crate::mobile` verifier from a binary — a leaf-first Key-Attestation chain +
+# caller-pinned Google root(s) + nonce + policy floors → a single loud verdict.
+# Only compiles with the `mobile-attest` verifier backend (which pulls in
+# x509-parser); OFF by default, same lean-default discipline as seal-verify.
+[[bin]]
+name = "postern-seal-verify-mobile"
+path = "src/bin/seal_verify_mobile.rs"
+required-features = ["mobile-attest"]
+
+# The Intel TDX DCAP verifier CLI (SNP-parity tool): drives the real
+# `crate::tdx` DCAP verifier (`verify_td_quote_with_collateral`) from a binary —
+# a DCAP v4 TD quote + pinned MRTD/MRCONFIGID/RTMR + channel binding + optional
+# Intel PCS/DCAP CRL collateral → a single loud, named verdict with SNP-style
+# exit codes. Fail-closed with no CRL collateral (never a silent revocation
+# skip). Only compiles with the `tdx-verify` verifier backend (x509-parser +
+# p256); OFF by default, same lean-default discipline as seal-verify-mobile. On
+# this host it can NEVER reach Genuine — the pinned Intel SGX Root CA is
+# unanchorable by any quote available here (hardware-gated; UNAUDITED; see tdx.rs).
+[[bin]]
+name = "postern-tdx-verify"
+path = "src/bin/postern_tdx_verify.rs"
+required-features = ["tdx-verify"]
+
+[features]
+# `sev-snp` — real AMD SEV-SNP attestation-report verification: parse the
+# report, verify its signature up the VCEK → ASK → ARK chain to the pinned
+# AMD root (virtee/sev builtins), and check measurement / HOSTDATA /
+# report_data / TCB. OFF by default on purpose: the default workspace
+# build/test gate stays lean and green (the messenger `matrix` discipline).
+#   build: cargo build -p postern-seal-companion --features sev-snp
+#   test:  cargo test  -p postern-seal-companion --features sev-snp
+#
+# The verifier additionally gains an AMD-KDS CRL freshness/revocation step
+# (`snp::check_kds_crl` / `verify_snp_report_with_crl`) — closing the earlier
+# "no CRL refresh" gap. That path parses an X.509 CRL and verifies it against
+# the pinned ASK, so `x509-parser` (ring-backed, verification only) is pulled in.
+sev-snp = ["dep:sev", "dep:x509-parser"]
+# `tdx-verify` — the Intel PCS/DCAP TD-quote collateral chain for `crate::tdx`
+# (`verify_collateral_dcap` / `verify_td_quote_with_collateral`): parse the v4
+# ECDSA quote signature section, verify PCK → Intel processor CA → pinned Intel
+# SGX Root CA (`x509-parser`), the QE-report binding + QE-report signature + the
+# quote signature (raw P-256 ECDSA, `p256`), and CRL freshness/revocation.
+# Additionally folds in Intel **TCB-Info + QE-Identity JSON** collateral:
+# `serde_json` (value-tree parse only, already in the workspace lock) reads the
+# caller-fetched PCS JSON, whose signed body is verified under the Intel TCB
+# signing cert (chained to the same pinned Intel root), checked for freshness
+# (`nextUpdate`) + TCB status, and cross-checked against the quote/PCK. The crate
+# still does NO network I/O — the operator fetches the JSON out of band and hands
+# the bytes in, exactly the CRL discipline.
+# Fail-closed WITHOUT collateral and — because our synthetic quotes chain to a
+# test root, never Intel's pinned root — never `Genuine` on this host (the crypto
+# path is exercised in tests against a SYNTHETIC anchor root, never Intel's).
+# OFF by default (same lean-default discipline as sev-snp):
+#   build: cargo build -p postern-seal-companion --features tdx-verify
+#   test:  cargo test  -p postern-seal-companion --features tdx-verify
+tdx-verify = ["dep:x509-parser", "dep:p256", "dep:serde_json"]
+# `mobile-attest` — the Android **Key Attestation** verifier backend (the
+# `mobile` provider `StrongBoxKey.kt` cites). Parses the Key-Attestation X.509
+# cert chain, verifies it to a caller-pinned Google attestation root, and
+# checks nonce / verified-boot / patch-level / app-id / security-level, fail
+# closed. OFF by default on purpose (same lean-default discipline as sev-snp):
+#   build: cargo build -p postern-seal-companion --features mobile-attest
+#   test:  cargo test  -p postern-seal-companion --features mobile-attest
+# Honest limit: attests the PHONE (key-attested device), NOT a measured-boot
+# workspace; roots in Google's CA + the OEM; StrongBox is classical P-256.
+#
+# Also pulls `serde_json` to parse the caller-fetched Google attestation
+# **status list** (`GET https://android.googleapis.com/attestation/status`, a
+# JSON `{ "entries": { "<serial-hex>": { "status": … } } }` map — schema
+# confirmed against Google's live endpoint + published docs) that the
+# `MobileRevocationPolicy` revocation check enforces against. This crate still
+# does NO network I/O — the operator fetches the JSON out of band and hands the
+# bytes in, exactly the snp/tdx CRL discipline. `serde_json` is already in the
+# workspace lock, so this adds no new external crate to the graph.
+mobile-attest = ["dep:x509-parser", "dep:serde_json"]
+
+[dependencies]
+# Reuse the node's exact PQ crypto (Falcon‖ML-DSA verify) — lean subset, no
+# rocksdb/libp2p, so this stays product-light and byte-compatible with the node.
+#
+# R6 DEP-PIN (Dev-D, single rev-pin coordinator): pin bloch-crypto to Dev-A's
+# ONE merged consensus-bundle commit, NOT a floating branch. A floating
+# `branch = "main"` lets this crate and the mobile byte-identity golden
+# (mobile/core/Cargo.toml, Dev-F) resolve to DIFFERENT node bytes → split-brain.
+# One canonical SHA must appear identically in all three Cargo.toml.
+#
+# PLACEHOLDER: Dev-A's work is uncommitted/unpushed, so no real published rev
+# exists yet. <A_MERGED_SHA> is a deliberate placeholder — this crate will NOT
+# resolve until a human replaces it with the real 40-hex commit SHA.
+# HUMAN, after Dev-A merges + pushes to gitlab main:
+#   1. Replace <A_MERGED_SHA> below with the merged commit SHA (same string in
+#      postern-consiglio-auth/Cargo.toml and mobile/core/Cargo.toml — Dev-F).
+#   2. grep -R 'A_MERGED_SHA\|rev = ' the three Cargo.toml → confirm ONE rev.
+#   3. cargo update -p bloch-crypto      # regenerate Cargo.lock for the new rev
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+# The canonical, domain-separated device-attestation transcript (defined once).
+postern-core = { path = "../postern-core" }
+# Channel binding (report_data = SHA-256(nonce ‖ guest_pubkey)) — default
+# build: the binding math is TEE-independent and must be testable everywhere.
+sha2 = "0.10"
+
+# --- feature `sev-snp` only (AMD hardware root of trust) --------------------
+# virtee/sev (Apache-2.0): the permissive SEV-SNP stack. `crypto_nossl` =
+# pure-Rust verification (p384 ECDSA for the VCEK/report signatures, rsa for
+# the RSA-PSS ARK/ASK chain — verification only, so RUSTSEC-2023-0071's
+# decrypt/sign timing channel is not in scope), no OpenSSL link. Default
+# features off: we take `snp` only (no legacy-SEV `sev` feature, no rdrand).
+sev = { version = "8", default-features = false, features = ["snp", "crypto_nossl"], optional = true }
+
+# --- feature `mobile-attest` only (Android Key Attestation) -----------------
+# x509-parser (MIT OR Apache-2.0): X.509 parsing + `verify` = ring-backed chain
+# signature verification (ECDSA P-256/P-384 leaf/intermediates, RSA-PSS/PKCS1
+# roots — verification only). `default-features = false` keeps it lean; ring is
+# already in the workspace graph via rustls/arti. The Android Key-Attestation
+# extension (OID 1.3.6.1.4.1.11129.2.1.17) is parsed with x509-parser's
+# re-exported asn1-rs, so no extra ASN.1 dependency is added. Shared by
+# `mobile-attest`, the `sev-snp` AMD-KDS CRL check, and `tdx-verify`'s PCK chain.
+x509-parser = { version = "0.17", default-features = false, features = ["verify"], optional = true }
+
+# serde_json (MIT OR Apache-2.0): parse the caller-fetched Google attestation
+# status list for `mobile::MobileRevocationPolicy::Enforce`. Value-tree parse
+# only (no serde derive pulled), verification-only — the crate never SERVES a
+# status list, only reads bytes the operator fetched out of band. Already in the
+# workspace lock; scoped to `mobile-attest`, off by default.
+serde_json = { version = "1", default-features = false, features = ["std"], optional = true }
+
+# --- feature `tdx-verify` only (Intel PCS/DCAP raw ECDSA) -------------------
+# p256 (Apache-2.0 OR MIT, pure Rust RustCrypto): raw ECDSA P-256 verification
+# of the TD-quote signature (attestation key over header‖body), the QE-report
+# signature (PCK over the QE report), and the QE-report → attestation-key
+# binding. The DCAP PCK chain is all NIST P-256. `default-features = false` +
+# `ecdsa` keeps it verification-only and lean; no signing in the shipped path.
+p256 = { version = "0.13", default-features = false, features = ["ecdsa"], optional = true }
+
+[dev-dependencies]
+# Test-only (never shipped): synthesize a self-consistent DCAP PCK chain + AMD
+# -style CRLs so the REAL verification crypto is exercised offline without Intel
+# /AMD hardware or vendored vendor secrets. rcgen builds the X.509 certs + CRLs;
+# p256 (with pkcs8) re-imports rcgen's key to raw-sign the QE report + quote so
+# the synthetic signatures verify under the synthetic PCK/AK. `time` mints the
+# CRL this_update/next_update instants the freshness check reads.
+rcgen = { version = "0.13", features = ["crypto", "pem", "ring"] }
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem"] }
+x509-parser = { version = "0.17", default-features = false, features = ["verify"] }
+time = { version = "0.3", default-features = false }

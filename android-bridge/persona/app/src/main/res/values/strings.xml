@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<resources>
+    <!-- NoporIS: the guarded BRIDGE (Kalinov most) between two worlds on one handset.
+         "Nopor" is a COINED mark (not folklore); the authentic myth is the crossing.
+         Name PROPOSED, pending trademark clearance (shares the "Nopor" root with an
+         existing filing). "Postern" is the suite brand; "NoporIS" is this app. -->
+    <string name="app_name">NoporIS</string>
+    <string name="dpc_label">NoporIS</string>
+    <string name="dpc_description">NoporIS runs a second persona in one isolated managed profile — separate encrypted storage and process boundary — chosen as a clean (hardened) flavor or a Google-Play flavor. The Google-Play flavor is the LESS-private side by construction: it phones home to Google. This is separation and convenience, not privacy on that side. A rooted or kernel-compromised host defeats the separation. It attests the phone, not the persona. An app on stock Android — never a replacement OS. Design only; unaudited.</string>
+</resources>

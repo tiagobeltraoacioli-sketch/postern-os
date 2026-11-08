@@ -1,0 +1,202 @@
+/* ============================================================================
+   Postern Design System — TOKENS
+   ----------------------------------------------------------------------------
+   The shared visual language extracted from the single-file apps (sotto,
+   vedetta, tolmach, ezekiel1, postern-login, postern-store, postern-enterprise).
+   Every app already ships the same graphite/ink neutral base + its own accent;
+   this file is that language named once, so apps can adopt it incrementally.
+
+   STATUS: UNAUDITED reference work. These tokens describe a look, not a
+   security property. Nothing here asserts audit, attestation, or verification.
+
+   All tokens are namespaced `--ps-*` so this file can be dropped into any app
+   without colliding with the app's existing (un-prefixed) variables.
+
+   THEME MODEL — keyed off the SAME `data-theme` attribute the apps already
+   toggle, so adoption is automatic:
+     - no attribute        -> follows the OS via prefers-color-scheme (auto)
+     - data-theme="dark"   -> forced dark
+     - data-theme="light"  -> forced light
+   The selectors also match `data-theme` on ANY container (not only :root), so a
+   page can show both themes side-by-side (see preview.html).
+   ============================================================================ */
+
+/* ---- Non-color tokens (theme-independent) -------------------------------- */
+:root {
+  /* Type families — system stacks only; NO web fonts (CSP-safe, offline). */
+  --ps-font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ps-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Type scale — UI copy is ~14.5px; mono labels/badges are small + tracked.
+     The apps use uppercase tracked mono for every "system voice" label. */
+  --ps-fs-micro: 10px;    /* badge / eyebrow mono */
+  --ps-fs-label: 11.5px;  /* honesty strip, trust-state, chips */
+  --ps-fs-sm:    12.5px;  /* help text, captions */
+  --ps-fs-base:  14.5px;  /* body */
+  --ps-fs-md:    16px;    /* lead / card title */
+  --ps-fs-lg:    19px;    /* section heading */
+  --ps-fs-xl:    24px;    /* dialog / page title */
+  --ps-fs-2xl:   32px;    /* hero */
+  --ps-lh-tight: 1.25;
+  --ps-lh-body:  1.55;
+  --ps-tracking-label: .12em;  /* uppercase mono labels */
+  --ps-tracking-wm:    .34em;  /* wordmark */
+
+  /* Spacing scale (px, 4-based with the 6/10/14 half-steps the apps use). */
+  --ps-sp-1: 4px;
+  --ps-sp-2: 6px;
+  --ps-sp-3: 8px;
+  --ps-sp-4: 10px;
+  --ps-sp-5: 12px;
+  --ps-sp-6: 14px;
+  --ps-sp-7: 16px;
+  --ps-sp-8: 20px;
+  --ps-sp-9: 28px;
+  --ps-sp-10: 40px;
+
+  /* Radius — badge 6, control 10, card 12, base 14, dialog 18, pill 999. */
+  --ps-radius-sm:   6px;
+  --ps-radius:      10px;
+  --ps-radius-card: 12px;
+  --ps-radius-lg:   14px;
+  --ps-radius-xl:   18px;
+  --ps-radius-pill: 999px;
+
+  /* Motion — micro .15s, transitions .25s; honest, quick, non-decorative. */
+  --ps-dur-micro: .15s;
+  --ps-dur-base:  .25s;
+  --ps-ease: cubic-bezier(.2, .6, .2, 1);
+  --ps-ease-in-out: ease-in-out;
+
+  /* Focus ring width (color comes from the accent, per theme). */
+  --ps-focus-w: 2px;
+  --ps-focus-offset: 2px;
+
+  /* Layout */
+  --ps-measure: 780px;  /* comfortable reading column the apps use */
+}
+
+/* ---- DARK is the default (matches every app's default) ------------------- */
+:root,
+[data-theme="dark"] {
+  --ps-bg:         #0d1014;
+  --ps-bg-glow:    #10141b;
+  --ps-surface:    #14181f;
+  --ps-surface-2:  #1a2029;
+  --ps-surface-3:  #212934;
+  --ps-border:     #29323e;
+  --ps-border-hi:  #3a4552;
+  --ps-text:       #e7e8ec;
+  --ps-text-dim:   #a8adb5;
+  --ps-muted:      #79818c;
+
+  /* Semantic — shared across all apps. `ok` is earned green, `warn` amber is
+     the honesty/caution color, `err` + `live` are the two reds. */
+  --ps-ok:    #63ab7c;
+  --ps-warn:  #d08c2e;
+  --ps-err:   #d96a63;
+  --ps-live:  #e4574f;
+
+  /* Default accent = "steel" (Vedetta / the most neutral of the family).
+     Override per app with an accent preset class (see below). */
+  --ps-acc:      #6fa3dc;
+  --ps-acc-hi:   #8fbceb;
+  --ps-acc-dim:  #47688f;
+  --ps-acc-ink:  #0b1118;
+
+  --ps-shadow: 0 18px 50px rgba(0,0,0,.45);
+  --ps-shadow-sm: 0 6px 18px rgba(0,0,0,.35);
+  --ps-scrim: rgba(6,8,10,.62);
+}
+
+/* ---- LIGHT ---------------------------------------------------------------- */
+[data-theme="light"] {
+  --ps-bg:         #f0eff3;
+  --ps-bg-glow:    #f6f5f0;
+  --ps-surface:    #fbfaf7;
+  --ps-surface-2:  #eceae2;
+  --ps-surface-3:  #e3e0d5;
+  --ps-border:     #d5d0c4;
+  --ps-border-hi:  #bdb7a8;
+  --ps-text:       #20242b;
+  --ps-text-dim:   #4f555e;
+  --ps-muted:      #767d87;
+
+  --ps-ok:    #2f7a4d;
+  --ps-warn:  #9a6210;
+  --ps-err:   #b1443d;
+  --ps-live:  #bc3b33;
+
+  --ps-acc:      #2d5f9e;
+  --ps-acc-hi:   #234b7d;
+  --ps-acc-dim:  #5b82ad;
+  --ps-acc-ink:  #f6faff;
+
+  --ps-shadow: 0 14px 40px rgba(40,50,64,.14);
+  --ps-shadow-sm: 0 4px 14px rgba(40,50,64,.10);
+  --ps-scrim: rgba(30,36,46,.42);
+}
+
+/* ---- AUTO: no data-theme -> follow the OS ------------------------------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ps-bg:#f0eff3; --ps-bg-glow:#f6f5f0; --ps-surface:#fbfaf7;
+    --ps-surface-2:#eceae2; --ps-surface-3:#e3e0d5; --ps-border:#d5d0c4;
+    --ps-border-hi:#bdb7a8; --ps-text:#20242b; --ps-text-dim:#4f555e;
+    --ps-muted:#767d87;
+    --ps-ok:#2f7a4d; --ps-warn:#9a6210; --ps-err:#b1443d; --ps-live:#bc3b33;
+    --ps-acc:#2d5f9e; --ps-acc-hi:#234b7d; --ps-acc-dim:#5b82ad; --ps-acc-ink:#f6faff;
+    --ps-shadow: 0 14px 40px rgba(40,50,64,.14);
+    --ps-shadow-sm: 0 4px 14px rgba(40,50,64,.10);
+    --ps-scrim: rgba(30,36,46,.42);
+  }
+}
+
+/* ============================================================================
+   ACCENT PRESETS — the per-app "voice".
+   Apply ONE class to <html> or <body> (or any container). Each preset carries
+   both its dark and its light value, gated on the same theme model above so it
+   tracks the app's existing toggle.
+   ============================================================================ */
+
+/* brass — Sotto */
+.ps-accent-brass { --ps-acc:#c9a648; --ps-acc-hi:#e4c465; --ps-acc-dim:#8f7630; --ps-acc-ink:#16130a; }
+[data-theme="light"].ps-accent-brass, [data-theme="light"] .ps-accent-brass,
+.ps-accent-brass[data-theme="light"], .ps-accent-brass [data-theme="light"] {
+  --ps-acc:#96781f; --ps-acc-hi:#7c6316; --ps-acc-dim:#b1963f; --ps-acc-ink:#fffdf5; }
+
+/* steel — Vedetta (same as default; provided for explicitness) */
+.ps-accent-steel { --ps-acc:#6fa3dc; --ps-acc-hi:#8fbceb; --ps-acc-dim:#47688f; --ps-acc-ink:#0b1118; }
+[data-theme="light"].ps-accent-steel, [data-theme="light"] .ps-accent-steel,
+.ps-accent-steel[data-theme="light"], .ps-accent-steel [data-theme="light"] {
+  --ps-acc:#2d5f9e; --ps-acc-hi:#234b7d; --ps-acc-dim:#5b82ad; --ps-acc-ink:#f6faff; }
+
+/* verdigris — Tolmach */
+.ps-accent-verdigris { --ps-acc:#4fa48d; --ps-acc-hi:#6fc4ab; --ps-acc-dim:#35705f; --ps-acc-ink:#0a1512; }
+[data-theme="light"].ps-accent-verdigris, [data-theme="light"] .ps-accent-verdigris,
+.ps-accent-verdigris[data-theme="light"], .ps-accent-verdigris [data-theme="light"] {
+  --ps-acc:#1f7a63; --ps-acc-hi:#14604d; --ps-acc-dim:#4f9b86; --ps-acc-ink:#f4fffb; }
+
+/* beryl — Ezekiel */
+.ps-accent-beryl { --ps-acc:#3fb6ad; --ps-acc-hi:#63d3ca; --ps-acc-dim:#2c7f79; --ps-acc-ink:#06110f; }
+[data-theme="light"].ps-accent-beryl, [data-theme="light"] .ps-accent-beryl,
+.ps-accent-beryl[data-theme="light"], .ps-accent-beryl [data-theme="light"] {
+  --ps-acc:#157e77; --ps-acc-hi:#0f645e; --ps-acc-dim:#4fa39c; --ps-acc-ink:#f2fbfa; }
+
+/* iris — Postern Login (Chiave) */
+.ps-accent-iris { --ps-acc:#9d8ce0; --ps-acc-hi:#b6a8ef; --ps-acc-dim:#6a5da3; --ps-acc-ink:#120e1f; }
+[data-theme="light"].ps-accent-iris, [data-theme="light"] .ps-accent-iris,
+.ps-accent-iris[data-theme="light"], .ps-accent-iris [data-theme="light"] {
+  --ps-acc:#5b4a9c; --ps-acc-hi:#483a7e; --ps-acc-dim:#8578b5; --ps-acc-ink:#f8f6ff; }
+
+/* amethyst — Postern Store */
+.ps-accent-amethyst { --ps-acc:#ab90e0; --ps-acc-hi:#c7b1f0; --ps-acc-dim:#7a63a8; --ps-acc-ink:#140f1e; }
+[data-theme="light"].ps-accent-amethyst, [data-theme="light"] .ps-accent-amethyst,
+.ps-accent-amethyst[data-theme="light"], .ps-accent-amethyst [data-theme="light"] {
+  --ps-acc:#6a4aa5; --ps-acc-hi:#543a86; --ps-acc-dim:#8f75c2; --ps-acc-ink:#faf7ff; }
+
+/* cobalt — Postern Enterprise (Consiglio) */
+.ps-accent-cobalt { --ps-acc:#5f87d6; --ps-acc-hi:#7ea2e6; --ps-acc-dim:#44619e; --ps-acc-ink:#0d1322; }
+[data-theme="light"].ps-accent-cobalt, [data-theme="light"] .ps-accent-cobalt,
+.ps-accent-cobalt[data-theme="light"], .ps-accent-cobalt [data-theme="light"] {
+  --ps-acc:#35569e; --ps-acc-hi:#2a4680; --ps-acc-dim:#6c83b8; --ps-acc-ink:#f6f8ff; }

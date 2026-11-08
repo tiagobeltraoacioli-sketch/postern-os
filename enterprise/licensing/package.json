@@ -1,0 +1,49 @@
+{
+  "name": "@postern/licensing",
+  "version": "0.0.1",
+  "description": "Privacy-preserving, offline-verifiable license/entitlement library for the Postern Business/Enterprise edition. Personal editions are free forever and are NEVER gated. No telemetry, no phone-home. SCAFFOLD, pre-production, unaudited.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "postern-license": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "keys",
+    "README.md",
+    "LICENSING-MODEL.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "cli": "node ./dist/cli.js",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "postern",
+    "license",
+    "entitlement",
+    "ed25519",
+    "offline",
+    "privacy",
+    "evaluation"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0"
+  }
+}

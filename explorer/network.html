@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- connect-src is https: + localhost (not pinned to one node) so users can point
+     the explorer at any node they run or trust; scripts stay inline-only, so no
+     external code can load. See explorer/build.js for the full tradeoff note. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https: http://127.0.0.1:* http://localhost:*; base-uri 'none'; form-action 'none'">
+<meta name="description" content="Peer connectivity of the Bloch-SIS-PoW mainnet beta as reported by the node you configure — an honest single-vantage view, not a global crawl. Unaudited, 51%-attackable mainnet beta; no value claim on the coin.">
+<meta name="color-scheme" content="dark light">
+<title>Bloch Network — connected peers · Postern Labs (mainnet beta, unaudited)</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+
+/* ---------- explorer widgets (Postern identity additions) ---------- */
+.toolhero { padding: 2.8rem 0 2.2rem; }
+.toolhero .rule { width: 3.5rem; height: 3px; background: var(--brass); margin-bottom: 1.6rem; border-radius: 2px; }
+
+.cfgbar {
+  display: flex; gap: .7rem 1rem; flex-wrap: wrap; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: .85rem 1rem; margin-top: 1.2rem;
+}
+.cfgbar .grow { flex: 1 1 18rem; min-width: 14rem; }
+.cfgbar label { font-size: .8rem; color: var(--text-dim); display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; }
+input[type="text"], input[type="url"], input[type="number"] {
+  background: var(--surface-2); border: 1px solid var(--border-hi); color: var(--text);
+  font-family: var(--font-mono); font-size: .86rem; padding: .55rem .7rem; border-radius: 6px;
+  width: 100%;
+}
+input[type="number"] { width: 4.2rem; }
+input[type="checkbox"] { accent-color: var(--brass); width: .95rem; height: .95rem; }
+input:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+button.btn { cursor: pointer; font-family: var(--font-ui); font-size: .9rem; background: var(--surface); }
+button.btn.primary { background: var(--brass); }
+button.btn.small { padding: .35rem .7rem; font-size: .8rem; }
+
+.conn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: .2rem .7rem; border-radius: 99px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.conn::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+.conn.ok   { color: var(--ok); border-color: var(--ok); }
+.conn.warn { color: var(--brass-hi); border-color: var(--brass-dim); }
+.conn.err  { color: var(--danger); border-color: var(--danger); }
+
+.statgrid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); margin-top: 1.4rem; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .95rem 1.05rem; }
+.stat .k { font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.stat .v { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 650; color: var(--text); margin-top: .35rem; overflow-wrap: anywhere; line-height: 1.3; }
+.stat .v small { font-size: .74rem; color: var(--muted); font-weight: 500; font-family: var(--font-ui); }
+.stat .sub { font-size: .78rem; color: var(--text-dim); margin-top: .3rem; }
+.stat.hero-num .v { font-size: 2.5rem; }
+
+.badge.ok   { color: var(--ok); border-color: var(--ok); }
+.badge.warn { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.err  { color: var(--danger); border-color: var(--danger); }
+
+.updated { font-size: .8rem; color: var(--muted); font-family: var(--font-mono); margin-top: .8rem; }
+
+.errpanel {
+  background: var(--surface); border: 1px solid var(--danger); border-left: 4px solid var(--danger);
+  border-radius: 8px; padding: 1.15rem 1.35rem; margin: 1.2rem 0; max-width: 52rem;
+}
+.errpanel h3 { color: var(--danger); font-size: .95rem; letter-spacing: .04em; text-transform: uppercase; margin-bottom: .5rem; }
+.errpanel p, .errpanel li { color: var(--text-dim); font-size: .92rem; }
+.errpanel ul { margin: .55rem 0 0 1.2rem; }
+.errpanel li + li { margin-top: .35rem; }
+.errpanel .cause { color: var(--text); font-weight: 650; }
+.errpanel .raw { margin-top: .7rem; font-size: .78rem; color: var(--muted); font-family: var(--font-mono); overflow-wrap: anywhere; }
+
+.detailpanel {
+  background: var(--surface); border: 1px solid var(--border-hi); border-left: 4px solid var(--brass);
+  border-radius: 10px; padding: 1.25rem 1.4rem; margin: 1.2rem 0;
+}
+.detailpanel h3 { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .9rem; }
+.detailpanel .close { margin-left: auto; }
+.kvlist { display: grid; grid-template-columns: minmax(8rem, 11rem) 1fr; gap: .5rem 1.2rem; font-size: .88rem; align-items: start; }
+.kvlist .k { color: var(--muted); }
+.kvlist .v { font-family: var(--font-mono); color: var(--text-dim); overflow-wrap: anywhere; }
+@media (max-width: 40rem) { .kvlist { grid-template-columns: 1fr; } .kvlist .k { margin-top: .5rem; } }
+.txbox {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: .7rem .9rem; margin-top: .6rem; font-size: .84rem; font-family: var(--font-mono); overflow-wrap: anywhere;
+}
+.txbox .meta { color: var(--muted); font-family: var(--font-ui); margin-top: .25rem; }
+
+.searchrow { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1rem; }
+.searchrow .grow { flex: 1 1 20rem; min-width: 15rem; }
+
+tbody tr.rowlink { cursor: pointer; }
+tbody tr.rowlink:hover td { background: var(--surface-2); }
+td.mono, th.mono { font-family: var(--font-mono); }
+.empty { color: var(--muted); font-size: .88rem; padding: 1.1rem; text-align: center; }
+
+.peerlist { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1rem; }
+.peer { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .6rem .8rem; font-family: var(--font-mono); font-size: .8rem; overflow-wrap: anywhere; }
+.peer .pid { color: var(--text); }
+.peer .paddr { color: var(--muted); }
+
+.copyable { cursor: copy; }
+.copyable.copied { color: var(--ok); }
+.hashlink { color: var(--brass-hi); }
+
+/* ---------- hashrate chart ---------- */
+.chartwrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1rem .55rem; margin-top: 1.4rem; }
+.chartwrap .cap { font-size: .78rem; color: var(--muted); font-family: var(--font-mono); margin-top: .4rem; }
+canvas.hashchart { display: block; width: 100%; height: 320px; }
+@media (max-width: 40rem) { canvas.hashchart { height: 240px; } input[type="number"].winbox { width: 3.6rem; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="/index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="/index.html">Home</a>
+      <a href="/postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="/products.html">Products</a>
+      <a href="/downloads.html">Downloads</a>
+      <a href="/run-a-node.html">Run a node</a>
+      <a href="/disclaimer.html">Disclaimer</a>
+      <a href="index.html">Explorer</a>
+      <a href="hashrate.html">Hashrate</a>
+      <a href="network.html" aria-current="page">Network</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) ·
+  very few nodes, low hashrate — 51%-attackable · the coin carries <strong>no value claim</strong> and is not a security.
+  <a href="/disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<div class="beta-ribbon" role="note" aria-label="Node update notice">
+  <strong>🛰 Running a node?</strong> Node <strong>v0.1.0-alpha2</strong> retires the fixed k=8 gate for a <strong>difficulty-driven k-ramp</strong> — genesis sync works again, and the <strong>signed snapshot</strong> is an optional one-command fast-sync. <a href="/snapshot.html">Snapshot fast-sync — how&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="toolhero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Postern Labs · tools · mainnet beta</p>
+    <h1>Network</h1>
+    <p class="lede">How many peers the node you query is connected to, and what it says about itself — refreshed live. <strong>Mainnet beta — unaudited · very few nodes, low hashrate, 51%-attackable · the coin carries no value claim.</strong></p>
+    <div class="warnpanel" role="note">
+      <h3>What this page can — and cannot — tell you</h3>
+      <ul>
+        <li><strong>Peer counts are single-vantage.</strong> Each number below is what one node reports about <em>its own</em> peer connections — not a global crawl, census, or "network size". Other nodes may see more, fewer, or different peers.</li>
+        <li><strong>There is no authoritative node registry.</strong> The protocol is ownerless; nobody can enumerate "all nodes". The vantage points you add below are user-supplied, not an official list.</li>
+        <li><strong>Numbers are self-reported</strong> by each node's RPC and are not independently verified by this page. A node can claim any network string; whatever it claims, treat this chain as a nascent, unaudited, 51%-attackable mainnet beta whose coin carries no value claim.</li>
+      </ul>
+    </div>
+    <div class="cfgbar">
+      <div class="grow">
+        <label for="rpc" style="display:block;margin-bottom:.3rem">Primary node RPC endpoint (JSON-RPC 2.0, POST)</label>
+        <input type="url" id="rpc" spellcheck="false" placeholder="https://your-node.example  or  http://127.0.0.1:8645">
+      </div>
+      <button class="btn primary" id="connect" type="button">Connect</button>
+      <label><input type="checkbox" id="auto" checked> auto-refresh</label>
+      <label>every <input type="number" id="interval" value="12" min="5" max="600" aria-label="refresh interval in seconds"> s</label>
+      <span class="conn" id="conn" role="status" aria-live="polite">idle</span>
+    </div>
+    <p class="small dim" style="margin-top:.6rem">Default is Postern's <strong>disposable demo node</strong> — a convenience, not official infrastructure.</p>
+  </div>
+</section>
+
+<section aria-labelledby="live-h">
+  <div class="wrap">
+    <p class="kicker" id="live-h">Live status</p>
+    <h2>What the primary node reports right now.</h2>
+    <div class="errpanel" id="err" style="display:none" role="alert"></div>
+    <div class="statgrid" id="stats" aria-live="polite"></div>
+    <p class="prose small" id="peernote" style="margin-top:1rem"></p>
+    <p class="updated" id="updated"></p>
+  </div>
+</section>
+
+<section aria-labelledby="peers-h">
+  <div class="wrap">
+    <p class="kicker" id="peers-h">Peer connections</p>
+    <h2>The peers this node is holding open.</h2>
+    <p class="prose small">From <code>getpeers</code> on the primary node — again, its own connections only.</p>
+    <div class="peerlist" id="peers"></div>
+  </div>
+</section>
+
+<section aria-labelledby="van-h">
+  <div class="wrap">
+    <p class="kicker" id="van-h">Known nodes — user-supplied vantage points</p>
+    <h2>Compare what different nodes see.</h2>
+    <p class="prose small">Add the RPC endpoints of other nodes you run or trust; each is polled with <code>getnetworkinfo</code> and shown side by side. This list lives only in your browser (localStorage) and is <strong>not an authoritative registry</strong> — an ownerless protocol has none. Endpoints must be reachable from your browser: HTTPS (or localhost) and CORS-enabled, otherwise the browser blocks the request and the row will say so.</p>
+    <div class="searchrow">
+      <div class="grow"><input type="url" id="vaddr" spellcheck="false" placeholder="https://another-node.example" aria-label="vantage point RPC endpoint"></div>
+      <button class="btn" id="vadd" type="button">Add vantage point</button>
+    </div>
+    <p class="small dim" id="vmsg" style="margin-top:.4rem"></p>
+    <div class="tablewrap" style="margin-top:1rem"><table id="vantages">
+      <thead><tr><th>Endpoint</th><th>Status</th><th>Peers</th><th>Height</th><th>Reported network</th><th>Updated</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<noscript><div class="wrap"><div class="warnpanel" role="note"><h3>JavaScript required</h3><p>This page polls a node's JSON-RPC from your browser; with JavaScript disabled it cannot fetch anything. It still makes zero requests to anyone but the node(s) you configure.</p></div></div></noscript>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Bloch Explorer — a Postern Labs tool</h4>
+        <p>Reads the ownerless <strong>Bloch-SIS-PoW</strong> protocol through a node's public JSON-RPC: <code>getnetworkinfo</code>, <code>getblockcount</code>, <code>getdaginfo</code>, <code>getrecentblocks</code>, <code>getblock</code>, <code>getblockbyheight</code>, <code>getaddressinfo</code>, <code>getpeers</code>. Nothing privileged — anyone can build the same.</p>
+        <p>No tracking. No analytics. The only network requests these pages make are the JSON-RPC calls to the node endpoint(s) you configure.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="/index.html">Home</a>
+          <a href="/postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="/products.html">Products</a>
+          <a href="/downloads.html">Downloads</a>
+          <a href="/run-a-node.html">Run a node</a>
+          <a href="/disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="index.html">Explorer</a>
+          <a href="network.html">Network</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>This chain is a <strong>mainnet beta</strong> — a designation, not a security claim: <strong>unaudited</strong> (audit contracted, not done), with <strong>very few nodes and low hashrate — 51%-attackable</strong>. The Module-SIS gate is a <strong>difficulty-driven k-ramp</strong> (node v0.1.0-alpha2): k=4 today, rising toward k=8 as the network's own difficulty grows and easing back if hashrate falls. It is <strong>not a security claim by itself</strong> (real security is cumulative SHAKE-256 hashcash work — raising k adds no cryptographic hardness at β=q/16). A brand-new node can <strong>sync from genesis</strong> or fast-sync from the optional <strong>signed snapshot</strong>. Whatever network string a node reports, treat confirmations as reversible.</p>
+        <p>The coin is <strong>not a security and not an asset</strong> — it carries no value claim. No token sale, no listing effort, no market-making, no price. A 17% founder premine is disclosed in full. Do not attach value.</p>
+      </div>
+    </div>
+    <p class="legal">The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; there is no official node, site, or explorer. This explorer is one independent tool on that commons, by Postern Labs. It lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to).</p>
+  </div>
+</footer>
+<script>
+'use strict';
+/* Bloch Network page — Postern Labs.
+ * Inlined into explorer/network.html by explorer/build.js.
+ *
+ * Honesty contract of this page:
+ *   - every peer count shown is what ONE node reports about ITS OWN
+ *     connections (getnetworkinfo.peers / getpeers) — a single vantage
+ *     point, never a global crawl or "network size";
+ *   - 0 peers is displayed as 0, with an explanation, never faked;
+ *   - unreachable nodes are reported as such, with the honest note that a
+ *     browser cannot distinguish "node down" from "CORS blocked".
+ * The ONLY network requests are JSON-RPC 2.0 POSTs to user-configured
+ * endpoints. All node-supplied strings are escaped before rendering. */
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const DASH = '—';
+  /* Bundled fallback list — same rationale as the explorer page (E1): one
+     disposable-node outage must not blank the primary tiles. The protocol is
+     ownerless; the first is Postern's disposable demo node, the rest are honest
+     fallbacks (a local node on the standard RPC port 16210). A user-typed
+     endpoint always wins and is never auto-swapped. */
+  const DEFAULT_RPCS = [
+    '/api/rpc',
+    'http://127.0.0.1:16210/',
+  ];
+  const DEFAULT_RPC = DEFAULT_RPCS[0];
+  const LS_RPC = 'postern_explorer_rpc';       // shared with the explorer page
+  const LS_VANTAGES = 'postern_network_vantages';
+
+  const rpcInput = $('#rpc'), connEl = $('#conn'), errEl = $('#err');
+  let timer = null, rpcId = 0;
+  let failedOver = null; // the primary endpoint we fell back FROM, for an honest note
+
+  let _storedRpc = localStorage.getItem(LS_RPC);
+  if (_storedRpc && /blochv-node\.fly\.dev/.test(_storedRpc)) { _storedRpc = null; localStorage.removeItem(LS_RPC); }
+  rpcInput.value = (_storedRpc || DEFAULT_RPC).trim();
+
+  const norm = (u) => String(u || '').trim().replace(/\/+$/, '');
+  const endpoint = () => norm(rpcInput.value);
+  const DEFAULT_SET = DEFAULT_RPCS.map(norm);
+  const isDefaultEndpoint = (ep) => DEFAULT_SET.includes(norm(ep));
+  const isHttpUrl = (u) => /^http:\/\//i.test(u || '');
+
+  async function rpcTo(ep, method, params = [], timeoutMs = 8000) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const r = await fetch(norm(ep) + '/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
+        referrerPolicy: 'no-referrer',
+        signal: ctl.signal,
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(typeof j.error === 'string' ? j.error : JSON.stringify(j.error));
+      if (j.result && typeof j.result === 'object' && !Array.isArray(j.result) && j.result.error)
+        throw new Error(String(j.result.error));
+      return j.result;
+    } finally { clearTimeout(t); }
+  }
+  const rpc = (method, params, timeoutMs) => rpcTo(endpoint(), method, params, timeoutMs);
+
+  /* First live-contact call, with bundled-default failover (see the list note).
+     Only hops between bundled defaults, and only when the user is on one; a
+     node the user typed is never swapped — its failure goes to the error UX. */
+  async function connectPrimary() {
+    const primary = endpoint();
+    try {
+      return await rpc('getnetworkinfo');
+    } catch (e) {
+      if (!isDefaultEndpoint(primary)) throw e;
+      for (const cand of DEFAULT_SET) {
+        if (norm(cand) === norm(primary)) continue;
+        try {
+          const net = await rpcTo(cand, 'getnetworkinfo', [], 7000);
+          rpcInput.value = cand;
+          localStorage.setItem(LS_RPC, cand);
+          failedOver = primary;
+          return net;
+        } catch (_) { /* try the next bundled default */ }
+      }
+      throw e;
+    }
+  }
+
+  /* ── wake/retry with exponential backoff ──────────────────────────────
+     Same rationale as the explorer page: the default demo node is a Fly
+     machine that AUTO-STOPS when idle and cold-starts (~2-5 s, sometimes
+     more) on the first request, so a first failed RPC usually means
+     "waking", not "down". Retry with backoff (1 s → 2 s → 4 s → 8 s → 8 s
+     → 8 s between attempts, each attempt bounded by the ~8 s per-request
+     timeout — roughly 30-40 s of patience overall) behind an honest
+     "waking / reconnecting" state before any hard error. No uptime is
+     promised — the demo node stays disposable. */
+  const WAKE_DELAYS = [1000, 2000, 4000, 8000, 8000, 8000];
+  const CANCELED = Symbol('canceled');
+  let wakeGen = 0;          // bumping this cancels any in-flight wake loop
+  let refreshing = false;   // prevents overlapping refresh cycles
+  let queuedRefresh = false;
+  let everConnected = false;
+  let skipWait = null;      // resolver for the current backoff pause ("retry now")
+
+  function wakeSleep(ms) {
+    return new Promise((res) => {
+      const t = setTimeout(() => { skipWait = null; res(); }, ms);
+      skipWait = () => { clearTimeout(t); skipWait = null; res(); };
+    });
+  }
+  function cancelWake() { wakeGen++; if (skipWait) skipWait(); }
+  function restartRefresh() {
+    cancelWake();
+    if (refreshing) queuedRefresh = true; else refresh();
+  }
+
+  function showWaking(attempt, nextMs) {
+    const reconnect = everConnected;
+    setConn('warn', reconnect ? 'reconnecting…' : 'waking node…');
+    errEl.className = 'warnpanel';       // amber, not red — this is not an error yet
+    errEl.style.display = 'block';
+    errEl.innerHTML = `<h3>${reconnect ? 'Connection dropped — reconnecting' : 'Waking the node…'}</h3>
+      <p>No reply from <code>${esc(endpoint())}</code> yet. ${isDefaultEndpoint(endpoint())
+        ? 'The demo node runs on a Fly machine that <strong>sleeps when idle</strong> and cold-starts on the first request (a few seconds, sometimes more) — a failed first call usually just means it is still waking up. It remains a <strong>disposable demo node</strong>, not official infrastructure; no uptime is promised.'
+        : 'The node may still be starting up, or briefly unreachable.'}
+      Retrying automatically — attempt ${attempt + 1} of ${WAKE_DELAYS.length + 1}, next try in ${Math.round(nextMs / 1000)}s.</p>
+      <p style="margin-top:.6rem"><button class="btn small" id="retryNow" type="button">Retry now</button>
+        <span class="small dim"> — if every retry fails, the honest error view (down vs CORS vs mixed content) follows.</span></p>`;
+    const b = $('#retryNow');
+    if (b) b.onclick = () => { if (skipWait) skipWait(); };
+  }
+
+  async function connectWithRetry() {
+    const gen = wakeGen;
+    for (let i = 0; ; i++) {
+      try {
+        return await connectPrimary();
+      } catch (e) {
+        if (gen !== wakeGen) throw CANCELED;
+        if (i >= WAKE_DELAYS.length) throw e;
+        showWaking(i, WAKE_DELAYS[i]);
+        await wakeSleep(WAKE_DELAYS[i]);
+        if (gen !== wakeGen) throw CANCELED;
+      }
+    }
+  }
+
+  /* ── helpers ── */
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const commas = (n) => (n == null || isNaN(Number(n))) ? DASH : Number(n).toLocaleString('en-US');
+  const val = (v) => (v == null) ? DASH : esc(v);
+  function setConn(state, txt) { connEl.className = 'conn' + (state ? ' ' + state : ''); connEl.textContent = txt; }
+  const stat = (k, v, sub, hero) => `<div class="stat${hero ? ' hero-num' : ''}"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+
+  /* ── primary node tiles ── */
+  function renderStats(net, peersRes) {
+    const peerCount = net.peers != null ? net.peers
+      : (peersRes && peersRes.peer_count != null ? peersRes.peer_count : null);
+    const syncBadge = net.syncing
+      ? '<span class="badge warn">syncing</span>'
+      : '<span class="badge ok">synced</span>';
+    $('#stats').innerHTML = [
+      stat('Connected peers', commas(peerCount), 'as reported by this one node — single vantage, not the network size', true),
+      stat('Height', commas(net.blocks)),
+      stat('Blue score', commas(net.blue_score)),
+      stat('Sync status', syncBadge),
+      stat('Mempool', commas(net.mempool) + ' <small>txs</small>'),
+      stat('Node reports network', val(net.network || net.chain),
+        '<strong>unaudited mainnet beta · 51%-attackable · no value claim</strong> — whatever the node calls it'),
+      stat('Protocol', val(net.net_protocol != null ? net.net_protocol : net.protocol)),
+      stat('Node version', val(net.version)),
+    ].join('');
+    const note = $('#peernote');
+    if (peerCount === 0) {
+      note.innerHTML = '<strong>This node currently sees 0 peers</strong> — it may be isolated, or the network is small. That zero is reported honestly, not papered over: on a nascent mainnet beta with very few nodes, a node with no inbound connections is a normal sight.';
+    } else if (peerCount != null) {
+      note.innerHTML = 'This node holds <strong>' + commas(peerCount) + '</strong> peer connection' + (peerCount === 1 ? '' : 's') + ' right now. That is its own view only — it says nothing about how many nodes exist in total (no one can know that for an ownerless protocol).';
+    } else {
+      note.textContent = 'This node did not report a peer count.';
+    }
+  }
+
+  function renderPeers(peersRes) {
+    const list = (peersRes && Array.isArray(peersRes.peers)) ? peersRes.peers : [];
+    const box = $('#peers');
+    if (!list.length) {
+      box.innerHTML = '<div class="peer"><span class="paddr">no peer connections reported — this node currently sees 0 peers (it may be isolated, or the network is small)</span></div>';
+      return;
+    }
+    box.innerHTML = list.map((p) => {
+      if (typeof p === 'string') return `<div class="peer"><span class="pid">${esc(p)}</span></div>`;
+      return `<div class="peer"><div class="pid">${val(p.peer_id || p.id)}</div><div class="paddr">${val(p.ip || p.address || p.addr)}</div></div>`;
+    }).join('');
+  }
+
+  function renderSkeleton() {
+    $('#stats').innerHTML = Array.from({ length: 8 }, () => stat('…', DASH)).join('');
+    $('#peers').innerHTML = '<div class="peer"><span class="paddr">waiting for a node connection…</span></div>';
+    $('#peernote').textContent = '';
+  }
+
+  /* ── honest failure UX (down vs CORS vs mixed content are indistinguishable) ── */
+  const retryButton = () => `<p style="margin-top:.8rem"><button class="btn small" id="retryErr" type="button">Retry now</button>
+      <span class="small dim"> — retries the same backoff schedule (the demo node may just need to wake again).</span></p>`;
+  function wireRetryButton() {
+    const b = $('#retryErr');
+    if (b) b.onclick = restartRefresh;
+  }
+  function showError(e) {
+    const msg = e && e.message ? e.message : String(e);
+    const aborted = e && e.name === 'AbortError';
+    const networkLike = aborted || (e && e.name === 'TypeError') || /failed to fetch|networkerror|load failed|network request failed/i.test(msg);
+    const mixed = location.protocol === 'https:' && isHttpUrl(endpoint());
+    errEl.className = 'errpanel';
+    errEl.style.display = 'block';
+    if (networkLike) {
+      errEl.innerHTML = `<h3>Could not reach the node</h3>
+        <p>The request to <code>${esc(endpoint() || '(empty)')}</code> ${aborted ? 'timed out' : 'failed before a reply arrived'}, and automatic retries with backoff (~30-40 s, enough to cover the demo node's cold start from sleep) failed too. From a browser these causes look identical, so all are listed honestly rather than guessing:</p>
+        <ul>
+          <li><span class="cause">Node down or unreachable.</span> Confirm the node is running and its JSON-RPC is listening at that address.</li>
+          <li><span class="cause">CORS blocked.</span> If the node does not send <code>Access-Control-Allow-Origin</code>, the browser blocks this page from reading the reply even when the node is up and answering. Fixes: put the node behind a CORS-enabled reverse proxy, enable its CORS flag, or use the desktop (Tauri) build, which is not subject to browser CORS.</li>
+          ${mixed ? '<li><span class="cause">Mixed content.</span> This page is served over HTTPS but the endpoint is <code>http://</code> — browsers block that. Use an HTTPS endpoint, or open this page over file:// or plain HTTP.</li>' : ''}
+          <li><span class="cause">CSP.</span> This page's Content-Security-Policy allows HTTPS endpoints plus <code>http://127.0.0.1</code> / <code>localhost</code>; other plain-http hosts are blocked by design.</li>
+        </ul>
+        ${retryButton()}
+        <p class="raw">raw error: ${esc(msg)}</p>`;
+      wireRetryButton();
+    } else {
+      errEl.innerHTML = `<h3>The node replied with an error</h3>
+        <p>The endpoint is reachable but returned: <strong>${esc(msg)}</strong></p>
+        ${retryButton()}`;
+      wireRetryButton();
+    }
+  }
+
+  /* ── vantage points (user-supplied, non-authoritative) ── */
+  function loadVantages() {
+    try {
+      const v = JSON.parse(localStorage.getItem(LS_VANTAGES) || '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+    } catch (e) { return []; }
+  }
+  const saveVantages = (v) => localStorage.setItem(LS_VANTAGES, JSON.stringify(v));
+  let vantages = loadVantages();
+  const vantageState = new Map(); // ep -> {status, peers, height, network, updated, detail}
+
+  function renderVantages() {
+    const tb = $('#vantages tbody');
+    if (!vantages.length) {
+      tb.innerHTML = `<tr><td colspan="7"><div class="empty">No extra vantage points yet. Add a node endpoint above to compare what different nodes see. (The primary node above is your first vantage point.)</div></td></tr>`;
+      return;
+    }
+    tb.innerHTML = vantages.map((ep, i) => {
+      const s = vantageState.get(ep) || {};
+      let badge;
+      if (s.status === 'ok') badge = '<span class="badge ok">reachable</span>';
+      else if (s.status === 'err') badge = `<span class="badge err" title="${esc(s.detail || '')}">unreachable / CORS-blocked</span>`;
+      else badge = '<span class="badge">querying…</span>';
+      return `<tr>
+        <td class="mono">${esc(ep)}</td>
+        <td>${badge}</td>
+        <td class="mono">${s.status === 'ok' ? commas(s.peers) : DASH}</td>
+        <td class="mono">${s.status === 'ok' ? commas(s.height) : DASH}</td>
+        <td class="mono">${s.status === 'ok' ? val(s.network) : DASH}</td>
+        <td class="mono">${val(s.updated)}</td>
+        <td><button class="btn small" data-rm="${i}" type="button" aria-label="remove ${esc(ep)}">remove</button></td>
+      </tr>`;
+    }).join('');
+    tb.querySelectorAll('button[data-rm]').forEach((b) => {
+      b.onclick = () => {
+        vantages.splice(+b.dataset.rm, 1);
+        saveVantages(vantages);
+        renderVantages();
+      };
+    });
+  }
+
+  async function refreshVantage(ep) {
+    try {
+      const net = await rpcTo(ep, 'getnetworkinfo', [], 7000);
+      vantageState.set(ep, {
+        status: 'ok',
+        peers: net.peers,
+        height: net.blocks,
+        network: net.network || net.chain,
+        updated: new Date().toLocaleTimeString(),
+      });
+    } catch (e) {
+      vantageState.set(ep, {
+        status: 'err',
+        detail: (e && e.message) || String(e),
+        updated: new Date().toLocaleTimeString(),
+      });
+    }
+  }
+
+  async function refreshVantages() {
+    if (!vantages.length) { renderVantages(); return; }
+    renderVantages();
+    await Promise.all(vantages.map(refreshVantage));
+    renderVantages();
+  }
+
+  $('#vadd').onclick = () => {
+    const raw = norm($('#vaddr').value);
+    const msg = $('#vmsg');
+    if (!raw) return;
+    if (!/^https?:\/\/[^\s]+$/i.test(raw)) {
+      msg.textContent = 'Enter a full http(s):// endpoint URL.';
+      return;
+    }
+    if (isHttpUrl(raw) && !/^http:\/\/(127\.0\.0\.1|localhost)([:/]|$)/i.test(raw)) {
+      msg.textContent = 'Note: this page’s CSP (and, on HTTPS, mixed-content rules) block plain-http hosts other than 127.0.0.1/localhost — that endpoint will show as unreachable. Use HTTPS for remote nodes.';
+    } else {
+      msg.textContent = '';
+    }
+    if (vantages.includes(raw) || raw === endpoint()) {
+      msg.textContent = 'That endpoint is already being watched.';
+      return;
+    }
+    vantages.push(raw);
+    saveVantages(vantages);
+    $('#vaddr').value = '';
+    refreshVantages();
+  };
+  $('#vaddr').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#vadd').click(); });
+
+  /* ── main refresh ──
+     Doubles as the heartbeat: the auto-refresh interval re-runs this, and a
+     mid-session failure goes back through the wake/backoff loop (an honest
+     "reconnecting…" state) instead of jumping straight to a hard error.
+     While reconnecting the last-seen data stays on screen; only a hard
+     failure (whole backoff schedule exhausted) blanks it to the skeleton. */
+  async function refresh() {
+    if (refreshing) return; // a wake/backoff cycle is already running
+    refreshing = true;
+    try {
+      refreshVantages(); // independent of the primary node's health
+      if (!endpoint()) {
+        setConn('err', 'no node set');
+        renderSkeleton();
+        errEl.className = 'errpanel';
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<h3>No node configured</h3><p>Enter a node's JSON-RPC endpoint above and press <strong>Connect</strong>.</p>`;
+        return;
+      }
+      setConn('warn', everConnected ? 'reconnecting…' : 'connecting…');
+      failedOver = null;
+      let net;
+      try {
+        net = await connectWithRetry();
+      } catch (e) {
+        if (e === CANCELED) return; // superseded by a newer connect/retry
+        setConn('err', 'not connected');
+        renderSkeleton();
+        showError(e);
+        return;
+      }
+      errEl.style.display = 'none';
+      errEl.className = 'errpanel';
+      setConn('ok', 'connected');
+      everConnected = true;
+      const peersRes = await rpc('getpeers').catch(() => null);
+      try { renderStats(net, peersRes); } catch (e) { console.error('renderStats', e); }
+      try { renderPeers(peersRes); } catch (e) { console.error('renderPeers', e); }
+      $('#updated').textContent = 'last updated ' + new Date().toLocaleTimeString()
+        + (failedOver ? ' · primary node ' + failedOver + ' unreachable — showing ' + endpoint() : '')
+        + ' · auto-refresh every ' + Math.max(5, parseInt($('#interval').value, 10) || 12) + 's while this tab is visible';
+    } finally {
+      refreshing = false;
+      if (queuedRefresh) { queuedRefresh = false; refresh(); }
+    }
+  }
+
+  /* ── scheduling ── */
+  function schedule() {
+    if (timer) clearInterval(timer);
+    if ($('#auto').checked) {
+      const s = Math.max(5, parseInt($('#interval').value, 10) || 12);
+      timer = setInterval(() => { if (!document.hidden) refresh(); }, s * 1000);
+    }
+  }
+  $('#connect').onclick = () => {
+    localStorage.setItem(LS_RPC, rpcInput.value.trim());
+    everConnected = false; // fresh endpoint → "connecting"/"waking", not "reconnecting"
+    restartRefresh();
+    schedule();
+  };
+  $('#auto').onchange = schedule;
+  $('#interval').onchange = schedule;
+  rpcInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#connect').click(); });
+
+  renderSkeleton();
+  renderVantages();
+  refresh();
+  schedule();
+})();
+
+</script></body>
+</html>

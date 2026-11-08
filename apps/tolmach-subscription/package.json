@@ -1,0 +1,29 @@
+{
+  "name": "tolmach-subscription-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Metering operator-proxy backend for the Tolmach Subscription tier. Zero runtime dependencies (Node built-in fetch/http/crypto). Sovereign tier needs no server; this backend exists only for the flat-monthly Subscription tier where tokens bill to the operator's Anthropic contract.",
+  "license": "MIT",
+  "type": "module",
+  "main": "server/proxy.mjs",
+  "bin": {
+    "tolmach-proxy": "server/proxy.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node server/proxy.mjs",
+    "check": "node --check server/proxy.mjs && node --check tools/metering-check.mjs && node --check tools/proxy-smoke.mjs && node --check tools/quota-test.mjs",
+    "test": "node tools/metering-check.mjs && node tools/quota-test.mjs",
+    "smoke": "node tools/proxy-smoke.mjs",
+    "quota": "node tools/quota-test.mjs",
+    "verify": "npm run check && npm test && npm run smoke"
+  },
+  "files": [
+    "server/",
+    "tools/",
+    "README.md"
+  ],
+  "dependencies": {}
+}

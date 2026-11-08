@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Strict CSP: the gate does NO network. No external resources, no telemetry.
+     connect-src 'none' means even an accidental fetch cannot leave the device. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sloboda — consent gate · Postern Labs</title>
+<!-- ============================================================================
+     ⚠  UNBUILT · UNBOOTED SCAFFOLD  ⚠
+     Sloboda — consent gate UI (the boundary into the Waydroid tier).
+
+     NAMING: this gate belongs to the NON-ATTESTABLE Waydroid tier — "Postern
+     for postmarketOS — community edition". It is NOT "Porog" (the stock-Android
+     managed-profile container, a different product) and NEVER "Postern OS".
+
+     This file is a dependency-free, CSP-strict single-file app. It reads and
+     writes the SAME state shape defined by ./gate-store.mjs + ./gate-state.schema.json
+     (an inlined, logic-identical copy of that store lives in the <script> below).
+     It also drives the always-on Tor egress toggle (egress.torBootstrapped):
+     egress is Tor-only and fail-closed — denied until Tor reports a live circuit
+     (see the porog-tor-glue shim over postern-tor). Tor = metadata reduction,
+     NOT anonymity ("hardened, not anonymous").
+
+     HONESTY: this UI, the store it mirrors, and the on-device Waydroid wrapper
+     that would consume the state have NEVER been built or booted on aarch64
+     hardware. Everything here is UNTESTED until it runs on a real device. The
+     tier is ALWAYS labelled non-attestable; every bridge defaults to DENY; there
+     is no telemetry and no network; the Postern coin is worthless and personal
+     use is free; nothing here is legal or financial advice.
+     ============================================================================ -->
+<style>
+/* ============================================================
+   SLOBODA — the consent gate.
+   Ember (caution ochre/rust) accent: the one Postern surface whose
+   brand color is a caution color, because the tier is the caution.
+   Reuses the graphite/ink base tokens + .warnbox/.refusebox/.standin/
+   .ledger house components (see apps/postern-onboard, apps/postern-store).
+   ============================================================ */
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #0d1014;
+  --bg-glow:   #17110b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #ece7e3;
+  --text-dim:  #b0aaa2;
+  --muted:     #82796d;
+
+  --acc:       #d98a3d;   /* ember — caution ochre/rust; the tier IS the caution */
+  --acc-hi:    #e8a45c;
+  --acc-dim:   #9a5f28;
+  --acc-ink:   #1c1206;
+
+  --live:      #e4574f;   /* mic/cam hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+:root[data-theme="light"] {
+  --bg:        #f4efe8;
+  --bg-glow:   #fbf6ee;
+  --surface:   #fbfaf7;
+  --surface-2: #f1ebe1;
+  --surface-3: #e8dfd2;
+  --border:    #dcd3c6;
+  --border-hi: #c5baa9;
+  --text:      #251f16;
+  --text-dim:  #524a3e;
+  --muted:     #7a7161;
+
+  --acc:       #a85a1c;   /* burnt sienna — the deeper light-mode ember */
+  --acc-hi:    #8a4712;
+  --acc-dim:   #c78a52;
+  --acc-ink:   #fff6ec;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(70,52,30,.13);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f4efe8; --bg-glow:#fbf6ee; --surface:#fbfaf7; --surface-2:#f1ebe1;
+    --surface-3:#e8dfd2; --border:#dcd3c6; --border-hi:#c5baa9;
+    --text:#251f16; --text-dim:#524a3e; --muted:#7a7161;
+    --acc:#a85a1c; --acc-hi:#8a4712; --acc-dim:#c78a52; --acc-ink:#fff6ec;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(70,52,30,.13);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--acc); color: var(--acc-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- bilingual: show only the active language ---------- */
+[data-lang="en"] .lang-pt { display: none !important; }
+[data-lang="pt-BR"] .lang-en { display: none !important; }
+
+/* ---------- UNBUILT strip (forced honesty, always visible) ---------- */
+.unbuilt {
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+}
+.unbuilt .wrap { display: flex; gap: 10px; align-items: center; padding: 7px 20px; flex-wrap: wrap; }
+.unbuilt .tag {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  background: var(--warn); color: #1a1206; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.unbuilt .txt { font-size: 12px; color: var(--text-dim); }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; flex-wrap: wrap; }
+.wordmark {
+  font-family: var(--font-mono); font-size: 15px; font-weight: 700;
+  letter-spacing: .22em; color: var(--text); user-select: none;
+  background: none; border: none; padding: 0;
+}
+.wordmark .tick { color: var(--acc); }
+.tier-badge {
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: .13em;
+  background: var(--acc); color: var(--acc-ink);
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 11px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.lang-toggle button {
+  background: transparent; border: none; padding: 6px 10px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; color: var(--muted);
+}
+.lang-toggle button[aria-pressed="true"] { background: var(--acc); color: var(--acc-ink); }
+
+/* ---------- views ---------- */
+.view { display: none; }
+main.wrap { padding-top: 22px; padding-bottom: 60px; }
+body[data-view="gate-full"]    #view-gate-full,
+body[data-view="gate-session"] #view-gate-session,
+body[data-view="declined"]     #view-declined,
+body[data-view="session"]      #view-session,
+body[data-view="about"]        #view-about { display: block; }
+
+.card {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px 22px; margin-bottom: 16px;
+}
+.card h2 {
+  margin: 0 0 6px; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--acc); font-weight: 700;
+}
+h1.title { margin: 4px 0 8px; font-size: 20px; font-weight: 650; letter-spacing: .01em; }
+p.lead { margin: 0 0 8px; font-size: 14.5px; color: var(--text-dim); }
+
+/* ---------- scroll-locked facts ---------- */
+.facts-scroll {
+  max-height: 46vh; overflow-y: auto; margin: 4px 0 8px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2);
+  padding: 4px 12px;
+  scrollbar-width: thin;
+}
+.scroll-hint {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--acc); text-align: center; margin: 2px 0 10px;
+}
+.scroll-hint[hidden] { display: none; }
+
+.warnbox, .refusebox {
+  border-radius: 10px; padding: 12px 14px; margin: 10px 0;
+  font-size: 13.2px; line-height: 1.58;
+}
+.warnbox {
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+}
+.warnbox strong, .warnbox b { color: var(--warn); }
+.refusebox {
+  border: 1px solid color-mix(in srgb, var(--err) 48%, var(--border));
+  background: color-mix(in srgb, var(--err) 8%, var(--surface));
+}
+.refusebox strong, .refusebox b { color: var(--err); }
+.fact-t { display: block; margin-bottom: 3px; font-weight: 600; }
+
+/* ---------- standin ---------- */
+.standin {
+  border: 1px dashed var(--border-hi);
+  border-radius: 10px; padding: 9px 12px; margin: 12px 0 4px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.65; color: var(--muted);
+}
+.standin b { color: var(--acc); font-weight: 600; }
+
+/* ---------- radio / check ---------- */
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 7%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--acc); flex: none; }
+.radio-card .rc-t { font-size: 13.8px; font-weight: 600; }
+.radio-card .rc-d { font-size: 12.5px; color: var(--muted); }
+.checkline { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; margin: 8px 0 2px; cursor: pointer; }
+.checkline input { margin-top: 3px; accent-color: var(--acc); flex: none; }
+.subhead {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-dim); margin: 16px 0 8px;
+}
+
+/* ---------- buttons ---------- */
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--border-hi); color: var(--text);
+  border-radius: 10px; padding: 11px 18px; font-size: 14px; font-weight: 550;
+}
+.btn-ghost:hover { border-color: var(--acc); }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 11px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 12.5px;
+}
+button.linkish:hover { color: var(--text-dim); }
+
+/* ---------- hold-to-cross button ---------- */
+.hold {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--acc); background: color-mix(in srgb, var(--acc) 16%, var(--surface));
+  color: var(--acc-hi); border-radius: 10px; padding: 11px 20px; font-size: 14px; font-weight: 650;
+  letter-spacing: .01em; touch-action: none; user-select: none;
+}
+.hold[disabled] { opacity: .4; cursor: not-allowed; }
+.hold .fill {
+  position: absolute; inset: 0; width: 0; background: var(--acc);
+  z-index: 0; transition: width 1.2s linear; opacity: .9;
+}
+.hold.holding .fill { width: 100%; }
+.hold .lbl { position: relative; z-index: 1; }
+.hold.holding .lbl { color: var(--acc-ink); }
+
+/* ---------- persistent in-session indicator ---------- */
+.indicator {
+  position: sticky; top: 0; z-index: 15;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--acc) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--acc) 45%, var(--border));
+  border-radius: 12px; padding: 9px 12px; margin-bottom: 16px;
+}
+.indicator .core { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: .1em; color: var(--acc-hi); }
+.chip {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border-hi); color: var(--text-dim);
+}
+.chip[data-backend="gapps"] { border-color: var(--err); color: var(--err); }
+.chip[data-backend="microg"] { border-color: var(--ok); color: var(--ok); }
+.dots { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.dot {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border);
+  color: var(--muted); background: var(--surface-2);
+}
+.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--border-hi); }
+.dot[data-on="1"] { color: var(--acc-hi); border-color: color-mix(in srgb, var(--acc) 50%, var(--border)); }
+.dot[data-on="1"]::before { background: var(--acc); }
+.dot[data-live="1"] { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+.dot[data-live="1"]::before { background: var(--live); animation: blink 1s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.indicator .leave { margin-left: auto; }
+
+/* ---------- bridge ledger ---------- */
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 8px 0 4px; }
+.bridge {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: start;
+  padding: 14px; border-bottom: 1px solid var(--border);
+}
+.bridge:last-child { border-bottom: 0; }
+.bridge .b-t { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.bridge .b-d { font-size: 12.6px; color: var(--text-dim); line-height: 1.55; }
+.bridge .b-risk { font-size: 12.2px; color: var(--muted); margin-top: 4px; }
+.bridge .b-risk b { color: var(--warn); }
+.bridge .b-sub { margin-top: 8px; display: none; }
+.bridge[data-on="1"] .b-sub { display: block; }
+.bridge .b-sub label { font-size: 12.5px; margin-right: 14px; cursor: pointer; }
+.bridge .b-sub input { accent-color: var(--acc); }
+
+/* toggle switch */
+.sw { position: relative; width: 46px; height: 26px; flex: none; align-self: center; }
+.sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.sw .track {
+  position: absolute; inset: 0; border-radius: 999px; background: var(--surface-3);
+  border: 1px solid var(--border-hi); transition: background .15s, border-color .15s;
+}
+.sw .knob {
+  position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--muted); transition: transform .15s, background .15s;
+}
+.sw input:checked + .track { background: color-mix(in srgb, var(--acc) 30%, var(--surface)); border-color: var(--acc); }
+.sw input:checked + .track .knob { transform: translateX(20px); background: var(--acc); }
+.sw input:focus-visible + .track { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+/* ---------- modal ---------- */
+.modal-back {
+  position: fixed; inset: 0; z-index: 40; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(3px);
+}
+.modal-back[data-open="1"] { display: flex; }
+.modal {
+  width: 100%; max-width: 480px; border: 1px solid var(--border-hi);
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px 22px; max-height: 88vh; overflow-y: auto;
+}
+.modal h3 { margin: 0 0 8px; font-size: 16px; }
+
+/* ---------- about ---------- */
+.about-body p { font-size: 14px; color: var(--text-dim); margin: 0 0 12px; }
+.about-body b { color: var(--text); }
+.about-body code { font-family: var(--font-mono); font-size: 12px; color: var(--acc); }
+.about-meta {
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+  border-top: 1px solid var(--border); padding-top: 12px; line-height: 1.7;
+}
+
+.tiny { font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+
+<body data-view="gate-full" data-state="idle">
+
+<!-- forced-honesty: this is a scaffold, never built or booted -->
+<div class="unbuilt" role="note">
+  <div class="wrap">
+    <span class="tag">UNBUILT · UNBOOTED</span>
+    <span class="txt lang-en">Scaffold only. This gate, its state store, and the on-device Waydroid wrapper have never been built or booted on hardware. UNTESTED.</span>
+    <span class="txt lang-pt">Apenas um esqueleto. Este portão, o armazenamento de estado e o wrapper Waydroid no aparelho nunca foram compilados nem inicializados em hardware. NÃO TESTADO.</span>
+  </div>
+</div>
+
+<header class="site">
+  <div class="wrap site-inner">
+    <button class="wordmark" id="btnHome" aria-label="Sloboda — gate">SLOBODA</button>
+    <span class="tier-badge lang-en">NON-ATTESTABLE TIER</span>
+    <span class="tier-badge lang-pt">CAMADA NÃO ATESTÁVEL</span>
+    <div class="site-actions">
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button id="langPt" data-lang="pt-BR" aria-pressed="false">PT</button>
+        <button id="langEn" data-lang="en" aria-pressed="true">EN</button>
+      </div>
+      <button class="hbtn" id="btnAbout"><span class="lang-en">About</span><span class="lang-pt">Sobre</span></button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ================= FULL CONSENT GATE (first entry) ================= -->
+<section class="view" id="view-gate-full" aria-labelledby="gfTitle">
+  <div class="card">
+    <h2><span class="lang-en">Crossing into Android</span><span class="lang-pt">Passagem para o Android</span></h2>
+
+    <h1 class="title" id="gfTitle">
+      <span class="lang-en">You're about to leave the attestable base.</span>
+      <span class="lang-pt">Você está prestes a sair da base atestável.</span>
+    </h1>
+    <p class="lead">
+      <span class="lang-en">Android runs here in a sandboxed container (Waydroid). It's a real Google-Android system, and it is the <b>less-private, non-attestable</b> side of your device. Nothing below is meant to scare you — it's just what's true. Read it, then decide.</span>
+      <span class="lang-pt">O Android roda aqui num contêiner isolado (Waydroid). É um sistema Android do Google de verdade, e é o lado <b>menos privado e não atestável</b> do seu aparelho. Nada abaixo é para te assustar — é só o que é verdade. Leia e depois decida.</span>
+    </p>
+
+    <div class="scroll-hint" id="scrollHint">
+      <span class="lang-en">↓ scroll through all five facts to enable crossing</span>
+      <span class="lang-pt">↓ role pelos cinco fatos para habilitar a passagem</span>
+    </div>
+
+    <div class="facts-scroll" id="factsScroll" tabindex="0" role="group" aria-label="Five honest facts">
+      <div class="warnbox">
+        <span class="fact-t lang-en">1 · You're crossing out of the sealed base.</span>
+        <span class="fact-t lang-pt">1 · Você está saindo da base selada.</span>
+        <span class="lang-en">Your wallet keys and the attestable system stay behind, in the base. This container is separate, mutable, and larger — a much bigger, less auditable surface than the wallet-only system you came from. Keep your secrets on the base side; don't type seed phrases or unlock passphrases into Android apps.</span>
+        <span class="lang-pt">Suas chaves de carteira e o sistema atestável ficam para trás, na base. Este contêiner é separado, mutável e maior — uma superfície bem maior e menos auditável do que o sistema só-carteira de onde você veio. Guarde seus segredos do lado da base; não digite frases-semente nem senhas de desbloqueio em apps Android.</span>
+      </div>
+
+      <div class="warnbox">
+        <span class="fact-t lang-en">2 · It's sandboxed, which is not the same as secure.</span>
+        <span class="fact-t lang-pt">2 · Ele é isolado, o que não é o mesmo que seguro.</span>
+        <span class="lang-en">Android runs in an LXC container fenced off from the base by the Linux kernel and SELinux. That fence is real, but it is only as strong as the kernel — a kernel-level flaw crosses it. We call this <i>sandboxed</i>. We do <b>not</b> call it secure, private, or attested.</span>
+        <span class="lang-pt">O Android roda num contêiner LXC separado da base pelo kernel Linux e pelo SELinux. Essa cerca é real, mas só é tão forte quanto o kernel — uma falha no nível do kernel a atravessa. Chamamos isso de <i>isolado</i>. Nós <b>não</b> chamamos de seguro, privado nem atestado.</span>
+      </div>
+
+      <div class="warnbox">
+        <span class="fact-t lang-en">3 · Banking, Google Wallet, and paid video will refuse to run.</span>
+        <span class="fact-t lang-pt">3 · Apps de banco, Google Wallet e vídeo pago vão se recusar a abrir.</span>
+        <span class="lang-en">Google's Play Integrity check needs a locked bootloader and genuine hardware attestation. A container can't provide that, so the STRONG verdict fails by design — and lately DEVICE fails too. Banking apps, Google Wallet/Pay, most DRM streaming (Widevine drops to SD or nothing), some 2FA and games will detect this and <b>refuse or degrade.</b> That's expected here. It is not a bug we can fix, and it is not something to work around on your bank's account — use your bank's website or a certified phone.</span>
+        <span class="lang-pt">A verificação Play Integrity do Google exige bootloader travado e atestação de hardware genuína. Um contêiner não tem isso, então o veredito STRONG falha por definição — e ultimamente o DEVICE também falha. Apps de banco, Google Wallet/Pay, a maioria dos streamings com DRM (o Widevine cai para SD ou nada), alguns 2FA e jogos vão detectar isso e <b>se recusar ou funcionar pela metade.</b> Isso é esperado aqui. Não é um bug que possamos corrigir, e não é algo para burlar na conta do seu banco — use o site do banco ou um aparelho certificado.</span>
+      </div>
+
+      <div class="warnbox">
+        <span class="fact-t lang-en">4 · Apps here talk to Google and their own servers.</span>
+        <span class="fact-t lang-pt">4 · Os apps aqui falam com o Google e com os próprios servidores deles.</span>
+        <span class="lang-en">This is a full Android userland. The apps you install can reach the network, phone home to their makers, and — depending on the choice below — talk to Google's services. Postern can't make an Android app private for you. What you can do: keep the container Google-free — the private default is no Google and no microG at all, with microG available afterward as an optional, recommended add-on for compatibility — route it over Tor, and grant it nothing from the base unless you decide to (next screen).</span>
+        <span class="lang-pt">Isto é um Android completo. Os apps que você instalar podem acessar a rede, mandar dados para os fabricantes e — dependendo da escolha abaixo — falar com os serviços do Google. O Postern não consegue tornar um app Android privado para você. O que dá para fazer: manter o contêiner sem Google — o padrão privado é sem Google e sem microG algum, com o microG disponível depois como um complemento opcional recomendado para compatibilidade — passar tudo por Tor e não dar a ele nada da base a menos que você decida (próxima tela).</span>
+      </div>
+
+      <div class="refusebox">
+        <span class="fact-t lang-en">5 · This tier is NOT covered by the Postern Seal.</span>
+        <span class="fact-t lang-pt">5 · Esta camada NÃO é coberta pelo Selo Postern.</span>
+        <span class="lang-en">The base image is measured and sealed: a verifier can check <code>os_roothash</code> and know the exact audited system is running. <b>The Android container is not part of that chain.</b> It's pulled at setup as mutable state, so the Seal says <i>nothing</i> about what runs inside Waydroid. Do not treat anything you do in Android as attested, verified, or provable. If you need that, it lives on the base — not here.</span>
+        <span class="lang-pt">A imagem base é medida e selada: um verificador pode checar o <code>os_roothash</code> e saber que exatamente o sistema auditado está rodando. <b>O contêiner Android não faz parte dessa cadeia.</b> Ele é baixado na configuração como estado mutável, então o Selo não diz <i>nada</i> sobre o que roda dentro do Waydroid. Não trate nada que você faça no Android como atestado, verificado ou comprovável. Se você precisa disso, está na base — não aqui.</span>
+      </div>
+    </div>
+
+    <!-- microG vs GApps (first run only) -->
+    <div class="subhead"><span class="lang-en">Which Android services?</span><span class="lang-pt">Quais serviços Android?</span></div>
+    <label class="radio-card">
+      <input type="radio" name="backend" value="microg" checked>
+      <span>
+        <span class="rc-t"><span class="lang-en">microG — Google-free (recommended optional add-on)</span><span class="lang-pt">microG — sem Google (complemento opcional recomendado)</span></span>
+        <span class="rc-d">
+          <span class="lang-en">A free reimplementation of Google's app services. No Google binaries on your device. Many apps work. Honest limits: microG still contacts Google's servers for the things it relays (push, maps, sign-in), and it can't reliably pass Play Integrity — so it won't rescue banking or Wallet.</span>
+          <span class="lang-pt">Uma reimplementação livre dos serviços de app do Google. Nenhum binário do Google no seu aparelho. Muitos apps funcionam. Limites honestos: o microG ainda contata os servidores do Google para o que ele repassa (push, mapas, login), e não passa no Play Integrity de forma confiável — então não salva banco nem Wallet.</span>
+        </span>
+      </span>
+    </label>
+    <label class="radio-card">
+      <input type="radio" name="backend" value="gapps">
+      <span>
+        <span class="rc-t"><span class="lang-en">Google Play Services (GApps) — less private</span><span class="lang-pt">Google Play Services (GApps) — menos privado</span></span>
+        <span class="rc-d">
+          <span class="lang-en">Installs Google's real, proprietary Play Services, with broad access across the container and Google's telemetry. A few more apps sign in. It still won't pass STRONG integrity, so banking/Wallet/DRM still refuse — you'd be adding Google's blobs back onto your device for little gain. Choose this only if a specific app you need demands genuine Google sign-in.</span>
+          <span class="lang-pt">Instala os Play Services proprietários de verdade do Google, com acesso amplo no contêiner e a telemetria do Google. Alguns apps a mais conseguem logar. Ainda não passa no STRONG integrity, então banco/Wallet/DRM continuam se recusando — você estaria colocando os blobs do Google de volta no aparelho por pouco ganho. Escolha isso só se um app específico que você precisa exigir login Google genuíno.</span>
+        </span>
+      </span>
+    </label>
+    <p class="tiny">
+      <span class="lang-en">You can't have a private container and Google's services at once. The private default underneath both of these choices has no Google and no microG at all; microG is the closest of the two to that default, GApps is the closest to compatible. Neither unlocks integrity-gated apps.</span>
+      <span class="lang-pt">Você não pode ter um contêiner privado e os serviços do Google ao mesmo tempo. O padrão privado por baixo dessas duas opções não tem Google nem microG algum; o microG é o mais perto desse padrão entre os dois, o GApps é o mais perto de compatível. Nenhum dos dois libera apps travados por integridade.</span>
+    </p>
+    <div class="refusebox" id="gappsConfirm" hidden>
+      <label class="checkline">
+        <input type="checkbox" id="gappsAck">
+        <span>
+          <span class="lang-en"><b>Louder confirm:</b> I understand GApps puts Google's proprietary blobs and telemetry back on my device, and it still won't pass STRONG integrity — banking/Wallet/DRM will refuse anyway.</span>
+          <span class="lang-pt"><b>Confirmação reforçada:</b> Eu entendo que o GApps coloca de volta os blobs proprietários e a telemetria do Google no meu aparelho, e mesmo assim não passa no STRONG integrity — banco/Wallet/DRM vão recusar de qualquer forma.</span>
+        </span>
+      </label>
+    </div>
+
+    <!-- session-memory radio -->
+    <div class="subhead"><span class="lang-en">Next time you enter Android</span><span class="lang-pt">Da próxima vez que entrar no Android</span></div>
+    <label class="radio-card">
+      <input type="radio" name="scope" value="session" checked>
+      <span>
+        <span class="rc-t"><span class="lang-en">This session only</span><span class="lang-pt">Só nesta sessão</span></span>
+        <span class="rc-d"><span class="lang-en">Show me the full warning again next time.</span><span class="lang-pt">Mostre o aviso completo de novo na próxima vez.</span></span>
+      </span>
+    </label>
+    <label class="radio-card">
+      <input type="radio" name="scope" value="persistent">
+      <span>
+        <span class="rc-t"><span class="lang-en">Remember the short warning</span><span class="lang-pt">Lembrar o aviso curto</span></span>
+        <span class="rc-d"><span class="lang-en">From now on, show me the compact reminder each time I enter Android (never nothing — the crossing is always shown).</span><span class="lang-pt">A partir de agora, mostre o lembrete compacto toda vez que eu entrar no Android (nunca nada — a passagem é sempre exibida).</span></span>
+      </span>
+    </label>
+
+    <div class="standin">
+      <span class="lang-en">Mechanism: <b>waydroid</b> in an LXC container · image pulled at <b>waydroid init</b>, outside the dm-verity-sealed rootfs · so <b>os_roothash</b> does not cover it. Off by default; you enabled it.</span>
+      <span class="lang-pt">Mecanismo: <b>waydroid</b> num contêiner LXC · imagem baixada no <b>waydroid init</b>, fora do rootfs selado por dm-verity · por isso o <b>os_roothash</b> não a cobre. Desligado por padrão; você ativou.</span>
+    </div>
+
+    <div class="btnrow">
+      <!-- Decline is FIRST focusable & the Esc target: the safe exit is easiest to hit -->
+      <button class="btn-ghost" id="fullDecline">
+        <span class="lang-en">Not now, stay on the base</span><span class="lang-pt">Agora não, ficar na base</span>
+      </button>
+      <button class="hold" id="fullCross" disabled aria-describedby="crossNote">
+        <span class="fill" aria-hidden="true"></span>
+        <span class="lbl"><span class="lang-en">Cross into Android (hold)</span><span class="lang-pt">Entrar no Android (segure)</span></span>
+      </button>
+    </div>
+    <p class="tiny" id="crossNote" aria-live="polite"></p>
+  </div>
+</section>
+
+<!-- ================= SESSION GATE (compact re-consent) ================= -->
+<section class="view" id="view-gate-session" aria-labelledby="gsTitle">
+  <div class="card" style="border-color: color-mix(in srgb, var(--acc) 40%, var(--border));">
+    <h1 class="title" id="gsTitle">
+      <span class="lang-en">Entering Android · non-attestable.</span>
+      <span class="lang-pt">Entrando no Android · não atestável.</span>
+    </h1>
+    <p class="lead">
+      <span class="lang-en">Sandboxed, not attested. Play Integrity fails, so banking/Wallet/DRM won't work. Not covered by the Postern Seal. Bridges to the base are off unless you turned them on.</span>
+      <span class="lang-pt">Isolado, não atestado. O Play Integrity falha, então banco/Wallet/DRM não funcionam. Não coberto pelo Selo Postern. As pontes com a base estão desligadas a menos que você as tenha ligado.</span>
+    </p>
+    <div class="btnrow">
+      <button class="btn-ghost" id="sessBack">
+        <span class="lang-en">Back to base</span><span class="lang-pt">Voltar à base</span>
+      </button>
+      <button class="hold" id="sessEnter">
+        <span class="fill" aria-hidden="true"></span>
+        <span class="lbl"><span class="lang-en">Enter (hold)</span><span class="lang-pt">Entrar (segure)</span></span>
+      </button>
+      <button class="linkish" id="sessFull">
+        <span class="lang-en">Show the full warning</span><span class="lang-pt">Ver o aviso completo</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DECLINED (stayed on base) ================= -->
+<section class="view" id="view-declined">
+  <div class="card">
+    <h1 class="title"><span class="lang-en">You stayed on the base.</span><span class="lang-pt">Você ficou na base.</span></h1>
+    <p class="lead">
+      <span class="lang-en">Nothing was started. Android was not entered; no container is running. Your wallet and the sealed, attestable system are exactly where they were.</span>
+      <span class="lang-pt">Nada foi iniciado. O Android não foi acessado; nenhum contêiner está rodando. Sua carteira e o sistema selado e atestável estão exatamente onde estavam.</span>
+    </p>
+    <div class="standin">
+      <span class="lang-en">On device this returns you to the attestable base compositor. Here in the demo, the gate re-arms.</span>
+      <span class="lang-pt">No aparelho isto te leva de volta ao compositor da base atestável. Aqui na demonstração, o portão é rearmado.</span>
+    </div>
+    <div class="btnrow">
+      <button class="btn-ghost" id="declReopen"><span class="lang-en">Open the gate again</span><span class="lang-pt">Abrir o portão de novo</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= IN-SESSION (inside Android) ================= -->
+<section class="view" id="view-session">
+  <!-- persistent indicator: no code path hides it while inside Android -->
+  <div class="indicator" id="indicator" role="region" aria-label="You are in Android, a non-attestable tier">
+    <span class="core">◆ ANDROID · <span class="lang-en">NON-ATTESTABLE</span><span class="lang-pt">NÃO ATESTÁVEL</span></span>
+    <span class="chip" id="backendChip" data-backend="microg">microG</span>
+    <span class="dots" id="bridgeDots" aria-live="polite"></span>
+    <button class="btn-danger leave" id="btnLeave">
+      <span class="lang-en">Leave</span><span class="lang-pt">Sair</span>
+    </button>
+  </div>
+
+  <div class="card">
+    <h2><span class="lang-en">Bridges to the base</span><span class="lang-pt">Pontes com a base</span></h2>
+    <p class="lead">
+      <span class="lang-en">Everything here starts OFF. The base shares nothing with Android until you turn a bridge on, one at a time. Each one is a hole you open on purpose — turn it off when you're done.</span>
+      <span class="lang-pt">Tudo aqui começa DESLIGADO. A base não compartilha nada com o Android até você ligar uma ponte, uma de cada vez. Cada uma é um buraco que você abre de propósito — desligue quando terminar.</span>
+    </p>
+
+    <div class="ledger">
+      <!-- clipboard -->
+      <div class="bridge" data-bridge="clipboard">
+        <div>
+          <div class="b-t"><span class="lang-en">Clipboard (both directions)</span><span class="lang-pt">Área de transferência (nos dois sentidos)</span></div>
+          <div class="b-d"><span class="lang-en">Lets copy-and-paste cross between the base and Android.</span><span class="lang-pt">Deixa copiar-e-colar cruzar entre a base e o Android.</span></div>
+          <div class="b-risk"><b><span class="lang-en">Risk:</span><span class="lang-pt">Risco:</span></b> <span class="lang-en">an Android app can read whatever you last copied on the base — including passwords or addresses. <i>(Auto-off at session end unless you pin it.)</i></span><span class="lang-pt">um app Android pode ler o que você copiou por último na base — inclusive senhas ou endereços. <i>(Desliga sozinho ao fim da sessão, a menos que você fixe.)</i></span></div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="clipboard" aria-label="Clipboard bridge"><span class="track"><span class="knob"></span></span></label>
+      </div>
+
+      <!-- files -->
+      <div class="bridge" data-bridge="files">
+        <div>
+          <div class="b-t"><span class="lang-en">Shared folder (base → Android)</span><span class="lang-pt">Pasta compartilhada (base → Android)</span></div>
+          <div class="b-d"><span class="lang-en">Mounts one folder into Android. Only what you drop in <code>Android-Shared</code> is visible; nothing else on the base is.</span><span class="lang-pt">Monta uma pasta no Android. Só o que você colocar em <code>Android-Shared</code> fica visível; o resto da base não.</span></div>
+          <div class="b-risk"><b><span class="lang-en">Risk:</span><span class="lang-pt">Risco:</span></b> <span class="lang-en">every app in the container can read that folder — not just the one you meant.</span><span class="lang-pt">todos os apps do contêiner podem ler essa pasta — não só aquele que você quis.</span></div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="files" aria-label="Shared folder bridge"><span class="track"><span class="knob"></span></span></label>
+      </div>
+
+      <!-- mic (micro-consent) -->
+      <div class="bridge" data-bridge="mic">
+        <div>
+          <div class="b-t"><span class="lang-en">Microphone → Android</span><span class="lang-pt">Microfone → Android</span></div>
+          <div class="b-d"><span class="lang-en">The container gets a virtual mic fed from the host mic. An app with mic permission can listen live.</span><span class="lang-pt">O contêiner recebe um microfone virtual alimentado pelo microfone do host. Um app com permissão de microfone pode ouvir ao vivo.</span></div>
+          <div class="b-risk"><b><span class="lang-en">Risk:</span><span class="lang-pt">Risco:</span></b> <span class="lang-en">live audio into a non-attestable app that may phone home. Two locks (host bridge + Android permission) must both be open. Turn it on only while you need it.</span><span class="lang-pt">áudio ao vivo para um app não atestável que pode mandar dados para fora. Duas travas (ponte do host + permissão Android) precisam estar abertas. Ligue só enquanto precisar.</span></div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="mic" data-consent="mic" aria-label="Microphone bridge"><span class="track"><span class="knob"></span></span></label>
+      </div>
+
+      <!-- camera (micro-consent) -->
+      <div class="bridge" data-bridge="camera">
+        <div>
+          <div class="b-t"><span class="lang-en">Camera → Android</span><span class="lang-pt">Câmera → Android</span></div>
+          <div class="b-d"><span class="lang-en">Feeds a live camera into Android. An app with camera permission sees and can upload the video.</span><span class="lang-pt">Envia uma câmera ao vivo para o Android. Um app com permissão de câmera vê e pode enviar o vídeo.</span></div>
+          <div class="b-risk"><b><span class="lang-en">Risk:</span><span class="lang-pt">Risco:</span></b> <span class="lang-en">live video into apps that can upload it. Same two-lock rule as mic. Never leave on across sessions.</span><span class="lang-pt">vídeo ao vivo para apps que podem enviá-lo. Mesma regra de duas travas do microfone. Nunca deixe ligado entre sessões.</span></div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="camera" data-consent="camera" aria-label="Camera bridge"><span class="track"><span class="knob"></span></span></label>
+      </div>
+
+      <!-- location (coarse/precise) -->
+      <div class="bridge" data-bridge="location">
+        <div>
+          <div class="b-t"><span class="lang-en">Location → Android</span><span class="lang-pt">Localização → Android</span></div>
+          <div class="b-d"><span class="lang-en">Gives Android your position. Choose coarse (city-level, the safer default) or precise.</span><span class="lang-pt">Dá ao Android sua posição. Escolha aproximada (nível de cidade, o padrão mais seguro) ou precisa.</span></div>
+          <div class="b-risk"><b><span class="lang-en">Risk:</span><span class="lang-pt">Risco:</span></b> <span class="lang-en">precise location is a strong tracking signal to every app and its servers. With microG, location may also involve microG's network-location lookups.</span><span class="lang-pt">localização precisa é um sinal forte de rastreamento para todo app e seus servidores. Com o microG, a localização também pode envolver as consultas de rede do microG.</span></div>
+          <div class="b-sub">
+            <label><input type="radio" name="locprec" value="coarse" checked> <span class="lang-en">Coarse</span><span class="lang-pt">Aproximada</span></label>
+            <label><input type="radio" name="locprec" value="precise"> <span class="lang-en">Precise</span><span class="lang-pt">Precisa</span></label>
+          </div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="location" aria-label="Location bridge"><span class="track"><span class="knob"></span></span></label>
+      </div>
+    </div>
+
+    <div class="standin">
+      <span class="lang-en">Each true value maps to concrete plumbing (clipboard → wl-clipboard; the rest → Waydroid/LXC device passthrough). A false or absent value exposes NOTHING. State persists to the gate-store schema (<b>bridges.*</b>), all default DENY.</span>
+      <span class="lang-pt">Cada valor verdadeiro mapeia para o encanamento concreto (área de transferência → wl-clipboard; o resto → passagem de dispositivo Waydroid/LXC). Um valor falso ou ausente expõe NADA. O estado persiste no esquema do gate-store (<b>bridges.*</b>), todos DENY por padrão.</span>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn-ghost" id="sessAbout"><span class="lang-en">About this tier</span><span class="lang-pt">Sobre esta camada</span></button>
+      <button class="btn-danger" id="sessLeave2"><span class="lang-en">Leave Android</span><span class="lang-pt">Sair do Android</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABOUT ================= -->
+<section class="view" id="view-about">
+  <div class="card about-body">
+    <h1 class="title"><span class="lang-en">About Sloboda</span><span class="lang-pt">Sobre o Sloboda</span></h1>
+
+    <div class="lang-en">
+      <p>Sloboda is the gateway that runs a full Google-Android system in a sandboxed container (Waydroid) so you can install and use Android apps that don't exist as native Linux or Postern apps. It is the <b>opt-in escape hatch</b> — deliberately the least-private tier of your device.</p>
+      <p><b>What it is honestly:</b> a real Android userland, fenced off from the attestable base by the Linux kernel and SELinux. <i>Sandboxed</i> — not secure, not private, not attested.</p>
+      <p><b>What it is NOT:</b> it is <b>not covered by the Postern Seal.</b> The base is measured and sealed (<code>os_roothash</code>); this container is mutable state pulled at setup and is outside that chain. Nothing you do in Android is attestable or provable. Play Integrity STRONG fails by design, so banking, Google Wallet/Pay, and most DRM video refuse to run — that's expected, not a defect.</p>
+      <p><b>Your data:</b> Sloboda collects no analytics and phones nothing home. The individual apps you install are another matter — they can talk to Google and to their own servers, and Postern can't make them private. Bridges to the base (clipboard, files, mic, camera, location) are all off until you turn them on, one at a time.</p>
+      <p><b>Cost:</b> free for personal use. There is no token, no paywall, and no "unlock" tied to any coin — the Postern coin is worthless, isn't a security, and revenue never touches it or this feature.</p>
+      <p><b>This is not legal or financial advice.</b> If an app refuses to run because integrity fails, that is the app enforcing Google's policy; use its website or a certified device.</p>
+    </div>
+    <div class="lang-pt">
+      <p>O Sloboda é a porta de entrada que roda um sistema Android do Google completo num contêiner isolado (Waydroid), para você instalar e usar apps Android que não existem como apps Linux nativos nem como apps Postern. É a <b>saída de emergência opcional</b> — de propósito, a camada menos privada do seu aparelho.</p>
+      <p><b>O que ele é, com honestidade:</b> um Android de verdade, cercado da base atestável pelo kernel Linux e pelo SELinux. <i>Isolado</i> — não seguro, não privado, não atestado.</p>
+      <p><b>O que ele NÃO é:</b> ele <b>não é coberto pelo Selo Postern.</b> A base é medida e selada (<code>os_roothash</code>); este contêiner é estado mutável baixado na configuração e está fora dessa cadeia. Nada que você faça no Android é atestável ou comprovável. O Play Integrity STRONG falha por definição, então banco, Google Wallet/Pay e a maioria dos vídeos com DRM se recusam a abrir — isso é esperado, não um defeito.</p>
+      <p><b>Seus dados:</b> o Sloboda não coleta nenhuma métrica e não manda nada para casa. Os apps que você instala são outra história — podem falar com o Google e com os próprios servidores, e o Postern não consegue torná-los privados. As pontes com a base (área de transferência, arquivos, microfone, câmera, localização) estão todas desligadas até você ligá-las, uma de cada vez.</p>
+      <p><b>Custo:</b> grátis para uso pessoal. Não há token, nem paywall, nem "desbloqueio" ligado a nenhuma moeda — a moeda Postern é sem valor, não é um investimento, e a receita nunca a toca nem toca este recurso.</p>
+      <p><b>Isto não é aconselhamento jurídico nem financeiro.</b> Se um app se recusa a abrir porque a verificação de integridade falha, é o app aplicando a política do Google; use o site dele ou um aparelho certificado.</p>
+    </div>
+
+    <div class="about-meta">
+      <span class="lang-en">Backend: <span id="aboutBackend">microG</span> · Container image: <code>[LineageOS build id]</code> · Waydroid <code>[version]</code>.<br>Base system: attestable, sealed — <code>os_roothash [prefix…]</code>. <i>This container: not sealed.</i></span>
+      <span class="lang-pt">Backend: <span id="aboutBackendPt">microG</span> · Imagem do contêiner: <code>[id da build LineageOS]</code> · Waydroid <code>[versão]</code>.<br>Sistema base: atestável, selado — <code>os_roothash [prefixo…]</code>. <i>Este contêiner: não selado.</i></span>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn-ghost" id="aboutBack"><span class="lang-en">Back</span><span class="lang-pt">Voltar</span></button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= micro-consent modal (mic / camera) ================= -->
+<div class="modal-back" id="mcBack" role="dialog" aria-modal="true" aria-labelledby="mcTitle">
+  <div class="modal">
+    <h3 id="mcTitle"></h3>
+    <p class="lead" id="mcBody"></p>
+    <div class="btnrow">
+      <button class="btn-ghost" id="mcSession"></button>
+      <button class="btn-ghost" id="mcKeep"></button>
+      <button class="linkish" id="mcCancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= kill-switch (Leave) sheet ================= -->
+<div class="modal-back" id="ksBack" role="dialog" aria-modal="true" aria-labelledby="ksTitle">
+  <div class="modal">
+    <h3 id="ksTitle"><span class="lang-en">Leaving Android</span><span class="lang-pt">Saindo do Android</span></h3>
+
+    <label class="radio-card">
+      <input type="radio" name="ksmode" value="stop" checked>
+      <span>
+        <span class="rc-t"><span class="lang-en">Stop the container</span><span class="lang-pt">Parar o contêiner</span></span>
+        <span class="rc-d"><span class="lang-en">Closes Android and stops it running. Your installed apps and their data stay for next time. Bridges reset to off.</span><span class="lang-pt">Fecha o Android e para a execução. Seus apps instalados e os dados deles ficam para a próxima vez. As pontes voltam para desligado.</span></span>
+      </span>
+    </label>
+    <label class="radio-card">
+      <input type="radio" name="ksmode" value="wipe">
+      <span>
+        <span class="rc-t"><span class="lang-en">Stop and wipe the session</span><span class="lang-pt">Parar e limpar a sessão</span></span>
+        <span class="rc-d"><span class="lang-en">Stops Android, clears the clipboard bridge, unmounts the shared folder, and resets every bridge to off. Nothing crosses back to the base.</span><span class="lang-pt">Para o Android, limpa a ponte da área de transferência, desmonta a pasta compartilhada e volta todas as pontes para desligado. Nada cruza de volta para a base.</span></span>
+      </span>
+    </label>
+
+    <label class="checkline" id="eraseLine" style="opacity:.5">
+      <input type="checkbox" id="ksErase" disabled>
+      <span>
+        <span class="lang-en"><b>Also erase everything inside Android</b> (apps, logins, downloads) — next entry starts from a clean image. This can't be undone.</span>
+        <span class="lang-pt"><b>Apagar também tudo dentro do Android</b> (apps, logins, downloads) — a próxima entrada começa de uma imagem limpa. Isso não pode ser desfeito.</span>
+      </span>
+    </label>
+
+    <p class="tiny">
+      <span class="lang-en">Either way, you return to the attestable base. (Your wallet and the sealed system were never inside Android; they're untouched.)</span>
+      <span class="lang-pt">De qualquer jeito, você volta para a base atestável. (Sua carteira e o sistema selado nunca estiveram dentro do Android; ficam intactos.)</span>
+    </p>
+
+    <div class="btnrow">
+      <button class="btn-ghost" id="ksCancel"><span class="lang-en">Cancel</span><span class="lang-pt">Cancelar</span></button>
+      <button class="btn-danger" id="ksStop"><span class="lang-en">Stop container</span><span class="lang-pt">Parar contêiner</span></button>
+      <button class="hold" id="ksWipe" style="border-color:var(--err); background:color-mix(in srgb, var(--err) 14%, var(--surface)); color:var(--err);">
+        <span class="fill" aria-hidden="true" style="background:var(--err)"></span>
+        <span class="lbl"><span class="lang-en">Stop &amp; wipe</span><span class="lang-pt">Parar e limpar</span></span>
+      </button>
+    </div>
+    <p class="tiny" id="ksNote" aria-live="polite"></p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   INLINED, LOGIC-IDENTICAL COPY of gate-store.mjs (the canonical module).
+   Condensed (not byte-for-byte) but parity-tested against ./gate-store.mjs
+   by ./test-ui-parity.mjs, so the browser UI and the node reference agree on
+   the state shape and its behaviour. Honesty rails enforced in code:
+     - tier is ALWAYS "non-attestable"
+     - every bridge DEFAULTS TO DENY; unknown/missing input => deny
+     - malformed/partial blob normalises to full-deny + not-consented
+   No network, no telemetry, no imports.
+   UNTESTED: the on-device wrapper that consumes this shape does not exist yet.
+   ============================================================================ */
+const SCHEMA_ID = "postern.sloboda-gate.state";
+const SCHEMA_VERSION = 1;
+const TIER = "non-attestable";
+const EGRESS_TOR_ONLY = true;   // pinned rail: egress is Tor-only, always
+const BRIDGE_KEYS = ["clipboard", "files", "mic", "camera", "location"];
+const CONSENT_SCOPES = ["session", "persistent"];
+const LANGS = ["pt-BR", "en"];
+
+function defaultState() {
+  return {
+    schema: SCHEMA_ID,
+    version: SCHEMA_VERSION,
+    tier: TIER,
+    lang: "en",
+    consent: { accepted: false, scope: "session", acceptedAtIso: null },
+    bridges: { clipboard: false, files: false, mic: false, camera: false, location: false },
+    egress: { torOnly: EGRESS_TOR_ONLY, torBootstrapped: false },
+    killSwitch: { engaged: false, engagedAtIso: null },
+  };
+}
+const asBool = (v) => v === true;
+const oneOf = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
+const asIso = (v) => (typeof v === "string" && v.length > 0 ? v : null);
+
+function normalize(input) {
+  const out = defaultState();
+  if (!input || typeof input !== "object") return out;
+  const c = input.consent && typeof input.consent === "object" ? input.consent : {};
+  out.consent.accepted = asBool(c.accepted);
+  out.consent.scope = oneOf(c.scope, CONSENT_SCOPES, "session");
+  out.consent.acceptedAtIso = out.consent.accepted ? asIso(c.acceptedAtIso) : null;
+  const b = input.bridges && typeof input.bridges === "object" ? input.bridges : {};
+  for (const k of BRIDGE_KEYS) out.bridges[k] = asBool(b[k]);
+  const e = input.egress && typeof input.egress === "object" ? input.egress : {};
+  out.egress.torBootstrapped = asBool(e.torBootstrapped); // torOnly stays pinned true
+  const ks = input.killSwitch && typeof input.killSwitch === "object" ? input.killSwitch : {};
+  out.killSwitch.engaged = asBool(ks.engaged);
+  out.killSwitch.engagedAtIso = out.killSwitch.engaged ? asIso(ks.engagedAtIso) : null;
+  out.lang = oneOf(input.lang, LANGS, "en");
+  return out;
+}
+function parse(text) {
+  let raw = null;
+  try { raw = JSON.parse(text); } catch { return defaultState(); }
+  return normalize(raw);
+}
+/* Strict on-disk boundary (shared consent contract rails 1+2): a corrupt, FOREIGN
+   `schema`, or unknown `version` blob => full-deny, before normalize. Mirrors the
+   module's loadState()/the spine's loadState() for "sloboda". */
+function loadState(text) {
+  let raw = null;
+  try { raw = JSON.parse(text); } catch { return defaultState(); }
+  if (!raw || typeof raw !== "object") return defaultState();
+  if (raw.schema !== SCHEMA_ID) return defaultState();
+  if (raw.version !== SCHEMA_VERSION) return defaultState();
+  return normalize(raw);
+}
+function serialize(state) {
+  const s = normalize(state);
+  return JSON.stringify(s, null, 2) + "\n";
+}
+function containerAllowed(state, opts) {
+  const requireConsent = !opts || opts.requireConsent !== false;
+  const s = normalize(state);
+  if (s.killSwitch.engaged) return false;
+  if (requireConsent && !s.consent.accepted) return false;
+  return true;
+}
+function activeBridges(state, opts) {
+  const s = normalize(state);
+  if (!containerAllowed(s, opts)) return [];
+  return BRIDGE_KEYS.filter((k) => s.bridges[k] === true);
+}
+function egressAllowed(state, opts) {
+  const s = normalize(state);
+  if (!containerAllowed(s, opts)) return false;
+  if (s.egress.torOnly !== true) return false;
+  return s.egress.torBootstrapped === true; // fail-closed until Tor is up
+}
+
+/* ============================================================================
+   Persistence + UI wiring. The gate does NO network (CSP connect-src 'none').
+   State persists to localStorage as the exact schema blob; a small separate
+   "ui" record holds cosmetic-only choices the schema doesn't carry (backend
+   microG/GApps — set on device by `waydroid init`; location precision; bridge
+   pinning). None of that is telemetry; it never leaves the device.
+   ============================================================================ */
+const LS_STATE = "postern.sloboda-gate.state";
+const LS_UI = "postern.sloboda-gate.ui";
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+let state = loadState(store.get(LS_STATE, "")); // strict: foreign/old-version blob => full-deny
+let ui = (() => {
+  try { return JSON.parse(store.get(LS_UI, "null")) || {}; } catch { return {}; }
+})();
+if (!ui.backend) ui.backend = "microg";      // gate's own pre-selection; the wrapper's actual private
+                                              // default is VANILLA (no Google, no microG at all —
+                                              // PAW_SYSTEM_TYPE=VANILLA, PAW_MICROG=0). microG is an
+                                              // optional, recommended post-init step (PAW_MICROG=1);
+                                              // GApps is the less-private compatibility trade-off.
+if (!ui.locPrecision) ui.locPrecision = "coarse";
+if (!ui.pins) ui.pins = {};                   // per-bridge "keep on" flags
+
+function saveState() { store.set(LS_STATE, serialize(state)); }
+function saveUi() { store.set(LS_UI, JSON.stringify(ui)); }
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const nowIso = () => new Date().toISOString();
+const root = document.documentElement;
+const body = document.body;
+
+/* ---------- language ---------- */
+function applyLang() {
+  root.setAttribute("data-lang", state.lang);
+  root.lang = state.lang === "pt-BR" ? "pt-BR" : "en";
+  $("#langPt").setAttribute("aria-pressed", String(state.lang === "pt-BR"));
+  $("#langEn").setAttribute("aria-pressed", String(state.lang === "en"));
+}
+function setLang(l) {
+  state.lang = oneOf(l, LANGS, "en");
+  saveState();
+  applyLang();
+}
+$("#langPt").addEventListener("click", () => setLang("pt-BR"));
+$("#langEn").addEventListener("click", () => setLang("en"));
+
+/* ---------- theme ---------- */
+function applyTheme() {
+  const t = store.get("postern.sloboda-gate.theme", "auto");
+  if (t === "auto") root.removeAttribute("data-theme");
+  else root.dataset.theme = t;
+  $("#btnTheme").textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+}
+$("#btnTheme").addEventListener("click", () => {
+  const cur = store.get("postern.sloboda-gate.theme", "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set("postern.sloboda-gate.theme", next);
+  applyTheme();
+});
+
+/* ---------- view routing ---------- */
+function show(view) { body.dataset.view = view; window.scrollTo(0, 0); }
+
+/* Which gate to show for a fresh entry (mirrors containerAllowed logic). */
+function chooseEntryGate() {
+  if (!state.consent.accepted || state.killSwitch.engaged) return "gate-full";
+  return state.consent.scope === "persistent" ? "gate-session" : "gate-full";
+}
+
+/* ============================================================================
+   Hold-to-confirm: timer is the source of truth (works under prefers-reduced-
+   motion, where the CSS fill transition is disabled). The fill is decorative.
+   Also honors keyboard hold (Enter/Space) for switch/keyboard access.
+   ============================================================================ */
+function holdButton(el, ms, onComplete) {
+  let timer = null;
+  const start = (e) => {
+    if (el.hasAttribute("disabled")) return;
+    if (e && e.type === "keydown" && !(e.key === "Enter" || e.key === " " || e.key === "Spacebar")) return;
+    if (e && e.type === "keydown" && e.repeat) return;
+    if (timer) return;
+    if (e && e.cancelable) e.preventDefault();
+    el.classList.add("holding");
+    timer = setTimeout(() => { cancel(); onComplete(); }, ms);
+  };
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    el.classList.remove("holding");
+  };
+  el.addEventListener("pointerdown", start);
+  el.addEventListener("pointerup", cancel);
+  el.addEventListener("pointerleave", cancel);
+  el.addEventListener("pointercancel", cancel);
+  el.addEventListener("keydown", start);
+  el.addEventListener("keyup", cancel);
+  el.addEventListener("blur", cancel);
+}
+
+/* ============================================================================
+   FULL GATE
+   ============================================================================ */
+const factsScroll = $("#factsScroll");
+const fullCross = $("#fullCross");
+const crossNote = $("#crossNote");
+let scrolledRead = false;
+
+function evalFullGateReady() {
+  const gappsChosen = $$('input[name="backend"]').find((r) => r.checked)?.value === "gapps";
+  const gappsAck = $("#gappsAck").checked;
+  $("#gappsConfirm").hidden = !gappsChosen;
+  let ready = scrolledRead;
+  let msg = "";
+  if (!scrolledRead) {
+    msg = state.lang === "pt-BR"
+      ? "Role e leia os cinco fatos para habilitar a passagem."
+      : "Scroll through and read the five facts to enable crossing.";
+  } else if (gappsChosen && !gappsAck) {
+    ready = false;
+    msg = state.lang === "pt-BR"
+      ? "Marque a confirmação reforçada do GApps para continuar."
+      : "Tick the louder GApps confirmation to continue.";
+  }
+  fullCross.disabled = !ready;
+  crossNote.textContent = msg;
+}
+function markScrolledIfDone() {
+  const el = factsScroll;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) {
+    scrolledRead = true;
+    $("#scrollHint").hidden = true;
+    evalFullGateReady();
+  }
+}
+factsScroll.addEventListener("scroll", markScrolledIfDone);
+$$('input[name="backend"]').forEach((r) => r.addEventListener("change", () => {
+  ui.backend = $$('input[name="backend"]').find((x) => x.checked).value;
+  evalFullGateReady();
+}));
+$("#gappsAck").addEventListener("change", evalFullGateReady);
+
+function commitCross() {
+  const scope = $$('input[name="scope"]').find((r) => r.checked)?.value === "persistent" ? "persistent" : "session";
+  state.consent.accepted = true;
+  state.consent.scope = scope;
+  state.consent.acceptedAtIso = nowIso();
+  state.killSwitch.engaged = false;
+  state.killSwitch.engagedAtIso = null;
+  ui.backend = $$('input[name="backend"]').find((r) => r.checked)?.value === "gapps" ? "gapps" : "microg";
+  saveState(); saveUi();
+  enterSession();
+}
+holdButton(fullCross, 1200, commitCross);
+$("#fullDecline").addEventListener("click", declineToBase);
+
+/* ============================================================================
+   SESSION GATE
+   ============================================================================ */
+holdButton($("#sessEnter"), 1200, () => {
+  state.killSwitch.engaged = false;
+  state.killSwitch.engagedAtIso = null;
+  saveState();
+  enterSession();
+});
+$("#sessBack").addEventListener("click", declineToBase);
+$("#sessFull").addEventListener("click", () => { resetFullGate(); show("gate-full"); });
+
+function declineToBase() { show("declined"); }
+$("#declReopen").addEventListener("click", () => { openEntryGate(); });
+
+function openEntryGate() {
+  const g = chooseEntryGate();
+  if (g === "gate-full") resetFullGate();
+  show(g);
+}
+function resetFullGate() {
+  scrolledRead = false;
+  $("#scrollHint").hidden = false;
+  // reflect stored backend choice
+  $$('input[name="backend"]').forEach((r) => { r.checked = (r.value === ui.backend); });
+  $$('input[name="scope"]').forEach((r) => { r.checked = (r.value === (state.consent.scope || "session")); });
+  $("#gappsAck").checked = false;
+  evalFullGateReady();
+  // if content is short enough that there's nothing to scroll, count as read
+  requestAnimationFrame(() => {
+    if (factsScroll.scrollHeight <= factsScroll.clientHeight + 8) {
+      scrolledRead = true; $("#scrollHint").hidden = true; evalFullGateReady();
+    }
+  });
+}
+
+/* ============================================================================
+   IN-SESSION
+   ============================================================================ */
+function enterSession() { syncBridgesUI(); renderIndicator(); show("session"); }
+
+function renderIndicator() {
+  const chip = $("#backendChip");
+  chip.dataset.backend = ui.backend;
+  chip.textContent = ui.backend === "gapps" ? "GApps" : "microG";
+  const dotsEl = $("#bridgeDots");
+  dotsEl.textContent = "";
+  const labels = { clipboard: "clip", files: "file", mic: "mic", camera: "cam", location: "loc" };
+  for (const k of BRIDGE_KEYS) {
+    const on = state.bridges[k] === true;
+    const d = document.createElement("span");
+    d.className = "dot";
+    d.dataset.on = on ? "1" : "0";
+    if (on && (k === "mic" || k === "camera")) d.dataset.live = "1";
+    d.textContent = labels[k];
+    d.setAttribute("aria-label", labels[k] + (on ? " on" : " off"));
+    dotsEl.appendChild(d);
+  }
+}
+function syncBridgesUI() {
+  $$('input[data-toggle]').forEach((t) => { t.checked = state.bridges[t.dataset.toggle] === true; });
+  $$('.bridge').forEach((b) => { b.dataset.on = state.bridges[b.dataset.bridge] === true ? "1" : "0"; });
+  $$('input[name="locprec"]').forEach((r) => { r.checked = (r.value === ui.locPrecision); });
+}
+
+$$('input[data-toggle]').forEach((toggle) => {
+  toggle.addEventListener("change", () => {
+    const key = toggle.dataset.toggle;
+    if (toggle.checked && toggle.dataset.consent) {
+      // mic/camera: revert until the micro-consent modal resolves
+      toggle.checked = false;
+      openMicroConsent(toggle.dataset.consent, key);
+      return;
+    }
+    setBridge(key, toggle.checked);
+  });
+});
+$$('input[name="locprec"]').forEach((r) => r.addEventListener("change", () => {
+  ui.locPrecision = $$('input[name="locprec"]').find((x) => x.checked).value; saveUi();
+}));
+
+function setBridge(key, on, pin) {
+  state.bridges[key] = on === true;
+  if (typeof pin === "boolean") ui.pins[key] = pin;
+  if (!on) delete ui.pins[key];
+  saveState(); saveUi();
+  syncBridgesUI(); renderIndicator();
+}
+
+$("#sessAbout").addEventListener("click", openAbout);
+$("#btnAbout").addEventListener("click", openAbout);
+$("#btnLeave").addEventListener("click", openKillSwitch);
+$("#sessLeave2").addEventListener("click", openKillSwitch);
+
+/* ---------- micro-consent modal (mic / camera) ---------- */
+let mcTarget = null;
+function openMicroConsent(kind, key) {
+  mcTarget = key;
+  const en = kind === "mic"
+    ? { t: "Microphone → Android", b: "You're about to feed your live mic into a non-attestable Android environment. An app with mic permission can record and may send audio to its servers. Turn this on only while you need it.", s: "Turn on for this session", k: "Keep on until I turn it off", c: "Cancel" }
+    : { t: "Camera → Android", b: "Feeds a live camera into Android. An app with camera permission sees and can upload the video. On only while you need it.", s: "This session", k: "Until I turn it off", c: "Cancel" };
+  const pt = kind === "mic"
+    ? { t: "Microfone → Android", b: "Você vai mandar seu microfone ao vivo para um ambiente Android não atestável. Um app com permissão de microfone pode gravar e talvez envie o áudio para os servidores dele. Ligue só enquanto precisar.", s: "Ligar nesta sessão", k: "Deixar ligado até eu desligar", c: "Cancelar" }
+    : { t: "Câmera → Android", b: "Envia uma câmera ao vivo para o Android. Um app com permissão de câmera vê e pode enviar o vídeo. Ligado só enquanto precisar.", s: "Nesta sessão", k: "Até eu desligar", c: "Cancelar" };
+  const L = state.lang === "pt-BR" ? pt : en;
+  $("#mcTitle").textContent = L.t;
+  $("#mcBody").textContent = L.b;
+  $("#mcSession").textContent = L.s;
+  $("#mcKeep").textContent = L.k;
+  $("#mcCancel").textContent = L.c;
+  $("#mcBack").dataset.open = "1";
+  $("#mcSession").focus();
+}
+function closeMicroConsent() { $("#mcBack").dataset.open = "0"; mcTarget = null; }
+$("#mcSession").addEventListener("click", () => { if (mcTarget) setBridge(mcTarget, true, false); closeMicroConsent(); });
+$("#mcKeep").addEventListener("click", () => { if (mcTarget) setBridge(mcTarget, true, true); closeMicroConsent(); });
+$("#mcCancel").addEventListener("click", closeMicroConsent);
+$("#mcBack").addEventListener("click", (e) => { if (e.target === $("#mcBack")) closeMicroConsent(); });
+
+/* ---------- About ---------- */
+let aboutFrom = "session";
+function openAbout() { aboutFrom = body.dataset.view; $("#aboutBackend").textContent = ui.backend === "gapps" ? "GApps" : "microG"; $("#aboutBackendPt").textContent = ui.backend === "gapps" ? "GApps" : "microG"; show("about"); }
+$("#aboutBack").addEventListener("click", () => show(aboutFrom === "about" ? "session" : aboutFrom));
+
+/* ============================================================================
+   KILL-SWITCH (Leave)
+   The "erase everything inside Android" checkbox arms the hold-to-confirm on
+   Stop & wipe. A full wipe re-arms the FULL gate next entry (first-entry status).
+   ============================================================================ */
+const ksBack = $("#ksBack");
+function openKillSwitch() {
+  $$('input[name="ksmode"]').forEach((r) => { r.checked = (r.value === "stop"); });
+  $("#ksErase").checked = false;
+  syncKsMode();
+  ksBack.dataset.open = "1";
+  $("#ksCancel").focus();
+}
+function closeKillSwitch() { ksBack.dataset.open = "0"; }
+function ksMode() { return $$('input[name="ksmode"]').find((r) => r.checked)?.value || "stop"; }
+function syncKsMode() {
+  const wipe = ksMode() === "wipe";
+  $("#ksErase").disabled = !wipe;
+  $("#eraseLine").style.opacity = wipe ? "1" : ".5";
+  if (!wipe) $("#ksErase").checked = false;
+  $("#ksStop").style.display = wipe ? "none" : "";
+  $("#ksWipe").style.display = wipe ? "" : "none";
+  $("#ksNote").textContent = "";
+}
+$$('input[name="ksmode"]').forEach((r) => r.addEventListener("change", syncKsMode));
+$("#ksCancel").addEventListener("click", closeKillSwitch);
+$("#ksBack").addEventListener("click", (e) => { if (e.target === ksBack) closeKillSwitch(); });
+
+/* Stop (soft): engage kill-switch, reset bridges, keep consent + installed apps. */
+$("#ksStop").addEventListener("click", () => {
+  resetBridges();
+  state.killSwitch.engaged = true;
+  state.killSwitch.engagedAtIso = nowIso();
+  saveState();
+  closeKillSwitch();
+  openEntryGate();
+});
+
+/* Stop & wipe. Without "erase everything": bridges off + engage, consent kept.
+   With "erase everything": full reset → first-entry status → FULL gate. */
+function doWipe() {
+  const erase = $("#ksErase").checked;
+  if (erase) {
+    const keepLang = state.lang;
+    state = defaultState();
+    state.lang = keepLang;
+    ui.backend = "microg"; ui.locPrecision = "coarse"; ui.pins = {};
+    saveState(); saveUi();
+    closeKillSwitch();
+    resetFullGate();
+    show("gate-full");
+  } else {
+    resetBridges();
+    state.killSwitch.engaged = true;
+    state.killSwitch.engagedAtIso = nowIso();
+    saveState();
+    closeKillSwitch();
+    openEntryGate();
+  }
+}
+/* hold-to-confirm required only when "erase everything" is armed; otherwise a
+   plain tap wipes the (recoverable) session. */
+(function wireWipe() {
+  const el = $("#ksWipe");
+  holdButton(el, 1200, () => { if ($("#ksErase").checked) doWipe(); });
+  el.addEventListener("click", () => { if (!$("#ksErase").checked) doWipe(); });
+})();
+function resetBridges() {
+  for (const k of BRIDGE_KEYS) state.bridges[k] = false;
+  ui.pins = {};
+  saveState(); saveUi();
+}
+
+/* ---------- global Esc: safe exit is always the Esc target ---------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("#mcBack").dataset.open === "1") { closeMicroConsent(); return; }
+  if (ksBack.dataset.open === "1") { closeKillSwitch(); return; }
+  const v = body.dataset.view;
+  if (v === "gate-full") { declineToBase(); }
+  else if (v === "gate-session") { declineToBase(); }
+  else if (v === "about") { show(aboutFrom === "about" ? "session" : aboutFrom); }
+});
+
+/* ---------- home wordmark: honest, goes to About ---------- */
+$("#btnHome").addEventListener("click", openAbout);
+
+/* ============================================================================
+   boot
+   ============================================================================ */
+applyTheme();
+applyLang();
+syncBridgesUI();
+renderIndicator();
+resetFullGate();
+show(chooseEntryGate());
+root.dataset.booted = "1"; // init completed without throwing
+</script>
+</body>
+</html>

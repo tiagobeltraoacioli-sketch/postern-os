@@ -1,0 +1,232 @@
+[package]
+name = "bloch-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Bloch-SIS desktop — full node companion (node control, wallet, miner, logs)"
+license = "MIT OR Apache-2.0"
+
+[lib]
+# A thin library target that re-exports only `terem` (src/lib.rs), so
+# `tests/*.rs` integration tests (compiled as a separate crate) can drive
+# terem.rs's guest-lifecycle functions directly without a live Tauri app
+# context. main.rs (the real app entry point) also `mod`s src/terem.rs
+# itself for its own #[tauri::command] registration — see main.rs's
+# `mod terem;`. The module is compiled twice (once per target); that is a
+# deliberate, disclosed duplication, not an accident.
+name = "bloch_desktop"
+path = "src/lib.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+# Pinned to the SAME rev every other consumer in this workspace uses (see root
+# Cargo.toml's [patch.crates-io] note + os/seal-gate/README.md's "dual-rev
+# dedupe — FIXED pre-box"). Was `branch = "main"` — a floating ref that
+# resolved bloch's internal path-deps (bloch-crypto/bloch-sis-pow/
+# coherence-core) to a SECOND, older git source (`#ce85756…`) alongside the
+# `rev = "dd8df3526…"` pin used directly by postern-courier/
+# postern-seal-companion/postern-consiglio-auth/mobile+desktop consumers —
+# importCargoLock cannot hold two revs of one crate, and this was the root
+# cause of the documented dual-git-rev Cargo.lock collision. Verified
+# `dd8df3526…` is a strict descendant of `ce85756…` and its workspace still
+# vendors all 5 needed crates — a safe, forward-only re-pin, not a downgrade.
+bloch = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+bloch-mobile = { path = "../../mobile/core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", features = ["json"] }
+hex = "0.4"
+# Postern in-process Tor layer — the wallet's RPC-over-Tor path (onion node).
+postern-tor = { path = "../../crates/postern-tor" }
+tokio = { version = "1", features = ["sync"] }
+# Audited Rust cores behind the Vault + Panic modules (replacing the JS previews).
+# postern-vault: Argon2id + XChaCha20-Poly1305 seal. postern-panic: the instant
+# denial-of-access re-lock (key + secrets evicted from RAM). Unaudited.
+postern-vault = { path = "../../crates/postern-vault" }
+postern-panic = { path = "../../crates/postern-panic" }
+zeroize = "1" # keep the derived vault key wiped from RAM on drop
+# postern-hygiene: the real metadata-scrub core (OOXML/ODF, JPEG, PNG, PDF)
+# behind the `hygiene_scrub` command — replaces the JS preview engine's
+# simulated OOXML/PDF reports. MIT/Apache deps only (zip, lopdf, sha3 — no
+# mat2/ExifTool). Unaudited, like everything here.
+postern-hygiene = { path = "../../crates/postern-hygiene" }
+base64 = "0.22" # MIT/Apache-2.0 — decode/encode the hygiene pane's file bytes
+# postern-quarantine: the real inbound-document safety core (the MIRROR of
+# hygiene — hygiene protects what you SEND, quarantine what you RECEIVE) behind
+# the `quarantine_rebuild` command. Images are decoded to raw pixels and
+# re-encoded to a clean PNG; PDFs are rendered page-by-page and rebuilt into a
+# flat, metadata-free PDF. `render-hayro` is ON so the PDF path has a renderer:
+# the pure-Rust `hayro` rasterizer (Apache-2.0 OR MIT — NOT poppler/mutool,
+# which are GPL/AGPL). HONESTY: the render runs IN-PROCESS with NO OS-level
+# containment (no out-of-process sandbox, no Landlock/seccomp around the
+# renderer, no wall-clock timeout); the image path's Landlock confinement is
+# Linux-only + best-effort. Office (.docx/OLE2) is NOT wired (it would spawn a
+# user-installed LibreOffice). Unaudited, like everything here.
+postern-quarantine = { path = "../../crates/postern-quarantine", features = ["render-hayro"] }
+
+# Phone-as-signer (v1: desktop requests a wallet-LOGIN signature from the paired
+# phone). The desktop holds NO wallet key: it only generates a per-session
+# EPHEMERAL channel keypair (inside postern-pairing) and composes the login
+# transcript. It now CONSUMES the two SHIPPED integration crates so the desktop
+# and postern-mobile-signer derive the SAME KEM-bound SAS and sign the SAME bytes
+# (one wire), instead of reimplementing the requester on a divergent stack:
+#   postern-pairing         — the QR-pinned ephemeral anchor + KEM-bound 6-digit
+#                             SAS (the real MITM tripwire) + the live forward-
+#                             secret, replay-guarded encrypted Channel. Path dep;
+#                             it carries its own empty [workspace].
+#   postern-signer-protocol — the DesktopRequester side: composes the SignRequest
+#                             (fresh nonce + monotonic counter + session binding)
+#                             and matches the phone's Approval — the exact wire
+#                             types the phone decodes. Path dep; own [workspace].
+#   postern-policy          — the shared consent kernel (Expiry / Revocation /
+#                             fail-closed Decision / typed EnforcementMode) for the
+#                             scoped, expiring, revocable grants list.
+#   bloch-crypto            — the hybrid Falcon‖ML-DSA VERIFIER. F-3: the desktop
+#                             verifies the phone's returned signature over the login
+#                             transcript BEFORE minting a grant (fail closed). Same
+#                             pinned rev as bloch-mobile (the phone's signer), so
+#                             the two ends run byte-identical crypto.
+postern-pairing = { path = "../../integration/pairing" }
+postern-signer-protocol = { path = "../../integration/signer-protocol" }
+postern-policy = { path = "../../crates/postern-policy" }
+# Courier — the hybrid post-quantum payload seal (ML-KEM-1024 + X25519 →
+# XChaCha20-Poly1305) behind the `courier_*` commands (courier.rs), replacing
+# the pane's classical ECDH-P256 preview KEM. Crypto seal only in this build:
+# the `onion-transport` feature stays OFF (no arti/Tor process, no network) —
+# the live drop remains behind the crate's DropSender/DropFetcher trait seam,
+# exercised offline via MockDrop in tests. UNAUDITED, MIT OR Apache-2.0.
+postern-courier = { path = "../../crates/postern-courier" }
+# Keys — the passkey/FIDO2 ES256 credential core behind the `keys_*` commands
+# (keys.rs). SOFTWARE authenticator: credentials live in app RAM only (the
+# crate's SigningKey/prf_seed are zeroize-on-drop), no hardware key, not a TEE
+# until real hardware. UNAUDITED, MIT OR Apache-2.0.
+postern-keys = { path = "../../crates/postern-keys" }
+# Vestnik — the Postern Messenger E2EE core behind the `vestnik_*` commands
+# (vestnik.rs). DEFAULT features only: the real, homeserver-free native Megolm
+# channel (channel/store/transport over vodozemac). The `matrix` feature
+# (matrix-rust-sdk federation) and `tor` feature stay OFF here — no account,
+# no server, no live network in this build. UNAUDITED, MIT OR Apache-2.0.
+postern-messenger = { path = "../../crates/postern-messenger" }
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+time = { version = "0.3", features = ["formatting"] } # RFC-3339 grant expiry strings
+# Encrypted Backup pane (backup.rs) — the LOCAL Postern → Filecoin user-backup
+# path. bloch-data (data/postern-data): the DATA0 anchor + PBM0/PBP0 codecs +
+# the StorageBackend/Sealer seams — SCAFFOLD, UNAUDITED, ZERO deps; its
+# LiveBackend (Filecoin upload) is a todo!() stub we NEVER call. It carries its
+# own empty [workspace], so it's added to the root Cargo.toml `exclude` list
+# (like the integration crates) to avoid a second-workspace-root collision.
+# postern-core: the REAL Postern AEAD seal (XChaCha20-Poly1305 v2,
+# key-committing) + Argon2id KDF the pane encrypts under — keys/passphrase never
+# leave the device. sha3: real SHAKE-256 (the PQ manifest_root, re-verified on
+# restore) + SHA3-256 (signer_commit). Unaudited, like everything here.
+bloch-data = { path = "../../data/postern-data" }
+postern-core = { path = "../../crates/postern-core" }
+sha3 = "0.10"
+# Swap / DEX pane (swap.rs) — REAL PosternDex (Uniswap-v2-model) constant-product
+# quote math over 256-bit integers (18-dp wei overflow u128 in the intermediate
+# product) + real EVM ABI calldata (keccak256 selectors via the sha3 above).
+# HONESTY: PosternDex + the Bloch EVM L2 are DESIGN-SCAFFOLD, NOT live — quote
+# math + calldata are real/tested, on-chain execution is PREVIEW. Already in the
+# workspace lock (no new fetch). MIT OR Apache-2.0.
+primitive-types = "0.13"
+
+# --- feature `vestnik-matrix` only (OFF by default) --------------------------
+# NOTE: postern-messenger is declared once above (default features, always
+# present for the homeserver-free Megolm channel). Its `matrix` slice (the
+# matrix-rust-sdk client behind vestnik_login/rooms/send…) is turned on by the
+# `vestnik-matrix` feature below via `postern-messenger/matrix` — Cargo forbids
+# a second declaration of the same dependency key, so the opt-in lives in
+# [features], NOT a duplicate entry here. With the feature OFF the commands
+# stay registered and return a clean "not built with matrix support" error.
+# matrix-sdk directly ONLY to name ruma identifier types (RoomId parsing) on
+# the command surface — the client itself is postern-messenger's
+# MatrixMessenger. Same version + features as postern-messenger's own dep, so
+# cargo unifies them into ONE matrix-sdk in the tree (no second copy).
+matrix-sdk = { version = "0.18", default-features = false, features = ["e2e-encryption", "sqlite"], optional = true }
+
+[features]
+# Opt-in OS-keychain unlock for the vault pane (OFF by default). HONESTY —
+# keychain unlock is a SOFTWARE convenience, not hardware protection: the
+# vault key is stored in the OS login keychain (macOS Keychain / freedesktop
+# Secret Service) and is released to any process running as this user. Not a
+# TEE until real hardware (no StrongBox / Secure Enclave / SEV key-wrap
+# exists here) — UNAUDITED, like everything in this repo.
+#
+# Mapping note: cargo `[features]` cannot be target-conditional, so this
+# turns on BOTH per-OS backends in postern-vault; the per-OS scoping happens
+# inside postern-vault itself, whose modules are gated
+# `cfg(all(target_os = "…", feature = "keychain-…"))` and whose native deps
+# (security-framework / secret-service) live in `[target.'cfg(…)']` tables.
+# Net effect: keychain-macos on macOS, keychain-linux on Linux, and only the
+# plain `keychain` abstraction (trait + InMemoryKeyStore) elsewhere — exactly
+# one backend ever compiles per target. With the feature OFF, the three
+# `vault_keychain_*` commands still exist but return a clean "not built with
+# keychain support" error (never a silent no-op).
+vault-keychain = [
+    "postern-vault/keychain",
+    "postern-vault/keychain-macos",
+    "postern-vault/keychain-linux",
+]
+
+# Opt-in Matrix client in the desktop backend (OFF by default) — mirrors the
+# `vault-keychain` pattern exactly. matrix-sdk is a heavy dependency tree, so
+# the default desktop build deliberately does not carry it; with the feature
+# ON, vestnik_client.rs drives postern-messenger's MatrixMessenger (login /
+# sync / tier-gated send / sealed-session custody wired end-to-end).
+#
+# HONESTY — carried on every command response (vestnik_client::HONESTY):
+# built-with-feature-only; a homeserver is contacted ONLY when the user acts
+# (never in CI, never at app startup); the homeserver sees the social graph
+# (no Tor wiring on this path); Megolm/Olm is classical Curve25519, not
+# post-quantum; sealed-at-rest covers the SavedSession blob ONLY; the SDK's
+# sqlite store passphrase is SDK-layer encryption only (not PQ-vault-wrapped);
+# UNAUDITED, like everything in this repo. With the feature OFF the
+# `vestnik_matrix_status`/`vestnik_login`/… commands still exist but return a
+# clean "not built with matrix support" error (never a silent no-op) and
+# vestnik_matrix_status reports { built: false, … } so the pane gates on real
+# capability.
+vestnik-matrix = ["postern-messenger/matrix", "dep:matrix-sdk"]
+
+[dev-dependencies]
+# zip (MIT) — build the minimal in-test DOCX fixture and read scrubbed entries
+# back in tests/hygiene_scrub.rs. Already in the tree via postern-hygiene.
+zip = "2"
+# image (MIT OR Apache-2.0) — TEST-ONLY: build a real, decodable 3x2 JPEG with a
+# spliced EXIF APP1 segment and decode the rebuilt PNG in tests/quarantine.rs.
+# Same lean feature set (png/jpeg) the postern-quarantine core uses; already in
+# the tree via that dependency, so no new crate is pulled.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+# TEST-ONLY re-declaration of the courier dep to turn on its `mock-transport`
+# feature for dev builds: exposes `drop_transport::MockDrop` (the in-memory
+# stored-bytes drop behind the DropSender/DropFetcher seam) so
+# tests/courier_core.rs drives the seal → drop → open pipeline entirely
+# OFFLINE. It moves no bytes anywhere and is not a transport-security claim;
+# the feature never reaches a shipping build (dev-dependencies only affect
+# test/example targets). The live onion path stays behind the crate's
+# `onion-transport` feature (off here) with its own #[ignore]d live test.
+postern-courier = { path = "../../crates/postern-courier", features = ["mock-transport"] }
+# TEST-ONLY matrix-sdk re-declaration turning on its `testing` feature:
+# exposes matrix_sdk::test_utils::mocks::MatrixMockServer (a LOOPBACK wiremock
+# homeserver) so tests/vestnik_client.rs drives login → seal → store → open →
+# restore and the tier-gated send refusal entirely OFFLINE — no real
+# homeserver is ever contacted by any test. dev-dependencies only affect
+# test/example targets, so `testing` (and wiremock) never reach a shipping
+# build. Same version/base features as the optional runtime dep — one
+# matrix-sdk in the lockfile.
+matrix-sdk = { version = "0.18", default-features = false, features = ["e2e-encryption", "sqlite", "testing"] }
+# #[tokio::test] for the async vestnik_client cores (the runtime the live app
+# gets from Tauri v2 itself; tests need their own).
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+
+# The matrix-client integration test only exists (and only compiles matrix
+# code) when the opt-in `vestnik-matrix` feature is on — same pattern as
+# postern-messenger's own `matrix_live` test target.
+[[test]]
+name = "vestnik_client"
+required-features = ["vestnik-matrix"]
+
+[[bin]]
+name = "bloch-desktop"
+path = "src/main.rs"

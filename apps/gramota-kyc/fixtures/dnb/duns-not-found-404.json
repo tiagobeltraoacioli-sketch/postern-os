@@ -1,0 +1,8 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs; NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "https://directplus.documentation.dnb.com/ (standard Direct+ error envelope, HTTP 404 — DUNS not found / not assigned)",
+  "error": {
+    "errorCode": "NOTFOUND",
+    "errorMessage": "The requested DUNS number could not be found."
+  }
+}

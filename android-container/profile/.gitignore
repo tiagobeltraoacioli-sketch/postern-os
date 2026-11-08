@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Build outputs and machine-local config for the Porog (Postern Container) DPC
+# app shell. The committed source builds a real debug APK via
+#   ./gradlew :app:assembleDebug
+# but none of the generated artifacts below belong in the repo.
+
+# Gradle / AGP build outputs
+/build/
+/app/build/
+.gradle/
+
+# Machine-local SDK path (each host points sdk.dir at its own Android SDK)
+local.properties
+
+# IDE
+/.idea/
+*.iml

@@ -1,0 +1,61 @@
+{
+  "//": "SPDX-License-Identifier: MIT OR Apache-2.0 — Records of Processing Activities (ROPA) TEMPLATE. GDPR Art. 30 / LGPD Art. 37. NOT LEGAL ADVICE. This is a fill-in template the controller (the employer) completes and maintains; Postern Labs is at most a processor. Bracketed [ ] fields are for the controller/DPO to complete. Validate as JSON with self-check.mjs.",
+  "schema": "postern.comms.ropa/1",
+  "controller": {
+    "name": "[Employer legal name]",
+    "contact": "[address / email]",
+    "dpo": "[DPO name & contact — required where Art. 37 / LGPD Art. 41 applies]",
+    "representative": "[EU/BR representative if controller is outside the region]"
+  },
+  "processor": {
+    "name": "Postern Labs (software provider) — role depends on deployment; self-hosted = no processor role",
+    "note": "In self-hosted/on-prem mode Postern Labs operates no server and processes no personal data."
+  },
+  "processingActivities": [
+    {
+      "id": "message-delivery",
+      "purpose": "Deliver end-to-end-encrypted messages between employees",
+      "lawfulBasis": "[legitimate interest — document the balancing test] (GDPR Art. 6(1)(f) / LGPD Art. 7 IX)",
+      "dataClasses": ["message.content.e2ee", "message.metadata"],
+      "dataSubjects": "Employees / authorised org members",
+      "recipients": "Message recipients within the org; the operator processes ciphertext + metadata only",
+      "retention": "See retention-policy.json (content-ciphertext 365d, metadata 90d — controller to confirm)",
+      "residency": "[eu | br | self-hosted]",
+      "crossBorderTransfer": "[none | mechanism under GDPR Art. 44-49 / LGPD Art. 33-36]",
+      "securityMeasures": "End-to-end encryption of content; TLS in transit; tamper-evident admin-audit trail",
+      "controllerCanReadContent": false
+    },
+    {
+      "id": "directory-management",
+      "purpose": "Provision and manage employee accounts & org directory",
+      "lawfulBasis": "[contract / legal obligation] (GDPR Art. 6(1)(b/c) / LGPD Art. 7 V/II)",
+      "dataClasses": ["directory.identity", "device.managed-config"],
+      "dataSubjects": "Employees / authorised org members",
+      "recipients": "Org admins",
+      "retention": "Duration of employment relationship (+ any legal-obligation override — document it)",
+      "residency": "[eu | br | self-hosted]",
+      "crossBorderTransfer": "[none | mechanism]",
+      "securityMeasures": "Access-controlled admin console; disclosed audit trail",
+      "controllerCanReadContent": true
+    },
+    {
+      "id": "admin-accountability",
+      "purpose": "Record admin actions for accountability & employee transparency",
+      "lawfulBasis": "[legal obligation / legitimate interest] (GDPR Art. 6(1)(c/f) / LGPD Art. 7 II/IX)",
+      "dataClasses": ["audit.admin-action"],
+      "dataSubjects": "Admins (actors) and affected employees (subjects)",
+      "recipients": "Affected employees (visible to them) and org admins",
+      "retention": "730 days (accountability window — controller to confirm)",
+      "residency": "[eu | br | self-hosted]",
+      "crossBorderTransfer": "[none | mechanism]",
+      "securityMeasures": "Append-only, SHA-256 hash-chained, tamper-evident, NO covert/content events",
+      "controllerCanReadContent": false
+    }
+  ],
+  "dsarProcess": {
+    "intake": "Documented request → identity verification → rights-engine.mjs routing",
+    "responseWindows": "LGPD Art. 19: 15 days (full). GDPR Art. 12(3): 1 month (+2 if complex).",
+    "honestLimit": "Employer-served requests cannot produce/rectify E2EE content; the subject self-serves that from their own client."
+  },
+  "reviewGate": "This ROPA and the whole deployment require legal review + a real data-protection audit BEFORE production. Adherence-by-design is not certified compliance."
+}

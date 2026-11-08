@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# sla-policy.yaml — Postern Enterprise support SLA targets.
+#
+# These are RESPONSE-time targets (time to a substantive human reply), not
+# resolution guarantees: a fix depends on the problem. The paid product is the
+# WORK and the ASSURANCE of a response window — never a promise that any given
+# bug is instantly solvable, and never any claim of a secured/audited product.
+#
+# Business = free 6-month evaluation, then a paid licence (fiat, not the coin).
+# Support/SLA is the paid work. Personal editions stay free. No telemetry.
+schema: postern.enterprise.sla-policy/v1
+
+# Business hours used for tiers whose targets are expressed in business hours.
+business_hours:
+  timezone: "UTC"
+  days: ["Mon", "Tue", "Wed", "Thu", "Fri"]
+  start: "09:00"
+  end: "17:00"
+
+tiers:
+  community:
+    description: >-
+      Best-effort, no guarantee. Community edition and personal products.
+      Never sold, never an SLA. Included here so the scaffold can classify it.
+    paid: false
+    response_targets: {}   # no committed targets
+
+  eval:
+    description: >-
+      Free 6-month business evaluation. Best-effort support so an operator can
+      trial self-hosting. No paid SLA yet; converts to business/enterprise on
+      licensing.
+    paid: false
+    eval_window_days: 183
+    response_targets:
+      sev1: "1 business day"
+      sev2: "2 business days"
+      sev3: "5 business days"
+      sev4: "best effort"
+
+  business:
+    description: >-
+      Paid licence. Business-hours SLA response targets.
+    paid: true
+    billing: "fiat licence + support fee; not the coin"
+    response_targets:
+      sev1: "4 business hours"
+      sev2: "8 business hours"
+      sev3: "2 business days"
+      sev4: "5 business days"
+
+  enterprise:
+    description: >-
+      Paid licence. Priority SLA with tighter, partly 24x7 response targets for
+      the most severe issues. Still a RESPONSE commitment, not a resolution or
+      security guarantee.
+    paid: true
+    billing: "fiat licence + priority support fee; not the coin"
+    coverage:
+      sev1: "24x7"
+      other: "business hours"
+    response_targets:
+      sev1: "1 hour (24x7)"
+      sev2: "4 business hours"
+      sev3: "1 business day"
+      sev4: "3 business days"
+
+# Severity definitions shared across tiers.
+severities:
+  sev1: "Critical — production outage or data-loss risk in a self-hosted deployment."
+  sev2: "Major — core function broken, no acceptable workaround."
+  sev3: "Minor — degraded or inconvenient; workaround exists."
+  sev4: "Question / informational."
+
+# Explicit non-commitments — kept honest.
+disclaimers:
+  - "Response targets are time-to-first-substantive-reply, not time-to-resolution."
+  - "No SLA implies the software is secure, audited, attested, or production-ready."
+  - "Reproducible-by-design is not reproduced; verification stays the customer's right."
+  - "The coin is not a security and is never the billing instrument; support is billed in fiat."
+  - "No telemetry backs these SLAs — tracking is from customer-opened tickets only."

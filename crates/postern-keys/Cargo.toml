@@ -1,0 +1,23 @@
+[package]
+name = "postern-keys"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs passkey/FIDO2 authenticator core — WebAuthn ES256 credentials whose private keys are sealed in the Postern Vault (Argon2id + XChaCha20-Poly1305 at rest today; TEE key-wrap is planned app-layer work, not shipped). Fills the identity/auth gap the permissive field leaves open (Bitwarden/KeePassXC are copyleft)."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_keys"
+
+[dependencies]
+# The canonical Postern seal (Argon2id KDF + versioned key-committing
+# XChaCha20-Poly1305 AEAD) — same engine postern-vault consumes. Reused for
+# the passphrase-sealed credential export; zero new external crypto code.
+postern-core = { path = "../postern-core" }
+# p256 ES256 (WebAuthn's default algorithm) — RustCrypto, Apache-2.0/MIT.
+p256 = { version = "0.13", features = ["ecdsa"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+thiserror = "2"
+zeroize = "1"               # wipe secrets from RAM (see ZeroizeOnDrop assertion in lib.rs)
+# PRF extension (WebAuthn `prf` / CTAP2 `hmac-secret`) — RustCrypto, Apache-2.0/MIT.
+hmac = "0.12"
+sha2 = "0.10"               # promoted from dev-dependencies: PRF input hashing needs it

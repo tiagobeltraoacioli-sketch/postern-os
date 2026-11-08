@@ -1,0 +1,3035 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Content-Security-Policy — defense-in-depth, not "security" on its own.
+
+  script-src's hash pins the ONE executable inline <script> (below) by
+  sha256 hash, so 'unsafe-inline' is dropped. The command anchors on the script's
+  "use strict" prologue so it never matches this comment's own <script> text.
+  RECOMPUTE after ANY edit to the executable script (this file is served
+  verbatim — no build step — so the served bytes == these bytes):
+
+    node -e 'const f=require("fs").readFileSync("apps/vedetta/index.html","utf8");const s=f.indexOf("<script>\n\"use strict")+8;const e=f.indexOf("</script>",s);console.log("sha256-"+require("crypto").createHash("sha256").update(f.slice(s,e),"utf8").digest("base64"))'
+
+  style-src keeps 'unsafe-inline' on purpose: there is a hand-maintained
+  <style> block and no build step hashes it, so a hash-only style policy
+  would be brittle in this hand-maintained, no-build-step file.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-InJdjAMHhGr+mCF9DjOMpqAkfPsi6AcnuKtGYTmHj8A='; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src data:; connect-src https://api.anthropic.com https://api.coingecko.com https://api.frankfurter.dev https://finnhub.io https://query1.finance.yahoo.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Vedetta — a quiet lookout on the markets · Postern Labs</title>
+<style>
+/* ============================================================
+   VEDETTA · Postern Labs
+   "vedetta" — the lookout post. A markets watch that watches
+   the market, not you. Graphite/ink instrument panel with a
+   steel-blue accent (Sotto's sibling; Sotto wears brass).
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #0d1014;
+  --bg-glow:   #10141b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e8ec;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --acc:       #6fa3dc;   /* steel blue — Vedetta's own accent */
+  --acc-hi:    #8fbceb;
+  --acc-dim:   #47688f;
+  --acc-ink:   #0b1118;
+
+  --live:      #e4574f;   /* mic hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+  --up:        #63ab7c;
+  --down:      #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --scrim:  rgba(6,8,10,.62);
+  --radius: 14px;
+}
+
+:root[data-theme="light"] {
+  --bg:        #f0eff3;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #eceae2;
+  --surface-3: #e3e0d5;
+  --border:    #d5d0c4;
+  --border-hi: #bdb7a8;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --acc:       #2d5f9e;
+  --acc-hi:    #234b7d;
+  --acc-dim:   #5b82ad;
+  --acc-ink:   #f6faff;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+  --up:        #2f7a4d;
+  --down:      #b1443d;
+
+  --shadow: 0 14px 40px rgba(40,50,64,.14);
+  --scrim:  rgba(30,36,46,.42);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0eff3; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#eceae2;
+    --surface-3:#e3e0d5; --border:#d5d0c4; --border-hi:#bdb7a8;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --acc:#2d5f9e; --acc-hi:#234b7d; --acc-dim:#5b82ad; --acc-ink:#f6faff;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --up:#2f7a4d; --down:#b1443d;
+    --shadow: 0 14px 40px rgba(40,50,64,.14);
+    --scrim: rgba(30,36,46,.42);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--acc); color: var(--acc-ink); }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+}
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 17px; font-weight: 700;
+  letter-spacing: .34em; text-indent: .34em;
+  color: var(--text);
+  user-select: none;
+  white-space: nowrap;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+  margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn[data-attn="1"] { border-color: var(--acc); color: var(--acc); }
+.hbtn.vault-open { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+.hbtn.vault-locked { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+
+/* honesty strip — always visible, never hidden */
+.honesty {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap; text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
+}
+.honesty b { color: var(--text-dim); font-weight: 600; }
+
+/* ---------- hero / orb ---------- */
+.hero { text-align: center; padding: 30px 0 6px; }
+
+.orb-stage { position: relative; width: 180px; height: 180px; margin: 0 auto; }
+
+.orb {
+  position: absolute; inset: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  background:
+    radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--acc) 26%, transparent), transparent 58%),
+    radial-gradient(circle at 68% 78%, color-mix(in srgb, var(--acc-dim) 20%, transparent), transparent 55%),
+    linear-gradient(160deg, var(--surface-3), var(--surface));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 0 0 1px color-mix(in srgb, var(--acc) 10%, transparent),
+    0 0 46px color-mix(in srgb, var(--acc) 13%, transparent),
+    var(--shadow);
+  display: grid; place-items: center;
+  -webkit-user-select: none; user-select: none;
+  touch-action: none;
+  transition: box-shadow .25s, transform .15s;
+  padding: 0;
+}
+.orb:active { transform: scale(.985); }
+
+.orb-glyph { width: 48px; height: 48px; color: var(--acc); pointer-events: none; }
+.orb-glyph .bar { transform-origin: center 50%; }
+
+.orb-ring {
+  position: absolute; inset: 10px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--acc) 30%, transparent);
+  pointer-events: none;
+  transition: border-color .25s, inset .25s;
+}
+.orb-ring.outer {
+  inset: 0;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--border-hi) 70%, transparent);
+  opacity: .7;
+}
+
+@keyframes breathe   { 0%,100% { transform: scale(1); opacity:.75 } 50% { transform: scale(1.035); opacity: 1 } }
+@keyframes spin      { to { transform: rotate(360deg); } }
+@keyframes livepulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent), var(--shadow); }
+                       55%     { box-shadow: 0 0 0 16px transparent, var(--shadow); } }
+@keyframes barTalk   { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
+@keyframes barListen { 0%,100% { transform: scaleY(.3) } 50% { transform: scaleY(1.15) } }
+
+body[data-state="idle"] .orb-ring:not(.outer) { animation: breathe 4.5s ease-in-out infinite; }
+
+body[data-state="listening"] .orb {
+  border-color: var(--live);
+  animation: livepulse 1.3s ease-out infinite;
+}
+body[data-state="listening"] .orb-ring:not(.outer) { border-color: color-mix(in srgb, var(--live) 65%, transparent); }
+body[data-state="listening"] .orb-glyph { color: var(--live); }
+body[data-state="listening"] .orb-glyph .bar { animation: barListen 0.9s ease-in-out infinite; }
+body[data-state="listening"] .orb-glyph .bar:nth-child(2) { animation-delay: .12s }
+body[data-state="listening"] .orb-glyph .bar:nth-child(3) { animation-delay: .24s }
+body[data-state="listening"] .orb-glyph .bar:nth-child(4) { animation-delay: .36s }
+body[data-state="listening"] .orb-glyph .bar:nth-child(5) { animation-delay: .48s }
+
+body[data-state="thinking"] .orb-ring.outer {
+  border-color: color-mix(in srgb, var(--acc) 55%, transparent);
+  animation: spin 2.6s linear infinite;
+}
+
+body[data-state="speaking"] .orb-glyph .bar { animation: barTalk 0.7s ease-in-out infinite; }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(2) { animation-delay: .1s }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(3) { animation-delay: .2s }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(4) { animation-delay: .3s }
+body[data-state="speaking"] .orb-glyph .bar:nth-child(5) { animation-delay: .4s }
+body[data-state="speaking"] .orb-ring:not(.outer) { border-color: color-mix(in srgb, var(--acc) 60%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  body[data-state="listening"] .orb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 45%, transparent), var(--shadow); }
+}
+
+/* mic-live badge — prominent + unambiguous */
+.mic-live {
+  display: none;
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  align-items: center; gap: 7px;
+  background: var(--live); color: #fff;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em;
+  padding: 4px 12px; border-radius: 999px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--live) 50%, transparent);
+  z-index: 5; white-space: nowrap;
+}
+.mic-live .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: breathe 1s infinite; }
+body[data-state="listening"] .mic-live { display: inline-flex; }
+
+.status-line {
+  min-height: 1.6em;
+  margin: 18px auto 2px;
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 620px;
+}
+.status-line .hint-key {
+  font-family: var(--font-mono); font-size: 11px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 7px; margin: 0 2px;
+  color: var(--muted); background: var(--surface-2);
+}
+.status-line[data-tone="err"]  { color: var(--err); }
+.status-line[data-tone="live"] { color: var(--live); font-weight: 500; }
+
+/* ---------- example chips ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 12px 0 4px; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: 6px 14px;
+  font-size: 13px; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.chip:hover { border-color: var(--acc); color: var(--text); background: var(--surface-2); }
+
+/* ---------- the board (watchlist / portfolio / alerts) ---------- */
+.board { display: grid; gap: 14px; grid-template-columns: 1fr; margin: 22px 0 4px; }
+@media (min-width: 780px) {
+  .board { grid-template-columns: 1fr 1fr; }
+  .panel.wide { grid-column: 1 / -1; }
+}
+
+.panel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+.panel-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 11.5px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--acc);
+  font-weight: 700;
+}
+.panel-head .spacer { margin-left: auto; }
+.pbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px 10px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-dim);
+}
+.pbtn:hover { border-color: var(--border-hi); color: var(--text); }
+.panel-body { padding: 6px 8px; overflow-x: auto; }
+.panel-foot {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .04em;
+  color: var(--muted);
+  padding: 7px 14px 9px; border-top: 1px dashed var(--border);
+  min-height: 1em;
+}
+.panel-foot[data-tone="err"] { color: var(--err); }
+
+.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tbl th {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.tbl td { padding: 7px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); vertical-align: baseline; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .num { text-align: right; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+.tbl th.num { text-align: right; }
+.tbl .sym { font-family: var(--font-mono); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+.tbl .name { color: var(--text-dim); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos { color: var(--up); }
+.neg { color: var(--down); }
+.tbl .rm {
+  background: none; border: 0; color: var(--muted); font-size: 13px;
+  line-height: 1; padding: 2px 6px; border-radius: 6px;
+}
+.tbl .rm:hover { color: var(--err); background: var(--surface-2); }
+.tbl .tot td { border-top: 1px solid var(--border); font-weight: 600; }
+
+.empty-row { color: var(--muted); font-size: 12.5px; padding: 14px 10px; }
+
+.mini-form { display: flex; gap: 6px; padding: 8px; flex-wrap: wrap; border-top: 1px dashed var(--border); }
+.mini-form input, .mini-form select {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 9px; font-size: 12.5px; color: var(--text);
+  min-width: 0;
+}
+.mini-form input:focus, .mini-form select:focus { border-color: var(--acc); outline: none; }
+.mini-form input.grow { flex: 1 1 90px; }
+.mini-form button {
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 8px; padding: 5px 12px; font-size: 12.5px; color: var(--text-dim);
+}
+.mini-form button:hover { border-color: var(--acc); color: var(--text); }
+
+.alert-badge {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+  border-radius: 999px; padding: 1px 8px; text-transform: uppercase;
+}
+.alert-badge.armed { color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.alert-badge.hit { color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 55%, var(--border)); }
+
+/* vault banners inside the board */
+.vault-note {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 6%, var(--surface));
+  border-radius: 12px; padding: 10px 14px;
+  font-size: 13px; color: var(--text-dim);
+}
+.vault-note.locked { border-color: color-mix(in srgb, var(--acc) 55%, var(--border)); background: color-mix(in srgb, var(--acc) 6%, var(--surface)); }
+.vault-note .vbtn {
+  margin-left: auto;
+  border: 1px solid var(--border-hi); background: var(--surface-2);
+  border-radius: 8px; padding: 5px 12px; font-size: 12.5px;
+}
+.vault-note .vbtn:hover { border-color: var(--acc); }
+
+/* ---------- transcript ---------- */
+.transcript { list-style: none; margin: 22px 0 0; padding: 0 0 20px; display: flex; flex-direction: column; gap: 14px; }
+.turn { display: flex; flex-direction: column; max-width: 86%; }
+.turn.user { align-self: flex-end; align-items: flex-end; }
+.turn.assistant { align-self: flex-start; }
+.turn .who {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); margin: 0 6px 4px;
+}
+.turn .bubble {
+  padding: 11px 15px; border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: 15px;
+}
+.turn.user .bubble {
+  background: color-mix(in srgb, var(--acc) 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--acc) 38%, var(--border));
+  border-bottom-right-radius: 5px;
+}
+.turn.assistant .bubble { border-bottom-left-radius: 5px; }
+.turn.assistant .bubble.streaming::after {
+  content: "▍"; color: var(--acc);
+  animation: breathe 1s infinite;
+}
+.turn .sys {
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  border: 1px dashed var(--border); border-radius: 10px; padding: 7px 12px;
+}
+.empty-hint { text-align: center; color: var(--muted); font-size: 13.5px; padding: 20px 0 8px; }
+
+/* ---------- composer ---------- */
+.composer-dock {
+  position: sticky; bottom: 0; z-index: 15;
+  padding: 12px 0 18px;
+  background: linear-gradient(transparent, var(--bg) 34%);
+}
+.composer {
+  display: flex; gap: 8px; align-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--acc) 60%, var(--border)); }
+.composer input[type="text"] {
+  flex: 1; background: none; border: 0; outline: none;
+  padding: 8px 10px; font-size: 15px; color: var(--text); min-width: 0;
+}
+.composer input::placeholder { color: var(--muted); }
+.cbtn {
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 11px; width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  color: var(--text-dim);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.cbtn:hover { color: var(--text); border-color: var(--border-hi); }
+.cbtn svg { width: 18px; height: 18px; }
+.cbtn.primary { background: var(--acc); border-color: var(--acc); color: var(--acc-ink); }
+.cbtn.primary:hover { background: var(--acc-hi); border-color: var(--acc-hi); color: var(--acc-ink); }
+.cbtn[aria-pressed="true"] { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+.cbtn:disabled { opacity: .45; cursor: not-allowed; }
+.composer-foot {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 11.5px; color: var(--muted); padding: 8px 6px 0;
+  font-family: var(--font-mono); letter-spacing: .02em;
+}
+.composer-foot .lock { color: var(--acc); }
+.composer-foot button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+  font: inherit;
+}
+.composer-foot button.linkish:hover { color: var(--text-dim); }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  width: min(620px, calc(100vw - 36px));
+  max-height: min(86vh, 780px);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: var(--scrim); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc);
+  font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+
+.field { margin-bottom: 18px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field .fhelp.warn { color: var(--warn); }
+.field input[type="password"], .field input[type="text"], .field input[type="number"], .field select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+}
+.field input:focus, .field select:focus { border-color: var(--acc); outline: none; }
+.keyrow { display: flex; gap: 8px; }
+.keyrow input { flex: 1; font-family: var(--font-mono); font-size: 13px; }
+.keyrow .hbtn { flex: none; }
+.field input[type="range"] { width: 100%; accent-color: var(--acc); }
+.field input[type="checkbox"] { accent-color: var(--acc); width: 15px; height: 15px; }
+.checkrow { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+.checkrow .fhelp { margin-top: 2px; }
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s, background .15s; }
+.radio-card:hover { border-color: var(--border-hi); background: var(--surface-2); }
+.radio-card:has(input:checked) { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 8%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--acc); }
+.radio-card .rc-t { font-size: 14px; }
+.radio-card .rc-d { font-size: 12px; color: var(--muted); }
+.radio-card input:disabled ~ div { opacity: .55; }
+.subfield { margin: 8px 0 0 26px; }
+
+.dlg-section {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+  border-top: 1px solid var(--border); margin: 22px -20px 16px; padding: 14px 20px 0;
+}
+
+.danger-zone { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 16px; }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 600;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-plain {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-plain:hover { border-color: var(--border-hi); color: var(--text); }
+.vault-err { color: var(--err); font-size: 13px; min-height: 1.2em; margin: 6px 0 0; }
+
+/* privacy ledger */
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 10px 0 16px; }
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; line-height: 1.4; }
+.ledger-row.local .mark { color: var(--ok); }
+.ledger-row.leaves .mark { color: var(--warn); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0 0 4px; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row p:last-child { margin-bottom: 0; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--acc); }
+.pv-note { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+
+/* footer */
+footer.site {
+  padding: 8px 0 26px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .byline { display: none; }
+  .turn { max-width: 94%; }
+  .composer-foot { flex-direction: column; gap: 4px; }
+}
+</style>
+</head>
+<body data-state="idle">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Vedetta">V<span class="tick">·</span>EDETTA</div>
+    <div class="byline">Postern Labs · quiet lookout</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnVault">Vault</button>
+      <button class="hbtn" id="btnPrivacy">Privacy</button>
+      <button class="hbtn" id="btnSettings">Settings</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<div class="honesty" role="note">
+  research &amp; tracking only — <b>informational, not investment advice</b> · places <b>no trades</b> · quotes may be <b>delayed</b>
+</div>
+
+<main class="wrap">
+  <section class="hero" aria-label="Voice control">
+    <div class="orb-stage">
+      <span class="mic-live" role="status"><span class="dot"></span>MIC LIVE</span>
+      <div class="orb-ring outer" aria-hidden="true"></div>
+      <div class="orb-ring" aria-hidden="true"></div>
+      <button class="orb" id="orb" aria-label="Hold to talk. Push-to-talk only: the microphone is on only while you hold this button or the space bar.">
+        <svg class="orb-glyph" viewBox="0 0 54 54" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round">
+          <line class="bar" x1="11" y1="21" x2="11" y2="33"/>
+          <line class="bar" x1="19" y1="15" x2="19" y2="39"/>
+          <line class="bar" x1="27" y1="9"  x2="27" y2="45"/>
+          <line class="bar" x1="35" y1="15" x2="35" y2="39"/>
+          <line class="bar" x1="43" y1="21" x2="43" y2="33"/>
+        </svg>
+      </button>
+    </div>
+    <p class="status-line" id="statusLine" aria-live="polite"></p>
+  </section>
+
+  <section class="chips" id="chips" aria-label="Example requests">
+    <button class="chip">What's Nvidia trading at?</button>
+    <button class="chip">Add Petrobras to my watchlist</button>
+    <button class="chip">How's my portfolio doing?</button>
+    <button class="chip">Alert me if Bitcoin falls below 100 thousand</button>
+    <button class="chip">Euro to dollar right now?</button>
+  </section>
+
+  <!-- ============ THE BOARD ============ -->
+  <section class="board" id="board" aria-label="Your market board">
+
+    <div class="vault-note" id="vaultBanner" hidden></div>
+
+    <div class="panel" id="pnlWatch">
+      <div class="panel-head">
+        <h2>Watchlist</h2>
+        <span class="spacer"></span>
+        <button class="pbtn" id="btnRefresh" title="Fetch fresh quotes for the whole board in one snapshot">↻ refresh</button>
+      </div>
+      <div class="panel-body"><table class="tbl" id="tblWatch"></table></div>
+      <form class="mini-form" id="formWatch">
+        <input class="grow" id="watchSym" placeholder="symbol or name (e.g. PBR, petrobras)" aria-label="Symbol to add to watchlist" autocomplete="off">
+        <button type="submit">add</button>
+      </form>
+      <div class="panel-foot" id="footWatch"></div>
+    </div>
+
+    <div class="panel" id="pnlAlerts">
+      <div class="panel-head">
+        <h2>Price alerts</h2>
+        <span class="spacer"></span>
+      </div>
+      <div class="panel-body"><table class="tbl" id="tblAlerts"></table></div>
+      <form class="mini-form" id="formAlert">
+        <input id="alertSym" placeholder="symbol" size="7" aria-label="Alert symbol" autocomplete="off">
+        <select id="alertDir" aria-label="Alert direction"><option value="above">above</option><option value="below">below</option></select>
+        <input class="grow" id="alertLevel" placeholder="level" inputmode="decimal" aria-label="Alert level" autocomplete="off">
+        <button type="submit">arm</button>
+      </form>
+      <div class="panel-foot" id="footAlerts">alerts fire only while this tab is open and quotes refresh — nothing runs in any cloud</div>
+    </div>
+
+    <div class="panel wide" id="pnlPort">
+      <div class="panel-head">
+        <h2>Portfolio</h2>
+        <span class="spacer"></span>
+      </div>
+      <div class="panel-body"><table class="tbl" id="tblPort"></table></div>
+      <form class="mini-form" id="formHolding">
+        <input id="holdSym" placeholder="symbol" size="7" aria-label="Holding symbol" autocomplete="off">
+        <input id="holdQty" placeholder="quantity" inputmode="decimal" size="9" aria-label="Holding quantity" autocomplete="off">
+        <input class="grow" id="holdCost" placeholder="cost per unit" inputmode="decimal" aria-label="Cost per unit" autocomplete="off">
+        <button type="submit">add holding</button>
+      </form>
+      <div class="panel-foot" id="footPort">tracking only — vedetta places no trades; connecting a real broker is deliberately out of scope</div>
+    </div>
+  </section>
+
+  <ol class="transcript" id="transcript" aria-label="Conversation transcript"></ol>
+  <p class="empty-hint" id="emptyHint">Hold the orb (or the space bar) and ask about the market — or just type below.<br>Your watchlist and portfolio never leave this device; see Privacy for exactly what does.</p>
+
+  <div class="composer-dock">
+    <form class="composer" id="composer">
+      <button type="button" class="cbtn" id="btnMute" aria-pressed="false" aria-label="Mute spoken replies" title="Mute spoken replies">
+        <svg id="icoSpeaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="spkWaves" d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/><line id="spkSlash" x1="22" y1="3" x2="14" y2="21" style="display:none"/></svg>
+      </button>
+      <input type="text" id="textInput" autocomplete="off"
+             placeholder="Type instead of speaking — the fully local input path"
+             aria-label="Message Vedetta by text">
+      <button type="button" class="cbtn" id="btnStop" disabled aria-label="Stop responding and speaking" title="Stop">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      </button>
+      <button type="submit" class="cbtn primary" id="btnSend" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </form>
+    <div class="composer-foot">
+      <span><span class="lock">●</span> no server · no account · holdings never leave this device</span>
+      <span>model: <button class="linkish" id="modelHint" type="button">—</button></span>
+    </div>
+  </div>
+</main>
+
+<footer class="site wrap">Vedetta · a Postern Labs instrument · research &amp; tracking — never advice, never trades</footer>
+
+<!-- ================= SETTINGS ================= -->
+<dialog id="dlgSettings" aria-labelledby="settingsTitle">
+  <div class="dlg-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <button class="x" data-close aria-label="Close settings">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="field">
+      <label for="apiKey">Your Anthropic API key</label>
+      <div class="keyrow">
+        <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button type="button" class="hbtn" id="btnShowKey">show</button>
+      </div>
+      <p class="fhelp">Stored only in this browser’s localStorage and sent only to <code>api.anthropic.com</code> — Vedetta has no server that could ever see it. Get a key at console.anthropic.com.</p>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Keys at rest (optional lock)</span>
+      <p class="fhelp" id="keyLockState" aria-live="polite"></p>
+      <div class="keyrow">
+        <input type="password" id="keyPass" placeholder="passphrase (min 6 characters)" autocomplete="off" spellcheck="false" aria-label="Passphrase to seal the API keys">
+        <button type="button" class="hbtn" id="btnKeyLock">lock keys</button>
+      </div>
+      <p class="fhelp" id="keyLockHelp">Locking seals your Anthropic <em>and</em> Finnhub keys with <b>AES-256-GCM</b> under a key
+      derived from your passphrase (<b>PBKDF2-SHA-256, 310,000 it.</b> — a WebCrypto stand-in for the product's <b>Argon2id</b>, the same construction as the vault below
+      and Chiave, our sign-in reference). localStorage then holds only ciphertext; you unlock once per session,
+      and forgetting the passphrase means re-entering the keys. <b>Without a lock, the keys sit readable in this
+      browser’s localStorage</b> — any code or person with access to this browser profile can read them.</p>
+    </div>
+
+    <div class="field">
+      <label for="modelSel">Claude model</label>
+      <select id="modelSel">
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest, best for voice (default)</option>
+        <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable, slower</option>
+      </select>
+      <p class="fhelp">Billed to your own Anthropic account at your account’s rates.</p>
+    </div>
+
+    <div class="dlg-section">Market data — bring your own source</div>
+
+    <div class="field">
+      <span class="flabel">Stock &amp; ETF quotes</span>
+      <label class="radio-card">
+        <input type="radio" name="stockProv" value="yahoo" id="provYahoo">
+        <div>
+          <div class="rc-t">Yahoo Finance (unofficial, no key) — default</div>
+          <div class="rc-d">Keyless and free, typically delayed up to ~15 minutes. Honest caveat: Yahoo sends no CORS headers, so a plain browser page may be blocked from reading it — it works from the Postern desktop shell (Tauri) or over postern-tor. If lookups fail here with a network error, that’s why; pick Finnhub below or use crypto/FX, which work in any browser.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="stockProv" value="finnhub" id="provFinnhub">
+        <div>
+          <div class="rc-t">Finnhub — your own free key, browser-friendly</div>
+          <div class="rc-d">CORS-enabled and designed for client-side use; near-real-time US stocks on the free tier. Your key goes only to finnhub.io — sent as a request header (<code>X-Finnhub-Token</code>), never in the URL, so it can’t land in history or intermediary logs. It stays in localStorage (sealable with the lock above).</div>
+          <div class="subfield"><input type="password" id="finnhubKey" placeholder="finnhub API key" autocomplete="off" spellcheck="false" aria-label="Finnhub API key"></div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="stockProv" value="custom" id="provCustom">
+        <div>
+          <div class="rc-t">Custom endpoint</div>
+          <div class="rc-d">A URL template containing <code>{symbol}</code>. The response may be a bare number or JSON with a <code>price</code>, <code>c</code>, <code>last</code>, <code>close</code>, <code>rate</code>, or <code>regularMarketPrice</code> field. <strong>Note:</strong> this page's Content-Security-Policy only allows connections to the disclosed providers in its <code>connect-src</code> allowlist — an arbitrary custom host (your own proxy or gateway included) is blocked by design, not a bug. A custom template works only when its host is already one of those allowlisted providers, e.g. an alternate path on <code>finnhub.io</code>.</div>
+          <div class="subfield"><input type="text" id="customUrl" placeholder="https://allowlisted-host/quote?s={symbol}" autocomplete="off" spellcheck="false" aria-label="Custom quote URL template"></div>
+        </div>
+      </label>
+      <p class="fhelp">Crypto always uses CoinGecko (keyless, CORS-open, works in any browser). FX pairs like EUR/USD always use Frankfurter (keyless, CORS-open, ECB daily reference rates). Both are disclosed in the Privacy ledger.</p>
+    </div>
+
+    <div class="field">
+      <label for="decoys">Decoy symbols (optional, privacy)</label>
+      <input type="text" id="decoys" placeholder="e.g. SPY, KO, TM — fetched alongside every snapshot" autocomplete="off" spellcheck="false">
+      <p class="fhelp">Every board refresh fetches these too, so the set of symbols your provider sees is padded beyond what you actually hold. It blurs the picture; it does not erase it — see Privacy.</p>
+    </div>
+
+    <div class="field">
+      <div class="checkrow">
+        <input type="checkbox" id="autoRefresh">
+        <div>
+          <label for="autoRefresh" style="display:inline; text-transform:none; letter-spacing:0; font-family:var(--font-ui); font-size:13.5px; color:var(--text)">Auto-refresh quotes every 60 seconds</label>
+          <p class="fhelp">Off by default because it means a network call to your data provider once a minute while the tab is visible. Alerts are checked on every refresh.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dlg-section">Voice</div>
+
+    <div class="field">
+      <span class="flabel" id="sttLabel">Speech-to-text engine</span>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="webspeech" id="sttWeb">
+        <div>
+          <div class="rc-t">Browser speech recognition (Web Speech API)</div>
+          <div class="rc-d">Works now in Chrome/Edge. Honest caveat: the browser may send your audio to its vendor’s servers for transcription — see the Privacy panel.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="ondevice" id="sttLocal">
+        <div>
+          <div class="rc-t">On-device Whisper (planned)</div>
+          <div class="rc-d">A whisper.cpp-WASM engine that never lets audio leave this machine. The engine slot is wired; the model isn’t bundled in this prototype. Until then, typing is the fully local path.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="field">
+      <label for="voiceSel">Voice for spoken replies (on-device)</label>
+      <select id="voiceSel"></select>
+    </div>
+
+    <div class="field">
+      <label for="rate">Speaking rate <span id="rateVal" style="color:var(--muted)"></span></label>
+      <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
+    </div>
+
+    <div class="danger-zone">
+      <span class="flabel">Erase everything</span>
+      <p class="fhelp" style="margin:0 0 10px">Wipes your API keys, all settings, the encrypted vault (watchlist, portfolio, alerts), and this session’s conversation from the browser. Nothing else exists to erase — there is no server copy.</p>
+      <button type="button" class="btn-danger" id="btnErase">Erase keys, vault &amp; conversation</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= VAULT ================= -->
+<dialog id="dlgVault" aria-labelledby="vaultTitle">
+  <div class="dlg-head">
+    <h2 id="vaultTitle">Vault — your holdings, encrypted</h2>
+    <button class="x" data-close aria-label="Close vault panel">✕</button>
+  </div>
+  <div class="dlg-body">
+
+    <div id="vaultNone">
+      <p class="pv-note" style="margin-top:0">
+        Right now your watchlist, portfolio, and alerts live <strong>only in this tab’s memory</strong> — they vanish when you close it.
+        Set a passphrase to keep them on this device, encrypted at rest with <strong>AES-256-GCM</strong>
+        (key derived from your passphrase with PBKDF2-SHA-256, 310,000 iterations, per-vault random salt, fresh IV per write).
+        The passphrase and key are never stored and never leave this browser. Forget the passphrase and the data is honestly gone —
+        there is no recovery, because there is no server.
+      </p>
+      <div class="field">
+        <label for="vaultPass1">Choose a passphrase</label>
+        <input type="password" id="vaultPass1" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="vaultPass2">Repeat it</label>
+        <input type="password" id="vaultPass2" autocomplete="new-password">
+      </div>
+      <p class="vault-err" id="vaultErrCreate"></p>
+      <p style="text-align:right; margin:14px 0 0">
+        <button class="btn-plain" data-close>Keep memory-only</button>
+        <button class="btn-acc" id="btnVaultCreate">Create encrypted vault</button>
+      </p>
+    </div>
+
+    <div id="vaultLocked" hidden>
+      <p class="pv-note" style="margin-top:0">
+        An encrypted vault exists on this device. Its contents (watchlist, portfolio, alerts) are unreadable
+        without your passphrase — including to this page right now.
+      </p>
+      <div class="field">
+        <label for="vaultPassUnlock">Passphrase</label>
+        <input type="password" id="vaultPassUnlock" autocomplete="current-password">
+      </div>
+      <p class="vault-err" id="vaultErrUnlock"></p>
+      <p style="text-align:right; margin:14px 0 0">
+        <button class="btn-danger" id="btnVaultDestroy">Destroy vault</button>
+        <button class="btn-acc" id="btnVaultUnlock">Unlock</button>
+      </p>
+    </div>
+
+    <div id="vaultOpen" hidden>
+      <p class="pv-note" style="margin-top:0">
+        Vault is <strong>unlocked</strong>. Every change to your watchlist, portfolio, or alerts is re-encrypted and
+        saved on this device immediately. Lock it and the plaintext key is dropped from memory.
+      </p>
+      <div class="field">
+        <label for="vaultPassNew">Change passphrase (optional)</label>
+        <input type="password" id="vaultPassNew" placeholder="new passphrase" autocomplete="new-password">
+      </div>
+      <p class="vault-err" id="vaultErrOpen"></p>
+      <p style="text-align:right; margin:14px 0 0">
+        <button class="btn-plain" id="btnVaultChange">Change passphrase</button>
+        <button class="btn-acc" id="btnVaultLock">Lock now</button>
+      </p>
+    </div>
+
+  </div>
+</dialog>
+
+<!-- ================= PRIVACY ================= -->
+<dialog id="dlgPrivacy" aria-labelledby="privacyTitle">
+  <div class="dlg-head">
+    <h2 id="privacyTitle">Privacy — who sees what</h2>
+    <button class="x" data-close aria-label="Close privacy panel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">
+      Vedetta is a static page. <strong>There is no Postern server, no account, no telemetry, and no analytics.</strong>
+      Your keys and settings live in this browser’s localStorage — with the optional lock set in Settings, the
+      API keys are stored only as AES-256-GCM ciphertext sealed under your passphrase; without it they are
+      readable there, and Settings says so plainly. Your watchlist, portfolio, and alerts live in an
+      encrypted vault on this device; the conversation lives in this tab’s memory and is gone when you close it.
+      The honest ledger:
+    </p>
+
+    <div class="ledger">
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Quote lookups → your market-data provider</h3>
+          <p>Every quote request necessarily tells the provider <strong>which symbol you asked about, from your IP
+          address</strong>. Over time that lets the provider infer your watchlist and interests. That is the
+          unavoidable physics of asking someone else for a price. What Vedetta does about it:</p>
+          <p>· <strong>Snapshot refreshes</strong> — the board refreshes the whole list at once, so a single lookup
+          doesn’t spotlight which asset you care about right now. Honest fine print: on per-symbol providers
+          (Yahoo, Finnhub) a snapshot is still one request per symbol to the same host — it hides your focus, not
+          the set. CoinGecko batches genuinely (one request for all coins), and Frankfurter returns <em>every</em>
+          currency in one response, so an FX lookup reveals nothing beyond the base currency.</p>
+          <p>· <strong>Decoy symbols</strong> (Settings) pad every snapshot so the set the provider sees is larger
+          than what you actually track. A blur, not an eraser.</p>
+          <p>· <strong>Name search is fully local</strong> — resolving “Petrobras” to PBR uses a directory inside
+          this file. Nothing is sent until you fetch the actual quote.</p>
+          <p>· <strong>Per-provider keys</strong> — Yahoo, CoinGecko, and Frankfurter are keyless. The optional
+          Finnhub key goes only to <code>finnhub.io</code>, as a request header (never in the URL, so it can’t land
+          in history or intermediary logs); like your Anthropic key it lives in localStorage and is sealable with
+          the Settings lock. No key is ever sent to any host other than its own provider.</p>
+          <p>· The real Postern product fetches quotes over on-device Tor (<code>postern-tor</code>) so the provider
+          doesn’t get your IP. This browser prototype does not do that — your IP is visible to the provider here.</p>
+        </div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your words → Anthropic (when you send a message)</h3>
+          <p>Each turn, the conversation text goes from your browser directly to <code>api.anthropic.com</code>,
+          authenticated with <em>your</em> key — no middleman relays or logs it. Anthropic processes it under
+          <em>your</em> agreement with them. Honest and important: <strong>when you ask about your portfolio or
+          watchlist, their contents are included in that message</strong> so the model can answer — your holdings
+          reach Anthropic in that moment, under your key. If you never ask, they never go.</p>
+        </div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your voice → your browser’s vendor (only while you hold to talk)</h3>
+          <p>Voice input uses the browser’s Web Speech API. In Chrome and most browsers this <strong>sends your audio
+          to the browser vendor’s servers (Google in Chrome/Chromium)</strong> for transcription — so speech input is <em>not</em> fully private.
+          It is strictly push-to-talk: the microphone is captured only while you hold the orb or the space bar, never
+          in the background. Want zero audio leaving the machine? <strong>Type instead</strong> — the text path is
+          fully local until you hit send. The real product ships an on-device Whisper (whisper.cpp/WASM) engine in
+          the same slot.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Watchlist, portfolio, alerts — this device only, encrypted</h3>
+          <p>Stored in localStorage as an AES-256-GCM ciphertext; the key is derived from your passphrase
+          (PBKDF2-SHA-256, 310,000 iterations) and is never stored or exported. No cloud copy, no sync, no account.
+          “Erase everything” in Settings destroys it instantly. Your holdings are the sensitive asset here — they
+          stay yours.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Spoken replies — on-device</h3>
+          <p>Text-to-speech uses your operating system’s voices via <code>speechSynthesis</code>. Audio is generated
+          locally and does not leave the device.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Price alerts — this tab only</h3>
+          <p>Alerts are checked in this page’s JavaScript when quotes refresh, and chime locally. No push service,
+          no server watching on your behalf — which honestly also means: <strong>alerts do not fire when the tab is
+          closed</strong>.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="pv-note">
+      <strong>What we won’t claim:</strong> Vedetta is not “100% private” or “100% secure.” Symbols you look up reach
+      your data provider from your IP, words you send reach Anthropic under <em>your own</em> key, and browser voice
+      input may reach your browser vendor (Google in Chrome/Chromium) — unavoidable the moment you ask someone else.
+      What Vedetta guarantees is <em>no extra parties and no resident copy of your holdings anywhere but here</em>:
+      no Postern server, no account, no telemetry. This browser prototype also lacks the real product’s on-device
+      Tor and Whisper — treat it as defense-in-depth, not a guarantee.
+    </p>
+    <p class="pv-note">
+      <strong>Every place this page can connect to</strong> — its Content-Security-Policy allows exactly five hosts
+      and blocks everything else by design: <code>api.anthropic.com</code> (your Claude conversation) plus the four
+      disclosed market-data providers <code>query1.finance.yahoo.com</code>, <code>finnhub.io</code>,
+      <code>api.coingecko.com</code>, and <code>api.frankfurter.dev</code>. No other destination is reachable from
+      this page’s code. The source is one readable HTML file; verify it yourself.
+    </p>
+    <p class="pv-note">
+      <strong>And what this is not:</strong> Vedetta is voice-driven research and tracking — not a brokerage, not a
+      trading terminal. It places no orders and holds no assets. “Buy” and “sell” here would only ever mean rows in
+      your local tracker. Actually trading would require connecting a regulated broker under your own agreement — a
+      deliberate non-feature of this app.
+    </p>
+    <p style="text-align:right; margin: 14px 0 0">
+      <button class="btn-acc" data-close>Understood</button>
+    </p>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ============================================================
+   VEDETTA — application logic
+   Zero dependencies. Network destinations, all disclosed:
+   api.anthropic.com (your key) + your chosen quote providers.
+   ============================================================ */
+
+/* ---------- tiny helpers ---------- */
+const $ = (sel) => document.querySelector(sel);
+const LS = {
+  KEY:    "vedetta.apiKey",
+  SEALED: "vedetta.apiKeys.sealed", // optional at-rest lock: AES-256-GCM ciphertext only
+  MODEL:  "vedetta.model",
+  VOICE:  "vedetta.voiceURI",
+  RATE:   "vedetta.rate",
+  MUTE:   "vedetta.muted",
+  STT:    "vedetta.stt",
+  THEME:  "vedetta.theme",
+  SPROV:  "vedetta.stockProvider",
+  FINN:   "vedetta.finnhubKey",
+  CUSTOM: "vedetta.customUrl",
+  DECOYS: "vedetta.decoys",
+  AUTO:   "vedetta.autoRefresh",
+  VAULT:  "vedetta.vault",
+};
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+/* ---------- sealed API keys at rest (optional lock) ----------
+   The Chiave construction (apps/postern-login), reusing the vault's own
+   primitives below (deriveVaultKey / aeadEncrypt / aeadDecrypt: PBKDF2-SHA-256
+   310k it. → non-extractable AES-256-GCM, fresh IV per write, AAD-bound).
+   Seals BOTH the Anthropic and the Finnhub key. When locked, localStorage
+   holds ONLY ciphertext — the readable keys live in this tab's memory,
+   unlocked once per session. */
+const KeySeal = (() => {
+  const KEYS_AAD = "vedetta.apikeys.v1";
+  let plain = null;    // { key, finnhub } — this tab's memory only, never persisted
+  let aesKey = null;   // derived, non-extractable; kept so edits re-seal without re-running the KDF
+  let saltB64 = null;
+  let writing = Promise.resolve(); // serialize re-seals (last write wins)
+
+  const record = () => { try { return JSON.parse(store.get(LS.SEALED, "null")); } catch { return null; } };
+  const freeReal = () => { if (aesKey && aesKey.real && aesKey.key) { try { aesKey.key.free(); } catch {} } };
+  async function persist() {
+    const cipher = await aeadEncrypt(aesKey, JSON.stringify(plain), KEYS_AAD);
+    store.set(LS.SEALED, JSON.stringify({
+      v: 1,
+      kdf: { algo: aesKey.real ? KDF_REAL : "PBKDF2-SHA-256", iter: PBKDF2_ITER, label: aesKey.label, salt: saltB64 },
+      cipher,
+    }));
+  }
+  return {
+    isSealed: () => !!record(),
+    isLocked: () => !!record() && plain === null,
+    get: (name) => (plain && plain[name]) || "",
+    real: () => VSDK.real(),                // is the real core installed right now?
+    cipherLabel: () => {                    // what actually sealed the current blob
+      const r = record();
+      if (r && r.kdf && r.kdf.algo === KDF_REAL) return "XChaCha20-Poly1305 (real Argon2id, via postern-sdk)";
+      return "AES-256-GCM (PBKDF2-SHA-256 stand-in)";
+    },
+    async lock(pass, keys) {                // seal both keys, then drop the plaintext copies from disk
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      aesKey = await deriveVaultKey(pass, salt, PBKDF2_ITER, VSDK.real());
+      saltB64 = b64(salt);
+      plain = { key: keys.key || "", finnhub: keys.finnhub || "" };
+      await persist();
+      store.del(LS.KEY); store.del(LS.FINN);
+    },
+    async unlock(pass) {                    // per-session; a wrong passphrase fails the AEAD tag
+      const r = record(); if (!r) return false;
+      const wantReal = !!(r.kdf && r.kdf.algo === KDF_REAL);
+      if (wantReal && !VSDK.real()) return false;   // fail-closed: the real core isn't loaded here
+      try {
+        const k = await deriveVaultKey(pass, unb64(r.kdf.salt), r.kdf.iter, wantReal);
+        const obj = JSON.parse(await aeadDecrypt(k, r.cipher, KEYS_AAD));
+        plain = { key: obj.key || "", finnhub: obj.finnhub || "" };
+        aesKey = k; saltB64 = r.kdf.salt;
+        return true;
+      } catch { return false; }             // all-or-nothing: nothing decrypted, nothing leaked
+    },
+    update(name, value) {                   // edits while unlocked re-seal automatically
+      if (!aesKey || !plain) return;
+      plain[name] = value;
+      writing = writing.then(persist).catch(() => {});
+    },
+    removeLock() {                          // back to plaintext-at-rest, by explicit choice only
+      if (plain === null) return false;
+      store.set(LS.KEY, plain.key || "");
+      store.set(LS.FINN, plain.finnhub || "");
+      store.del(LS.SEALED);
+      freeReal(); aesKey = null; saltB64 = null;
+      return true;
+    },
+    forget() { plain = null; freeReal(); aesKey = null; saltB64 = null; },
+  };
+})();
+const te = new TextEncoder();
+const td = new TextDecoder();
+
+/* ---------- constants ---------- */
+const API_URL = "https://api.anthropic.com/v1/messages";
+const MODELS = {
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+  "claude-sonnet-5": "Sonnet 5",
+  "claude-opus-4-8": "Opus 4.8",
+};
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const MAX_TOKENS = 1024;
+const MAX_TOOL_ROUNDS = 6;
+const PBKDF2_ITER = 310000;
+const VAULT_AAD = "vedetta.vault.v1";
+const DISCLAIMER = "Informational only — not investment advice.";
+
+const SYSTEM_PROMPT = [
+  "You are Vedetta, the voice of a private markets lookout made by Postern Labs. Your replies are read aloud by a speech synthesizer, so speak like a considerate person, not a terminal:",
+  "- Keep it brief: one to three short sentences for most requests. Plain prose only — never markdown, bullet points, tables, or emoji.",
+  "- Say numbers the way a person would say them aloud, rounded sensibly unless the user asks for precision.",
+  "Tools: use your tools for every fact about prices, the watchlist, the portfolio, or alerts. Never invent, estimate, or recall a price from memory — if a tool fails, say so plainly and pass along the fix the error suggests. When the user gives a company name and you are not certain of the ticker, call search_asset first; it runs entirely on the user's device.",
+  "Data honesty: quotes come from the user's configured provider and may be delayed; each tool result says how. Never claim data is real-time unless the tool result says so, and mention the delay when it matters.",
+  "You are not an adviser. Never recommend buying, selling, holding, position sizes, entry or exit points, or call anything a good or bad investment. You may state facts and neutral context. If you name an asset the user did not ask about, or say anything that could be heard as a suggestion, you must end that reply with exactly: \"" + DISCLAIMER + "\"",
+  "You are not a broker. You cannot place, route, or simulate real orders, and there is no way to connect an exchange or brokerage here. If asked to buy or sell, say plainly that Vedetta only researches and tracks; actual trading would need a regulated brokerage connection, which this app deliberately does not have. Offer to record the position in the local tracker instead.",
+  "Privacy, if asked: the watchlist and portfolio are encrypted and stay on this device; each quote lookup necessarily reveals that symbol to the data provider; the conversation — including portfolio contents when discussed — goes to Anthropic under the user's own key; voice input may reach the browser vendor; the spoken voice is generated on-device. Never claim Vedetta is one hundred percent private.",
+].join("\n");
+
+const TOOLS = [
+  {
+    name: "lookup_quote",
+    description: "Fetch the latest available quote for one symbol from the user's configured market-data provider. Symbol forms: stock/ETF tickers like NVDA or PBR; crypto tickers like BTC or ETH (BTC-USD also accepted); FX pairs like EUR/USD. If you only know a company name, call search_asset first. The result includes price, change, an as-of time, and an honest delay note.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker symbol, e.g. NVDA, PBR, BTC, EUR/USD." } },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "search_asset",
+    description: "Resolve a company, asset, or currency-pair NAME to a ticker symbol using a directory built into the page. Fully local: this search sends nothing over the network. Use it before lookup_quote when the user names a company rather than a ticker.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Free-text name, e.g. 'Petrobras', 'Nvidia', 'euro dollar'." } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "add_to_watchlist",
+    description: "Add a symbol to the user's local watchlist (stored encrypted on their device). Also fetches its current quote so the board shows a price.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker symbol to add." } },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "remove_from_watchlist",
+    description: "Remove a symbol from the user's local watchlist.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker symbol to remove." } },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "show_watchlist",
+    description: "List the user's watchlist with fresh quotes (one snapshot fetch for the whole list). Use when asked what's on the watchlist or how the watched assets are doing.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "add_holding",
+    description: "Record a holding in the user's local portfolio tracker (encrypted on their device). This is BOOKKEEPING ONLY — it does not buy anything or place any order anywhere. If the same symbol already exists, quantities are combined and the cost basis becomes the weighted average.",
+    input_schema: {
+      type: "object",
+      properties: {
+        symbol:     { type: "string", description: "Ticker symbol." },
+        quantity:   { type: "number", description: "Number of units/shares held. Must be positive." },
+        cost_basis: { type: "number", description: "Average purchase price PER UNIT, in the asset's quote currency." },
+      },
+      required: ["symbol", "quantity", "cost_basis"],
+    },
+  },
+  {
+    name: "remove_holding",
+    description: "Remove a symbol's row from the local portfolio tracker. Bookkeeping only — it sells nothing.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker symbol to remove from the tracker." } },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "show_portfolio",
+    description: "Fetch fresh quotes for every holding and report market value and profit/loss per position and in total. Use when asked how the portfolio is doing.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "set_price_alert",
+    description: "Arm a client-side price alert that chimes and speaks in this browser tab when the level is crossed. Honest limits: it is checked only while this tab is open and quotes refresh — there is no server watching. If direction is omitted it is inferred from the current price.",
+    input_schema: {
+      type: "object",
+      properties: {
+        symbol:    { type: "string", description: "Ticker symbol." },
+        level:     { type: "number", description: "Price level that triggers the alert." },
+        direction: { type: "string", enum: ["above", "below"], description: "Fire when price goes above or below the level. Optional; inferred from the current price if omitted." },
+      },
+      required: ["symbol", "level"],
+    },
+  },
+];
+
+/* ============================================================
+   Local asset directory — name→symbol search that never
+   touches the network. Format: [symbol, name, kind, aliases…]
+   ============================================================ */
+const DIR = [
+  ["AAPL","Apple Inc.","stock","apple"],
+  ["MSFT","Microsoft Corporation","stock","microsoft"],
+  ["NVDA","NVIDIA Corporation","stock","nvidia"],
+  ["GOOGL","Alphabet Inc. (Class A)","stock","google","alphabet"],
+  ["AMZN","Amazon.com Inc.","stock","amazon"],
+  ["META","Meta Platforms Inc.","stock","facebook","instagram","meta"],
+  ["TSLA","Tesla Inc.","stock","tesla"],
+  ["BRK-B","Berkshire Hathaway (Class B)","stock","berkshire","buffett"],
+  ["JPM","JPMorgan Chase & Co.","stock","jpmorgan","jp morgan","chase"],
+  ["V","Visa Inc.","stock","visa"],
+  ["MA","Mastercard Inc.","stock","mastercard"],
+  ["JNJ","Johnson & Johnson","stock","johnson"],
+  ["WMT","Walmart Inc.","stock","walmart"],
+  ["XOM","Exxon Mobil Corporation","stock","exxon","exxonmobil"],
+  ["CVX","Chevron Corporation","stock","chevron"],
+  ["PG","Procter & Gamble Co.","stock","procter","gamble"],
+  ["KO","Coca-Cola Co.","stock","coca cola","coke"],
+  ["PEP","PepsiCo Inc.","stock","pepsi","pepsico"],
+  ["DIS","Walt Disney Co.","stock","disney"],
+  ["NFLX","Netflix Inc.","stock","netflix"],
+  ["AMD","Advanced Micro Devices","stock","amd"],
+  ["INTC","Intel Corporation","stock","intel"],
+  ["ORCL","Oracle Corporation","stock","oracle"],
+  ["CRM","Salesforce Inc.","stock","salesforce"],
+  ["ADBE","Adobe Inc.","stock","adobe"],
+  ["IBM","International Business Machines","stock","ibm"],
+  ["QCOM","Qualcomm Inc.","stock","qualcomm"],
+  ["AVGO","Broadcom Inc.","stock","broadcom"],
+  ["MU","Micron Technology","stock","micron"],
+  ["BA","Boeing Co.","stock","boeing"],
+  ["GE","GE Aerospace","stock","general electric"],
+  ["F","Ford Motor Co.","stock","ford"],
+  ["GM","General Motors Co.","stock","general motors"],
+  ["NKE","Nike Inc.","stock","nike"],
+  ["MCD","McDonald's Corporation","stock","mcdonalds","mcdonald's"],
+  ["SBUX","Starbucks Corporation","stock","starbucks"],
+  ["T","AT&T Inc.","stock","att","at&t"],
+  ["VZ","Verizon Communications","stock","verizon"],
+  ["PFE","Pfizer Inc.","stock","pfizer"],
+  ["MRK","Merck & Co.","stock","merck"],
+  ["LLY","Eli Lilly & Co.","stock","eli lilly","lilly"],
+  ["NVO","Novo Nordisk (ADR)","stock","novo nordisk"],
+  ["UNH","UnitedHealth Group","stock","unitedhealth"],
+  ["GS","Goldman Sachs Group","stock","goldman"],
+  ["MS","Morgan Stanley","stock","morgan stanley"],
+  ["BAC","Bank of America","stock","bank of america"],
+  ["C","Citigroup Inc.","stock","citigroup","citi"],
+  ["WFC","Wells Fargo & Co.","stock","wells fargo"],
+  ["PYPL","PayPal Holdings","stock","paypal"],
+  ["UBER","Uber Technologies","stock","uber"],
+  ["ABNB","Airbnb Inc.","stock","airbnb"],
+  ["COIN","Coinbase Global","stock","coinbase"],
+  ["SHOP","Shopify Inc.","stock","shopify"],
+  ["SPOT","Spotify Technology","stock","spotify"],
+  ["PLTR","Palantir Technologies","stock","palantir"],
+  ["TSM","Taiwan Semiconductor (ADR)","stock","tsmc","taiwan semi"],
+  ["ASML","ASML Holding (ADR)","stock","asml"],
+  ["SAP","SAP SE (ADR)","stock","sap"],
+  ["SONY","Sony Group (ADR)","stock","sony"],
+  ["TM","Toyota Motor (ADR)","stock","toyota"],
+  ["BABA","Alibaba Group (ADR)","stock","alibaba"],
+  ["NIO","NIO Inc. (ADR)","stock","nio"],
+  ["PBR","Petróleo Brasileiro — Petrobras (ADR)","stock","petrobras","petroleo brasileiro","petróleo"],
+  ["VALE","Vale S.A. (ADR)","stock","vale"],
+  ["ITUB","Itaú Unibanco (ADR)","stock","itau","itaú"],
+  ["BBD","Banco Bradesco (ADR)","stock","bradesco"],
+  ["MELI","MercadoLibre Inc.","stock","mercadolibre","mercado libre"],
+  ["NU","Nu Holdings (Nubank)","stock","nubank"],
+  ["EMBR3.SA","Embraer S.A. (B3)","stock","embraer"],
+  ["SPY","SPDR S&P 500 ETF","stock","s&p 500","sp500","s and p"],
+  ["QQQ","Invesco QQQ (Nasdaq-100 ETF)","stock","nasdaq 100","qqq"],
+  ["VTI","Vanguard Total Stock Market ETF","stock","total market"],
+  ["VOO","Vanguard S&P 500 ETF","stock","vanguard 500"],
+  ["DIA","SPDR Dow Jones ETF","stock","dow","dow jones"],
+  ["IWM","iShares Russell 2000 ETF","stock","russell"],
+  ["GLD","SPDR Gold Shares ETF","stock","gold etf","gold"],
+  ["SLV","iShares Silver Trust ETF","stock","silver"],
+  ["EEM","iShares MSCI Emerging Markets ETF","stock","emerging markets"],
+  ["EWZ","iShares MSCI Brazil ETF","stock","brazil etf","ibovespa proxy"],
+  ["BTC","Bitcoin","crypto","bitcoin","btc"],
+  ["ETH","Ethereum","crypto","ethereum","ether"],
+  ["SOL","Solana","crypto","solana"],
+  ["XRP","XRP (Ripple)","crypto","ripple"],
+  ["ADA","Cardano","crypto","cardano"],
+  ["DOGE","Dogecoin","crypto","dogecoin"],
+  ["DOT","Polkadot","crypto","polkadot"],
+  ["LTC","Litecoin","crypto","litecoin"],
+  ["LINK","Chainlink","crypto","chainlink"],
+  ["AVAX","Avalanche","crypto","avalanche"],
+  ["BNB","BNB","crypto","binance coin"],
+  ["TRX","TRON","crypto","tron"],
+  ["XLM","Stellar","crypto","stellar"],
+  ["UNI","Uniswap","crypto","uniswap"],
+  ["ATOM","Cosmos","crypto","cosmos"],
+  ["XMR","Monero","crypto","monero"],
+  ["BCH","Bitcoin Cash","crypto","bitcoin cash"],
+  ["NEAR","NEAR Protocol","crypto","near"],
+  ["TON","Toncoin","crypto","toncoin","ton"],
+  ["EUR/USD","Euro / US Dollar","fx","euro dollar","eurusd","euro to dollar"],
+  ["USD/JPY","US Dollar / Japanese Yen","fx","dollar yen","yen"],
+  ["GBP/USD","British Pound / US Dollar","fx","pound dollar","cable","sterling"],
+  ["USD/BRL","US Dollar / Brazilian Real","fx","dollar real","real brasileiro","brazilian real"],
+  ["USD/CHF","US Dollar / Swiss Franc","fx","swiss franc"],
+  ["AUD/USD","Australian Dollar / US Dollar","fx","aussie dollar"],
+  ["USD/CAD","US Dollar / Canadian Dollar","fx","canadian dollar","loonie"],
+  ["USD/MXN","US Dollar / Mexican Peso","fx","mexican peso"],
+  ["EUR/GBP","Euro / British Pound","fx","euro pound"],
+  ["EUR/BRL","Euro / Brazilian Real","fx","euro real"],
+];
+
+const CRYPTO_IDS = {
+  BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple", ADA: "cardano",
+  DOGE: "dogecoin", DOT: "polkadot", LTC: "litecoin", LINK: "chainlink",
+  AVAX: "avalanche-2", BNB: "binancecoin", TRX: "tron", XLM: "stellar",
+  UNI: "uniswap", ATOM: "cosmos", XMR: "monero", BCH: "bitcoin-cash",
+  NEAR: "near", TON: "the-open-network",
+};
+
+function dirFind(query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return [];
+  const hits = [];
+  for (const [sym, name, kind, ...aliases] of DIR) {
+    const hay = [sym.toLowerCase(), name.toLowerCase(), ...aliases];
+    if (hay.some(h => h === q)) { hits.unshift({ sym, name, kind }); continue; }
+    if (hay.some(h => h.includes(q))) hits.push({ sym, name, kind });
+  }
+  return hits.slice(0, 6);
+}
+function dirName(sym) {
+  const row = DIR.find(r => r[0] === sym);
+  return row ? row[1] : null;
+}
+
+/* Normalize whatever the user/model said into a canonical symbol. */
+function normalizeSymbol(raw) {
+  let s = String(raw || "").trim().toUpperCase();
+  if (!s) return "";
+  const eqx = s.match(/^([A-Z]{3})([A-Z]{3})=X$/);         // EURUSD=X → EUR/USD
+  if (eqx) s = eqx[1] + "/" + eqx[2];
+  const dashUsd = s.match(/^([A-Z]{2,6})-USD$/);           // BTC-USD → BTC (if known coin)
+  if (dashUsd && CRYPTO_IDS[dashUsd[1]]) s = dashUsd[1];
+  return s;
+}
+function classify(sym) {
+  if (/^[A-Z]{3}\/[A-Z]{3}$/.test(sym)) return "fx";
+  if (CRYPTO_IDS[sym]) return "crypto";
+  return "stock";
+}
+
+/* ---------- state ---------- */
+let history = [];            // Anthropic messages array (session memory)
+let busy = false;            // a request is in flight
+let abortCtl = null;
+let ttsQueue = [];           // sentences waiting to be spoken
+let ttsSpeaking = false;
+
+/* the book: everything the vault protects */
+let book = { watch: [], holdings: [], alerts: [] };
+let quotes = new Map();      // sym -> quote (latest fetched, memory only)
+let quotesAsOf = null;
+let vaultKey = null;         // CryptoKey while unlocked
+let vaultState = "none";     // none | locked | open
+let autoTimer = null;
+
+/* ---------- elements ---------- */
+const el = {
+  body: document.body,
+  orb: $("#orb"),
+  status: $("#statusLine"),
+  transcript: $("#transcript"),
+  emptyHint: $("#emptyHint"),
+  chips: $("#chips"),
+  composer: $("#composer"),
+  input: $("#textInput"),
+  btnSend: $("#btnSend"),
+  btnStop: $("#btnStop"),
+  btnMute: $("#btnMute"),
+  spkWaves: $("#spkWaves"),
+  spkSlash: $("#spkSlash"),
+  modelHint: $("#modelHint"),
+  dlgSettings: $("#dlgSettings"),
+  dlgPrivacy: $("#dlgPrivacy"),
+  dlgVault: $("#dlgVault"),
+  apiKey: $("#apiKey"),
+  keyPass: $("#keyPass"),
+  btnKeyLock: $("#btnKeyLock"),
+  keyLockState: $("#keyLockState"),
+  keyLockHelp: $("#keyLockHelp"),
+  btnShowKey: $("#btnShowKey"),
+  modelSel: $("#modelSel"),
+  voiceSel: $("#voiceSel"),
+  rate: $("#rate"),
+  rateVal: $("#rateVal"),
+  sttWeb: $("#sttWeb"),
+  sttLocal: $("#sttLocal"),
+  btnErase: $("#btnErase"),
+  btnSettings: $("#btnSettings"),
+  btnPrivacy: $("#btnPrivacy"),
+  btnVault: $("#btnVault"),
+  btnTheme: $("#btnTheme"),
+  provYahoo: $("#provYahoo"),
+  provFinnhub: $("#provFinnhub"),
+  provCustom: $("#provCustom"),
+  finnhubKey: $("#finnhubKey"),
+  customUrl: $("#customUrl"),
+  decoys: $("#decoys"),
+  autoRefresh: $("#autoRefresh"),
+  tblWatch: $("#tblWatch"),
+  tblPort: $("#tblPort"),
+  tblAlerts: $("#tblAlerts"),
+  footWatch: $("#footWatch"),
+  footPort: $("#footPort"),
+  footAlerts: $("#footAlerts"),
+  btnRefresh: $("#btnRefresh"),
+  formWatch: $("#formWatch"),
+  watchSym: $("#watchSym"),
+  formHolding: $("#formHolding"),
+  holdSym: $("#holdSym"),
+  holdQty: $("#holdQty"),
+  holdCost: $("#holdCost"),
+  formAlert: $("#formAlert"),
+  alertSym: $("#alertSym"),
+  alertDir: $("#alertDir"),
+  alertLevel: $("#alertLevel"),
+  vaultBanner: $("#vaultBanner"),
+  vaultNone: $("#vaultNone"),
+  vaultLocked: $("#vaultLocked"),
+  vaultOpen: $("#vaultOpen"),
+  vaultPass1: $("#vaultPass1"),
+  vaultPass2: $("#vaultPass2"),
+  vaultPassUnlock: $("#vaultPassUnlock"),
+  vaultPassNew: $("#vaultPassNew"),
+  vaultErrCreate: $("#vaultErrCreate"),
+  vaultErrUnlock: $("#vaultErrUnlock"),
+  vaultErrOpen: $("#vaultErrOpen"),
+  btnVaultCreate: $("#btnVaultCreate"),
+  btnVaultUnlock: $("#btnVaultUnlock"),
+  btnVaultDestroy: $("#btnVaultDestroy"),
+  btnVaultLock: $("#btnVaultLock"),
+  btnVaultChange: $("#btnVaultChange"),
+};
+
+/* ============================================================
+   UI state machine
+   ============================================================ */
+function setState(state) {
+  el.body.dataset.state = state; // idle | listening | thinking | speaking
+}
+function setStatus(html, tone) {
+  el.status.innerHTML = html;
+  if (tone) el.status.dataset.tone = tone; else delete el.status.dataset.tone;
+}
+function idleStatus() {
+  if (!getKey()) {
+    if (KeySeal.isLocked()) {
+      setStatus('Your API keys are sealed at rest. Unlock them in <b>Settings</b> for this session.');
+    } else {
+      setStatus('Add your Anthropic API key in <b>Settings</b> to begin — it never leaves this browser except to reach Anthropic.');
+    }
+    el.btnSettings.dataset.attn = "1";
+    return;
+  }
+  el.btnSettings.removeAttribute("data-attn");
+  if (stt.available()) {
+    setStatus('Hold the orb — or hold <span class="hint-key">space</span> — and ask about the market. Release to send. Or type below.');
+  } else {
+    setStatus("Voice input isn’t available in this browser, but typing works fully — and it’s the most private path anyway.");
+  }
+}
+
+/* ============================================================
+   Transcript rendering
+   ============================================================ */
+function addTurn(role, text) {
+  el.emptyHint.style.display = "none";
+  const li = document.createElement("li");
+  li.className = "turn " + role;
+  const who = document.createElement("div");
+  who.className = "who";
+  who.textContent = role === "user" ? "you" : "vedetta";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  li.append(who, bubble);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "end", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  return { li, bubble };
+}
+function addSystemNote(text) {
+  el.emptyHint.style.display = "none";
+  const li = document.createElement("li");
+  li.className = "turn assistant";
+  const sys = document.createElement("div");
+  sys.className = "sys";
+  sys.textContent = text;
+  li.appendChild(sys);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "end" });
+}
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/* ============================================================
+   Speech OUT — on-device TTS (speechSynthesis)
+   ============================================================ */
+const tts = {
+  voices: [],
+  loadVoices() {
+    this.voices = (window.speechSynthesis ? speechSynthesis.getVoices() : []) || [];
+    const sel = el.voiceSel;
+    sel.innerHTML = "";
+    if (!window.speechSynthesis) {
+      sel.appendChild(new Option("Speech synthesis unavailable in this browser", ""));
+      sel.disabled = true;
+      return;
+    }
+    const saved = store.get(LS.VOICE, "");
+    sel.appendChild(new Option("System default voice", ""));
+    this.voices.forEach(v => {
+      const o = new Option(`${v.name} (${v.lang})${v.localService ? "" : " ⚠ network voice"}`, v.voiceURI);
+      if (v.voiceURI === saved) o.selected = true;
+      sel.appendChild(o);
+    });
+  },
+  pick() {
+    const uri = store.get(LS.VOICE, "");
+    return this.voices.find(v => v.voiceURI === uri) || null;
+  },
+  muted() { return store.get(LS.MUTE, "0") === "1"; },
+  enqueue(sentence) {
+    if (!window.speechSynthesis || this.muted()) return;
+    const clean = sentence.replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    ttsQueue.push(clean);
+    this.pump();
+  },
+  pump() {
+    if (ttsSpeaking || ttsQueue.length === 0 || !window.speechSynthesis) return;
+    const text = ttsQueue.shift();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = this.pick();
+    if (v) u.voice = v;
+    u.rate = parseFloat(store.get(LS.RATE, "1")) || 1;
+    ttsSpeaking = true;
+    if (!busy) setState("speaking");
+    u.onend = u.onerror = () => {
+      ttsSpeaking = false;
+      if (ttsQueue.length) this.pump();
+      else if (!busy) { setState("idle"); syncStopBtn(); }
+    };
+    speechSynthesis.speak(u);
+  },
+  stop() {
+    ttsQueue = [];
+    ttsSpeaking = false;
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  },
+};
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = () => tts.loadVoices();
+}
+
+/* Strip things that read badly aloud (defense in depth; the prompt already forbids markdown) */
+function speakable(text) {
+  return text.replace(/[*_`#>|]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
+}
+
+/* ============================================================
+   Speech IN — swappable STT engines behind one interface.
+   Engine contract: { id, label, available():bool,
+                      start({onInterim,onFinal,onError}), stop() }
+   ============================================================ */
+
+/* Engine 1: browser Web Speech API (may send audio to the browser vendor) */
+const WebSpeechEngine = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  let rec = null, finals = "", interim = "", cb = null, stopping = false;
+  return {
+    id: "webspeech",
+    label: "Browser (Web Speech API)",
+    available: () => !!SR,
+    start(callbacks) {
+      if (!SR) { callbacks.onError("Speech recognition is not available in this browser."); return; }
+      cb = callbacks; finals = ""; interim = ""; stopping = false;
+      rec = new SR();
+      rec.lang = navigator.language || "en-US";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (ev) => {
+        interim = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (r.isFinal) finals += r[0].transcript;
+          else interim += r[0].transcript;
+        }
+        cb.onInterim((finals + " " + interim).trim());
+      };
+      rec.onerror = (ev) => {
+        if (stopping && (ev.error === "aborted" || ev.error === "no-speech")) return;
+        const msgs = {
+          "not-allowed": "Microphone permission was denied. Vedetta only listens while you hold to talk — allow the mic to use voice, or keep typing.",
+          "no-speech": "Didn’t catch anything — hold and try again, or type instead.",
+          "audio-capture": "No microphone found. Typing works fully.",
+          "network": "The browser’s speech service couldn’t be reached. Typing is fully local and always works.",
+        };
+        cb.onError(msgs[ev.error] || ("Speech recognition error: " + ev.error));
+      };
+      rec.onend = () => {
+        if (!cb) return;
+        const text = (finals + " " + interim).trim();
+        const done = cb.onFinal; cb = null;
+        done(text);
+      };
+      try { rec.start(); } catch (e) { cb && cb.onError("Couldn’t start the microphone: " + e.message); cb = null; }
+    },
+    stop() {
+      stopping = true;
+      if (rec) { try { rec.stop(); } catch {} }
+    },
+  };
+})();
+
+/* Engine 2: on-device Whisper — the slot the real product fills.
+   Deliberately honest stub: selectable in code, disabled in UI,
+   so swapping in whisper.cpp-wasm later touches only this object. */
+const OnDeviceWhisperEngine = {
+  id: "ondevice",
+  label: "On-device Whisper (whisper.cpp / WASM)",
+  available: () => false, // flips to true when a wasm build + model are bundled
+  start({ onError }) {
+    onError("The on-device Whisper engine isn’t bundled in this prototype yet. Until it is, typing is the fully local path.");
+  },
+  stop() {},
+};
+
+const STT_ENGINES = { webspeech: WebSpeechEngine, ondevice: OnDeviceWhisperEngine };
+
+const stt = {
+  engine() {
+    const want = store.get(LS.STT, "webspeech");
+    const e = STT_ENGINES[want] || WebSpeechEngine;
+    return e.available() ? e : WebSpeechEngine;
+  },
+  available() { return this.engine().available(); },
+  start(cbs) { this.engine().start(cbs); },
+  stop() { this.engine().stop(); },
+};
+
+/* ---------- push-to-talk ---------- */
+let ptt = false;
+
+function pttStart() {
+  if (ptt || busy) return;
+  if (!getKey()) { openSettings(); return; }
+  if (!stt.available()) {
+    setStatus("Voice input isn’t available here — type below instead (it’s the most private path).", "err");
+    return;
+  }
+  ptt = true;
+  tts.stop();                    // barge-in: talking interrupts Vedetta
+  setState("listening");
+  setStatus("Listening… release to send.", "live");
+  stt.start({
+    onInterim: (text) => { if (ptt) setStatus(escapeHtml(text) || "Listening… release to send.", "live"); },
+    onFinal: (text) => {
+      setState("idle");
+      if (text) { send(text); }
+      else { setStatus("Didn’t catch that — hold and try again, or type below.", "err"); setTimeout(idleStatus, 3500); }
+    },
+    onError: (msg) => {
+      ptt = false;
+      setState("idle");
+      setStatus(escapeHtml(msg), "err");
+      setTimeout(idleStatus, 5000);
+    },
+  });
+}
+function pttStop() {
+  if (!ptt) return;
+  ptt = false;
+  setStatus("…", null);
+  stt.stop(); // onFinal fires from engine's end event
+}
+
+el.orb.addEventListener("pointerdown", (e) => { e.preventDefault(); el.orb.setPointerCapture(e.pointerId); pttStart(); });
+el.orb.addEventListener("pointerup", () => pttStop());
+el.orb.addEventListener("pointercancel", () => pttStop());
+el.orb.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); pttStart(); } });
+el.orb.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); pttStop(); } });
+
+/* global space-bar hold (when not typing in a field / dialog) */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== " " || e.repeat) return;
+  const a = document.activeElement;
+  const typing = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT" || a.isContentEditable);
+  const dialogOpen = el.dlgSettings.open || el.dlgPrivacy.open || el.dlgVault.open;
+  if (typing || dialogOpen || a === el.orb) return;
+  e.preventDefault();
+  pttStart();
+});
+document.addEventListener("keyup", (e) => {
+  if (e.key !== " ") return;
+  if (document.activeElement === el.orb) return;
+  pttStop();
+});
+window.addEventListener("blur", () => { pttStop(); }); // never leave the mic hot
+
+/* ============================================================
+   Claude — direct browser → api.anthropic.com, streaming SSE.
+   ============================================================ */
+function getKey() {
+  if (KeySeal.isSealed()) return (KeySeal.get("key") || "").trim();
+  return (store.get(LS.KEY, "") || "").trim();
+}
+function setKey(v) {
+  if (KeySeal.isSealed()) KeySeal.update("key", v); // re-seal; never write plaintext while locked mode is on
+  else store.set(LS.KEY, v);
+}
+function getFinnhubKey() {
+  if (KeySeal.isSealed()) return (KeySeal.get("finnhub") || "").trim();
+  return (store.get(LS.FINN, "") || "").trim();
+}
+function setFinnhubKey(v) {
+  if (KeySeal.isSealed()) KeySeal.update("finnhub", v);
+  else store.set(LS.FINN, v);
+}
+function getModel() { return store.get(LS.MODEL, DEFAULT_MODEL); }
+
+async function send(userText) {
+  if (busy) return;
+  const key = getKey();
+  if (!key) { openSettings(); return; }
+
+  busy = true;
+  syncStopBtn();
+  tts.stop();
+  addTurn("user", userText);
+  const histMark = history.length; // rollback point: on failure, drop the whole turn
+  history.push({ role: "user", content: userText });
+
+  setState("thinking");
+  setStatus("Thinking…");
+  abortCtl = new AbortController();
+
+  let assistantBubble = null;
+  let spokenUpTo = 0;
+  let fullText = "";
+
+  const onText = (delta) => {
+    if (!assistantBubble) {
+      assistantBubble = addTurn("assistant", "").bubble;
+      assistantBubble.classList.add("streaming");
+      setStatus("");
+    }
+    fullText += delta;
+    assistantBubble.textContent = fullText;
+    assistantBubble.parentElement.scrollIntoView({ block: "end" });
+    // speak completed sentences as they stream in (low perceived latency)
+    let m;
+    const re = /[.!?…]["')\]]?\s/g;
+    re.lastIndex = spokenUpTo;
+    while ((m = re.exec(fullText)) !== null) {
+      tts.enqueue(speakable(fullText.slice(spokenUpTo, m.index + m[0].length)));
+      spokenUpTo = m.index + m[0].length;
+    }
+  };
+
+  try {
+    await runTurn(onText, MAX_TOOL_ROUNDS);
+    // speak the tail
+    if (fullText.slice(spokenUpTo).trim()) tts.enqueue(speakable(fullText.slice(spokenUpTo)));
+    if (assistantBubble) assistantBubble.classList.remove("streaming");
+    if (!fullText.trim() && assistantBubble) assistantBubble.textContent = "(no reply)";
+  } catch (err) {
+    if (assistantBubble) assistantBubble.classList.remove("streaming");
+    // Roll conversation memory back to before this turn so history never ends
+    // with a dangling tool_use (which would invalidate the next request).
+    history.length = histMark;
+    if (err.name === "AbortError") {
+      addSystemNote("Stopped.");
+    } else {
+      const msg = friendlyError(err);
+      setStatus(escapeHtml(msg), "err");
+      addSystemNote(msg);
+    }
+  } finally {
+    busy = false;
+    abortCtl = null;
+    setState(ttsSpeaking ? "speaking" : "idle");
+    syncStopBtn();
+    if (!el.status.dataset.tone) idleStatus();
+  }
+}
+
+/* One assistant turn, following tool_use rounds as needed.
+   Market tools hit the network, so tool results are awaited. */
+async function runTurn(onText, roundsLeft) {
+  const { content, stopReason } = await streamMessage(onText);
+  history.push({ role: "assistant", content });
+
+  if (stopReason === "tool_use" && roundsLeft > 0) {
+    const toolUses = content.filter(b => b.type === "tool_use");
+    if (toolUses.length) {
+      setStatus("Checking the market…");
+      const results = [];
+      for (const b of toolUses) {
+        results.push({ type: "tool_result", tool_use_id: b.id, content: await runTool(b.name, b.input) });
+      }
+      history.push({ role: "user", content: results });
+      return runTurn(onText, roundsLeft - 1);
+    }
+  }
+  if (stopReason === "refusal") {
+    onText(" I can’t help with that request.");
+  }
+}
+
+/* POST /v1/messages with stream:true and parse the SSE stream. */
+async function streamMessage(onText) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    signal: abortCtl.signal,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": getKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: getModel(),
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT + "\nToday's date is " + new Date().toDateString() + ".",
+      tools: TOOLS,
+      messages: history,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json())?.error?.message || ""; } catch {}
+    const e = new Error(detail || res.statusText);
+    e.status = res.status;
+    e.retryAfter = res.headers.get("retry-after");
+    throw e;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const blocks = [];   // ordered content blocks for the assistant turn
+  let stopReason = null;
+
+  const handleEvent = (ev) => {
+    switch (ev.type) {
+      case "content_block_start":
+        blocks[ev.index] =
+          ev.content_block.type === "tool_use"
+            ? { type: "tool_use", id: ev.content_block.id, name: ev.content_block.name, input: {}, _json: "" }
+            : { type: "text", text: "" };
+        break;
+      case "content_block_delta":
+        if (ev.delta.type === "text_delta") {
+          blocks[ev.index].text += ev.delta.text;
+          onText(ev.delta.text);
+        } else if (ev.delta.type === "input_json_delta") {
+          blocks[ev.index]._json += ev.delta.partial_json;
+        }
+        break;
+      case "content_block_stop": {
+        const b = blocks[ev.index];
+        if (b && b.type === "tool_use") {
+          try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; }
+          delete b._json;
+        }
+        break;
+      }
+      case "message_delta":
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        break;
+      case "error": {
+        const e = new Error(ev.error?.message || "stream error");
+        e.status = ev.error?.type === "overloaded_error" ? 529 : 500;
+        throw e;
+      }
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch { continue; }
+        handleEvent(ev);
+      }
+    }
+  }
+
+  return { content: blocks.filter(Boolean), stopReason };
+}
+
+function friendlyError(err) {
+  if (err.status === 401) return "Anthropic rejected that API key. Check it in Settings (it should start with sk-ant-…).";
+  if (err.status === 403) return "That API key doesn’t have permission for this model. Try another model in Settings.";
+  if (err.status === 404) return "Model not found — it may not be enabled for your account. Pick another model in Settings.";
+  if (err.status === 429) return "Rate limited by Anthropic." + (err.retryAfter ? ` Try again in ~${err.retryAfter}s.` : " Give it a moment and try again.");
+  if (err.status === 400) return "Anthropic rejected the request: " + (err.message || "invalid request.");
+  if (err.status === 529 || err.status >= 500) return "Anthropic’s API is briefly overloaded. Try again in a few seconds.";
+  if (err instanceof TypeError) return "Couldn’t reach api.anthropic.com — check your connection. (Nothing was sent anywhere else.)";
+  return "Something went wrong: " + (err.message || String(err));
+}
+
+/* ============================================================
+   Market data — swappable providers behind one interface.
+   Provider contract: async quotes(symbols[]) -> Map<sym, Quote>
+   Quote: { sym, name, price, ccy, prev, ch, chPct, chLabel,
+            asOf(ms|null), note, src }
+   Throws Error with a plain, honest message on failure.
+   ============================================================ */
+
+const YahooProvider = {
+  id: "yahoo",
+  label: "Yahoo Finance (unofficial)",
+  note: "via Yahoo Finance (unofficial) — typically delayed up to about 15 minutes",
+  async quotes(symbols) {
+    const out = new Map();
+    const results = await Promise.allSettled(symbols.map(async (sym) => {
+      const url = "https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(sym) + "?range=1d&interval=1d";
+      const res = await fetch(url, { headers: { accept: "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta || typeof meta.regularMarketPrice !== "number") throw new Error("no quote in response");
+      const prev = typeof meta.chartPreviousClose === "number" ? meta.chartPreviousClose : null;
+      const price = meta.regularMarketPrice;
+      out.set(sym, {
+        sym, name: meta.longName || meta.shortName || dirName(sym), price,
+        ccy: meta.currency || "USD", prev,
+        ch: prev != null ? price - prev : null,
+        chPct: prev ? ((price - prev) / prev) * 100 : null,
+        chLabel: "today",
+        asOf: meta.regularMarketTime ? meta.regularMarketTime * 1000 : null,
+        note: this.note, src: "yahoo",
+      });
+    }));
+    const rejects = results.filter(r => r.status === "rejected");
+    if (rejects.length === symbols.length && rejects.every(r => r.reason instanceof TypeError)) {
+      throw new Error("Yahoo blocked this browser page (no CORS headers). That is a Yahoo limitation, not a bug here: this keyless source works from the Postern desktop shell or over postern-tor. In a plain browser, switch stocks to Finnhub (free key) in Settings — crypto and FX already work here.");
+    }
+    if (out.size === 0 && rejects.length) throw new Error("Yahoo returned no quotes (" + rejects[0].reason.message + "). Check the symbol, or switch provider in Settings.");
+    return out;
+  },
+};
+
+const FinnhubProvider = {
+  id: "finnhub",
+  label: "Finnhub",
+  note: "via Finnhub on your own key — US stocks near-real-time on the free tier",
+  async quotes(symbols) {
+    const token = getFinnhubKey();
+    if (!token) throw new Error("Finnhub is selected as the stock provider but no Finnhub API key is set in Settings.");
+    const out = new Map();
+    await Promise.all(symbols.map(async (sym) => {
+      // The key travels as the X-Finnhub-Token request header (Finnhub's documented
+      // header auth), NEVER as a ?token= query parameter — URLs land in browser
+      // history and intermediary logs; headers don't.
+      const url = "https://finnhub.io/api/v1/quote?symbol=" + encodeURIComponent(sym);
+      const res = await fetch(url, { headers: { "X-Finnhub-Token": token } });
+      if (res.status === 401 || res.status === 403) throw new Error("Finnhub rejected the API key — check it in Settings.");
+      if (!res.ok) throw new Error("Finnhub HTTP " + res.status);
+      const q = await res.json();
+      if (!q || typeof q.c !== "number" || (q.c === 0 && q.pc === 0)) return; // unknown symbol
+      out.set(sym, {
+        sym, name: dirName(sym), price: q.c, ccy: "USD",
+        prev: q.pc ?? null, ch: q.d ?? null, chPct: q.dp ?? null, chLabel: "today",
+        asOf: q.t ? q.t * 1000 : null, note: this.note, src: "finnhub",
+      });
+    }));
+    return out;
+  },
+};
+
+const CustomProvider = {
+  id: "custom",
+  label: "Custom endpoint",
+  note: "via your custom endpoint — freshness and delay are whatever your endpoint provides",
+  async quotes(symbols) {
+    const tpl = (store.get(LS.CUSTOM, "") || "").trim();
+    if (!tpl || !tpl.includes("{symbol}")) throw new Error("Custom provider is selected but the URL template in Settings is empty or missing {symbol}.");
+    const out = new Map();
+    await Promise.all(symbols.map(async (sym) => {
+      const res = await fetch(tpl.replace("{symbol}", encodeURIComponent(sym)));
+      if (!res.ok) throw new Error("Custom endpoint HTTP " + res.status);
+      const text = (await res.text()).trim();
+      let price = Number(text);
+      if (!isFinite(price)) {
+        try {
+          const j = JSON.parse(text);
+          for (const k of ["price", "c", "last", "close", "rate", "regularMarketPrice", "value"]) {
+            if (typeof j?.[k] === "number") { price = j[k]; break; }
+          }
+        } catch {}
+      }
+      if (!isFinite(price)) return;
+      out.set(sym, { sym, name: dirName(sym), price, ccy: "", prev: null, ch: null, chPct: null, chLabel: null, asOf: Date.now(), note: this.note, src: "custom" });
+    }));
+    if (out.size === 0) throw new Error("The custom endpoint returned nothing parseable (expected a bare number, or JSON with price/c/last/close/rate).");
+    return out;
+  },
+};
+
+const CoinGeckoProvider = {
+  id: "coingecko",
+  label: "CoinGecko",
+  note: "via CoinGecko (keyless) — spot price, may lag a minute or two; 24-hour change, not since a market close",
+  async quotes(symbols) {
+    const ids = symbols.map(s => CRYPTO_IDS[s]).filter(Boolean);
+    if (!ids.length) return new Map();
+    const url = "https://api.coingecko.com/api/v3/simple/price?ids=" + encodeURIComponent(ids.join(",")) +
+      "&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true";
+    const res = await fetch(url, { headers: { accept: "application/json" } });
+    if (res.status === 429) throw new Error("CoinGecko rate-limited this address (keyless tier). Wait a minute and try again.");
+    if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
+    const data = await res.json();
+    const out = new Map();
+    for (const sym of symbols) {
+      const row = data[CRYPTO_IDS[sym]];
+      if (!row || typeof row.usd !== "number") continue;
+      const chPct = typeof row.usd_24h_change === "number" ? row.usd_24h_change : null;
+      out.set(sym, {
+        sym, name: dirName(sym) || sym, price: row.usd, ccy: "USD",
+        prev: chPct != null ? row.usd / (1 + chPct / 100) : null,
+        ch: chPct != null ? row.usd - row.usd / (1 + chPct / 100) : null,
+        chPct, chLabel: "24h",
+        asOf: row.last_updated_at ? row.last_updated_at * 1000 : null,
+        note: this.note, src: "coingecko",
+      });
+    }
+    return out;
+  },
+};
+
+const FrankfurterProvider = {
+  id: "frankfurter",
+  label: "Frankfurter (ECB)",
+  note: "ECB daily reference rate via Frankfurter — one rate per business day around 16:00 CET, not a live market feed",
+  async quotes(pairs) {
+    const out = new Map();
+    const byBase = {};
+    for (const p of pairs) {
+      const [base, quote] = p.split("/");
+      (byBase[base] = byBase[base] || []).push({ pair: p, quote });
+    }
+    await Promise.all(Object.entries(byBase).map(async ([base, wants]) => {
+      // Deliberately fetch the FULL table for the base: a genuinely broad
+      // snapshot — the provider learns only the base currency, not the pair.
+      const res = await fetch("https://api.frankfurter.dev/v1/latest?base=" + encodeURIComponent(base), { headers: { accept: "application/json" } });
+      if (!res.ok) throw new Error("Frankfurter HTTP " + res.status + (res.status === 404 ? " — unknown base currency " + base : ""));
+      const data = await res.json();
+      for (const w of wants) {
+        const rate = data?.rates?.[w.quote];
+        if (typeof rate !== "number") continue;
+        out.set(w.pair, {
+          sym: w.pair, name: dirName(w.pair) || (base + " / " + w.quote), price: rate, ccy: w.quote,
+          prev: null, ch: null, chPct: null, chLabel: null,
+          asOf: data.date ? Date.parse(data.date + "T16:00:00+01:00") : null,
+          note: this.note, src: "frankfurter",
+        });
+      }
+    }));
+    return out;
+  },
+};
+
+function stockProvider() {
+  const id = store.get(LS.SPROV, "yahoo");
+  return id === "finnhub" ? FinnhubProvider : id === "custom" ? CustomProvider : YahooProvider;
+}
+
+/* Route a mixed symbol list to the right providers, in parallel. */
+async function fetchQuotes(symbols) {
+  const uniq = [...new Set(symbols.map(normalizeSymbol).filter(Boolean))];
+  const groups = { stock: [], crypto: [], fx: [] };
+  uniq.forEach(s => groups[classify(s)].push(s));
+  const out = new Map();
+  const errors = [];
+  const jobs = [];
+  if (groups.stock.length)  jobs.push(stockProvider().quotes(groups.stock).then(m => m.forEach((v, k) => out.set(k, v))).catch(e => errors.push(e.message)));
+  if (groups.crypto.length) jobs.push(CoinGeckoProvider.quotes(groups.crypto).then(m => m.forEach((v, k) => out.set(k, v))).catch(e => errors.push(e.message)));
+  if (groups.fx.length)     jobs.push(FrankfurterProvider.quotes(groups.fx).then(m => m.forEach((v, k) => out.set(k, v))).catch(e => errors.push(e.message)));
+  await Promise.all(jobs);
+  if (out.size) {
+    out.forEach((v, k) => quotes.set(k, v));
+    quotesAsOf = Date.now();
+    renderBoard();
+    checkAlerts();
+  }
+  return { got: out, errors };
+}
+
+/* Snapshot: requested symbols + whole board + decoys in one batch,
+   so a single lookup doesn't spotlight one asset. */
+function snapshotSymbols(extra = []) {
+  const decoys = (store.get(LS.DECOYS, "") || "").split(/[,\s]+/).filter(Boolean);
+  return [...extra, ...book.watch, ...book.holdings.map(h => h.sym), ...book.alerts.filter(a => !a.hit).map(a => a.sym), ...decoys];
+}
+
+/* ---------- formatting ---------- */
+function fmtNum(v, dp) {
+  if (v == null || !isFinite(v)) return "—";
+  if (dp == null) dp = Math.abs(v) >= 1 ? 2 : Math.abs(v) >= 0.01 ? 4 : 6;
+  return Number(v).toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+function fmtPrice(q) { return fmtNum(q.price) + (q.ccy ? " " + q.ccy : ""); }
+function fmtChange(q) {
+  if (q.chPct == null) return "";
+  const sign = q.chPct >= 0 ? "up" : "down";
+  const chBit = q.ch != null ? fmtNum(Math.abs(q.ch)) + " (" + fmtNum(Math.abs(q.chPct)) + " percent)" : fmtNum(Math.abs(q.chPct)) + " percent";
+  return " " + sign + " " + chBit + (q.chLabel === "24h" ? " over 24 hours" : " today") + (q.prev != null && q.chLabel !== "24h" ? ", previous close " + fmtNum(q.prev) : "") + ".";
+}
+function fmtAsOf(q) {
+  if (!q.asOf) return "";
+  const d = new Date(q.asOf);
+  return " As of " + d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ".";
+}
+function quoteText(q) {
+  return q.sym + (q.name ? " (" + q.name + ")" : "") + ": " + fmtPrice(q) + "." + fmtChange(q) + fmtAsOf(q) + " " + q.note + ".";
+}
+
+/* ============================================================
+   Client-side tools — what Vedetta can actually DO.
+   All async; quote tools hit the user's configured provider.
+   ============================================================ */
+const VAULT_LOCKED_MSG = "The vault is locked, so the watchlist, portfolio, and alerts are unreadable right now — even to this page. Ask the user to unlock it with their passphrase (the Vault button in the header).";
+
+async function runTool(name, input) {
+  try {
+    switch (name) {
+      case "search_asset": {
+        const hits = dirFind(input.query);
+        if (!hits.length) return "No match for \"" + String(input.query || "") + "\" in the local directory (about a hundred well-known stocks, coins, and FX pairs — searched entirely on-device, nothing sent). If the user knows the exchange ticker, try lookup_quote with it directly.";
+        return "Local directory matches (resolved on-device, nothing sent over the network): " +
+          hits.map(h => `${h.sym} — ${h.name} [${h.kind}]`).join("; ") + ".";
+      }
+
+      case "lookup_quote": {
+        const sym = normalizeSymbol(input.symbol);
+        if (!sym) return "Error: no symbol given.";
+        const { got, errors } = await fetchQuotes(snapshotSymbols([sym]));
+        const q = got.get(sym) || quotes.get(sym);
+        if (!q) return "Couldn't get a quote for " + sym + "." + (errors.length ? " Provider said: " + errors.join(" / ") : " The symbol may be wrong — try search_asset with the company name.");
+        return quoteText(q);
+      }
+
+      case "add_to_watchlist": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        const sym = normalizeSymbol(input.symbol);
+        if (!sym) return "Error: no symbol given.";
+        if (book.watch.includes(sym)) return sym + " is already on the watchlist (" + book.watch.length + " symbols).";
+        book.watch.push(sym);
+        persistBook();
+        renderBoard();
+        const { got, errors } = await fetchQuotes(snapshotSymbols());
+        const q = got.get(sym) || quotes.get(sym);
+        return "Added " + sym + (dirName(sym) ? " (" + dirName(sym) + ")" : "") + " to the watchlist — now " + book.watch.length + " symbol" + (book.watch.length === 1 ? "" : "s") + ", stored only on this device." +
+          (q ? " Latest: " + quoteText(q) : (errors.length ? " Quote fetch failed: " + errors.join(" / ") : ""));
+      }
+
+      case "remove_from_watchlist": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        const sym = normalizeSymbol(input.symbol);
+        if (!book.watch.includes(sym)) return sym + " isn't on the watchlist. Currently watching: " + (book.watch.join(", ") || "nothing") + ".";
+        book.watch = book.watch.filter(s => s !== sym);
+        persistBook();
+        renderBoard();
+        return "Removed " + sym + ". Watchlist now: " + (book.watch.join(", ") || "empty") + ".";
+      }
+
+      case "show_watchlist": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        if (!book.watch.length) return "The watchlist is empty. Add symbols by voice ('add Petrobras to my watchlist') or in the board.";
+        const { errors } = await fetchQuotes(snapshotSymbols());
+        const lines = book.watch.map(sym => {
+          const q = quotes.get(sym);
+          return q ? quoteText(q) : sym + ": no quote available." + (errors.length ? " (" + errors[0] + ")" : "");
+        });
+        return "Watchlist (" + book.watch.length + " symbols, stored only on this device): " + lines.join(" ");
+      }
+
+      case "add_holding": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        const sym = normalizeSymbol(input.symbol);
+        const qty = Number(input.quantity);
+        const cost = Number(input.cost_basis);
+        if (!sym) return "Error: no symbol given.";
+        if (!(qty > 0)) return "Error: quantity must be a positive number.";
+        if (!(cost >= 0)) return "Error: cost_basis must be a non-negative number (average purchase price per unit).";
+        const existing = book.holdings.find(h => h.sym === sym);
+        let merged = false;
+        if (existing) {
+          const totalQty = existing.qty + qty;
+          existing.cost = (existing.qty * existing.cost + qty * cost) / totalQty;
+          existing.qty = totalQty;
+          merged = true;
+        } else {
+          book.holdings.push({ sym, qty, cost });
+        }
+        persistBook();
+        renderBoard();
+        fetchQuotes(snapshotSymbols()).catch(() => {});
+        return (merged ? "Merged into the existing " + sym + " position — now " : "Recorded ") +
+          (merged ? fmtNum(book.holdings.find(h => h.sym === sym).qty, null) + " units at average cost " + fmtNum(book.holdings.find(h => h.sym === sym).cost) :
+            fmtNum(qty, null) + " " + sym + " at cost " + fmtNum(cost) + " per unit") +
+          ". This is bookkeeping in the local encrypted tracker only — nothing was bought or sold anywhere.";
+      }
+
+      case "remove_holding": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        const sym = normalizeSymbol(input.symbol);
+        if (!book.holdings.some(h => h.sym === sym)) return "No " + sym + " position in the tracker. Current positions: " + (book.holdings.map(h => h.sym).join(", ") || "none") + ".";
+        book.holdings = book.holdings.filter(h => h.sym !== sym);
+        persistBook();
+        renderBoard();
+        return "Removed the " + sym + " row from the local tracker (bookkeeping only — nothing was sold).";
+      }
+
+      case "show_portfolio": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        if (!book.holdings.length) return "The portfolio tracker is empty. Record a position by voice ('I hold 10 shares of Apple at 190') or in the board.";
+        const { errors } = await fetchQuotes(snapshotSymbols());
+        const lines = [];
+        const totals = {}; // ccy -> {value, cost}
+        let missing = 0;
+        for (const h of book.holdings) {
+          const q = quotes.get(h.sym);
+          if (!q) { missing++; lines.push(h.sym + ": " + fmtNum(h.qty, null) + " units at cost " + fmtNum(h.cost) + " — no current quote."); continue; }
+          const value = h.qty * q.price;
+          const costTotal = h.qty * h.cost;
+          const pl = value - costTotal;
+          const plPct = costTotal ? (pl / costTotal) * 100 : null;
+          const ccy = q.ccy || "?";
+          totals[ccy] = totals[ccy] || { value: 0, cost: 0 };
+          totals[ccy].value += value; totals[ccy].cost += costTotal;
+          lines.push(h.sym + ": " + fmtNum(h.qty, null) + " units, value " + fmtNum(value) + " " + ccy + ", " + (pl >= 0 ? "up " : "down ") + fmtNum(Math.abs(pl)) + (plPct != null ? " (" + fmtNum(Math.abs(plPct)) + " percent)" : "") + " versus cost.");
+        }
+        const totLines = Object.entries(totals).map(([ccy, t]) => {
+          const pl = t.value - t.cost;
+          return "Total in " + ccy + ": " + fmtNum(t.value) + ", " + (pl >= 0 ? "up " : "down ") + fmtNum(Math.abs(pl)) + (t.cost ? " (" + fmtNum(Math.abs(pl / t.cost * 100)) + " percent)" : "") + " versus cost.";
+        });
+        return "Portfolio (" + book.holdings.length + " positions, tracked only on this device; values use possibly delayed quotes): " +
+          lines.join(" ") + " " + totLines.join(" ") +
+          (Object.keys(totals).length > 1 ? " Totals are per currency — Vedetta does not convert between currencies." : "") +
+          (missing ? " " + missing + " position(s) had no quote" + (errors.length ? " (" + errors[0] + ")" : "") + "." : "");
+      }
+
+      case "set_price_alert": {
+        if (vaultState === "locked") return VAULT_LOCKED_MSG;
+        const sym = normalizeSymbol(input.symbol);
+        const level = Number(input.level);
+        if (!sym) return "Error: no symbol given.";
+        if (!isFinite(level) || level <= 0) return "Error: level must be a positive number.";
+        let dir = input.direction === "above" || input.direction === "below" ? input.direction : null;
+        let priceNote = "";
+        const { got } = await fetchQuotes(snapshotSymbols([sym]));
+        const q = got.get(sym) || quotes.get(sym);
+        if (!dir) {
+          if (!q) return "Couldn't infer the direction because no current quote is available for " + sym + ". Retry with an explicit direction, above or below.";
+          dir = level > q.price ? "above" : "below";
+        }
+        if (q) priceNote = " Current price is " + fmtPrice(q) + ".";
+        book.alerts.push({ id: "a" + Date.now() + Math.random().toString(36).slice(2, 6), sym, level, dir, hit: false });
+        persistBook();
+        renderBoard();
+        return "Alert armed: " + sym + " " + dir + " " + fmtNum(level) + "." + priceNote +
+          " Honest limits: it's checked in this tab only, when quotes refresh — it will not fire if the tab is closed, and quotes may be delayed.";
+      }
+
+      default:
+        return "Error: unknown tool \"" + name + "\".";
+    }
+  } catch (e) {
+    return "Error running " + name + ": " + (e && e.message ? e.message : String(e));
+  }
+}
+
+/* ============================================================
+   The board — rendering + manual (non-voice) controls
+   ============================================================ */
+function td_(cls, text) { const c = document.createElement("td"); if (cls) c.className = cls; c.textContent = text; return c; }
+function th_(cls, text) { const c = document.createElement("th"); if (cls) c.className = cls; c.textContent = text; return c; }
+
+function renderBoard() {
+  renderVaultBanner();
+  const locked = vaultState === "locked";
+
+  /* watchlist */
+  el.tblWatch.innerHTML = "";
+  if (locked) {
+    el.tblWatch.appendChild(emptyRow("Locked — unlock the vault to see your watchlist."));
+  } else if (!book.watch.length) {
+    el.tblWatch.appendChild(emptyRow("Nothing watched yet. Say “add Petrobras to my watchlist”, or add a symbol below."));
+  } else {
+    const head = document.createElement("tr");
+    head.append(th_("", "Symbol"), th_("", ""), th_("num", "Last"), th_("num", "Change"), th_("", ""));
+    el.tblWatch.appendChild(head);
+    for (const sym of book.watch) {
+      const q = quotes.get(sym);
+      const tr = document.createElement("tr");
+      tr.append(
+        td_("sym", sym),
+        td_("name", (q && q.name) || dirName(sym) || ""),
+        td_("num", q ? fmtPrice(q) : "—"),
+      );
+      const chTd = td_("num " + (q && q.chPct != null ? (q.chPct >= 0 ? "pos" : "neg") : ""), q && q.chPct != null ? (q.chPct >= 0 ? "+" : "−") + fmtNum(Math.abs(q.chPct)) + "%" + (q.chLabel === "24h" ? " ²⁴ʰ" : "") : "—");
+      tr.appendChild(chTd);
+      const rmTd = document.createElement("td");
+      const rm = document.createElement("button");
+      rm.className = "rm"; rm.textContent = "✕";
+      rm.setAttribute("aria-label", "Remove " + sym + " from watchlist");
+      rm.onclick = () => { book.watch = book.watch.filter(s => s !== sym); persistBook(); renderBoard(); };
+      rmTd.appendChild(rm);
+      tr.appendChild(rmTd);
+      el.tblWatch.appendChild(tr);
+    }
+  }
+  footQuotes(el.footWatch);
+
+  /* portfolio */
+  el.tblPort.innerHTML = "";
+  if (locked) {
+    el.tblPort.appendChild(emptyRow("Locked — unlock the vault to see your portfolio."));
+  } else if (!book.holdings.length) {
+    el.tblPort.appendChild(emptyRow("No positions tracked. Say “I hold ten shares of Apple at one ninety”, or add one below. Tracking only — nothing is ever bought or sold here."));
+  } else {
+    const head = document.createElement("tr");
+    head.append(th_("", "Symbol"), th_("num", "Qty"), th_("num", "Cost/unit"), th_("num", "Last"), th_("num", "Value"), th_("num", "P/L"), th_("num", "P/L %"), th_("", ""));
+    el.tblPort.appendChild(head);
+    const totals = {};
+    for (const h of book.holdings) {
+      const q = quotes.get(h.sym);
+      const value = q ? h.qty * q.price : null;
+      const cost = h.qty * h.cost;
+      const pl = value != null ? value - cost : null;
+      const plPct = pl != null && cost ? pl / cost * 100 : null;
+      if (q && value != null) {
+        const ccy = q.ccy || "?";
+        totals[ccy] = totals[ccy] || { value: 0, cost: 0 };
+        totals[ccy].value += value; totals[ccy].cost += cost;
+      }
+      const tr = document.createElement("tr");
+      tr.append(
+        td_("sym", h.sym),
+        td_("num", fmtNum(h.qty, null)),
+        td_("num", fmtNum(h.cost)),
+        td_("num", q ? fmtPrice(q) : "—"),
+        td_("num", value != null ? fmtNum(value) : "—"),
+        td_("num " + (pl != null ? (pl >= 0 ? "pos" : "neg") : ""), pl != null ? (pl >= 0 ? "+" : "−") + fmtNum(Math.abs(pl)) : "—"),
+        td_("num " + (plPct != null ? (plPct >= 0 ? "pos" : "neg") : ""), plPct != null ? (plPct >= 0 ? "+" : "−") + fmtNum(Math.abs(plPct)) + "%" : "—"),
+      );
+      const rmTd = document.createElement("td");
+      const rm = document.createElement("button");
+      rm.className = "rm"; rm.textContent = "✕";
+      rm.setAttribute("aria-label", "Remove " + h.sym + " holding");
+      rm.onclick = () => { book.holdings = book.holdings.filter(x => x.sym !== h.sym); persistBook(); renderBoard(); };
+      rmTd.appendChild(rm);
+      tr.appendChild(rmTd);
+      el.tblPort.appendChild(tr);
+    }
+    for (const [ccy, t] of Object.entries(totals)) {
+      const pl = t.value - t.cost;
+      const tr = document.createElement("tr");
+      tr.className = "tot";
+      tr.append(
+        td_("sym", "TOTAL " + ccy), td_("num", ""), td_("num", fmtNum(t.cost)), td_("num", ""),
+        td_("num", fmtNum(t.value)),
+        td_("num " + (pl >= 0 ? "pos" : "neg"), (pl >= 0 ? "+" : "−") + fmtNum(Math.abs(pl))),
+        td_("num " + (pl >= 0 ? "pos" : "neg"), t.cost ? (pl >= 0 ? "+" : "−") + fmtNum(Math.abs(pl / t.cost * 100)) + "%" : "—"),
+        td_("", ""),
+      );
+      el.tblPort.appendChild(tr);
+    }
+  }
+  if (!locked) footQuotes(el.footPort, "tracking only — vedetta places no trades · P/L uses your last refreshed, possibly delayed quotes");
+
+  /* alerts */
+  el.tblAlerts.innerHTML = "";
+  if (locked) {
+    el.tblAlerts.appendChild(emptyRow("Locked — unlock the vault to see your alerts."));
+  } else if (!book.alerts.length) {
+    el.tblAlerts.appendChild(emptyRow("No alerts armed. Say “alert me if Bitcoin falls below 100 thousand”."));
+  } else {
+    for (const a of book.alerts) {
+      const tr = document.createElement("tr");
+      tr.append(td_("sym", a.sym), td_("", a.dir + " " + fmtNum(a.level)));
+      const st = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "alert-badge " + (a.hit ? "hit" : "armed");
+      badge.textContent = a.hit ? "hit" : "armed";
+      st.appendChild(badge);
+      tr.appendChild(st);
+      const rmTd = document.createElement("td");
+      const rm = document.createElement("button");
+      rm.className = "rm"; rm.textContent = "✕";
+      rm.setAttribute("aria-label", "Remove alert for " + a.sym);
+      rm.onclick = () => { book.alerts = book.alerts.filter(x => x.id !== a.id); persistBook(); renderBoard(); };
+      rmTd.appendChild(rm);
+      tr.appendChild(rmTd);
+      el.tblAlerts.appendChild(tr);
+    }
+  }
+}
+function emptyRow(text) {
+  const tr = document.createElement("tr");
+  const c = document.createElement("td");
+  c.className = "empty-row";
+  c.colSpan = 8;
+  c.textContent = text;
+  tr.appendChild(c);
+  return tr;
+}
+function footQuotes(foot, suffix) {
+  if (vaultState === "locked") { foot.textContent = "vault locked"; return; }
+  const srcs = [...new Set([...quotes.values()].map(q => q.src))];
+  const base = quotesAsOf
+    ? "snapshot " + new Date(quotesAsOf).toLocaleTimeString() + " · " + (srcs.join(", ") || "no source") + " · may be delayed"
+    : "no quotes fetched yet — refresh discloses symbols to your provider";
+  foot.textContent = suffix ? suffix : base;
+  if (!suffix) foot.textContent = base;
+}
+function footError(msg) {
+  el.footWatch.textContent = msg;
+  el.footWatch.dataset.tone = "err";
+  setTimeout(() => { delete el.footWatch.dataset.tone; renderBoard(); }, 8000);
+}
+
+function renderVaultBanner() {
+  const b = el.vaultBanner;
+  const hasData = book.watch.length || book.holdings.length || book.alerts.length;
+  if (vaultState === "open") { b.hidden = true; syncVaultBtn(); return; }
+  b.hidden = false;
+  b.className = "vault-note" + (vaultState === "locked" ? " locked" : "");
+  b.innerHTML = "";
+  const span = document.createElement("span");
+  const btn = document.createElement("button");
+  btn.className = "vbtn";
+  if (vaultState === "locked") {
+    span.textContent = "Vault locked — your watchlist, portfolio, and alerts are encrypted on this device and unreadable until you unlock.";
+    btn.textContent = "Unlock";
+  } else {
+    span.textContent = hasData
+      ? "Memory only — this board vanishes when the tab closes. Set a passphrase to keep it, encrypted, on this device."
+      : "New here: the board below is yours alone. Set a passphrase to store it encrypted on this device (" + (VSDK.real() ? "XChaCha20-Poly1305 + Argon2id, via postern-sdk" : "AES-256-GCM") + ").";
+    btn.textContent = "Set passphrase";
+  }
+  btn.onclick = openVault;
+  b.append(span, btn);
+  syncVaultBtn();
+}
+function syncVaultBtn() {
+  el.btnVault.className = "hbtn " + (vaultState === "open" ? "vault-open" : vaultState === "locked" ? "vault-locked" : "");
+  el.btnVault.textContent = vaultState === "open" ? "Vault · open" : vaultState === "locked" ? "Vault · locked" : "Vault";
+}
+
+/* manual board forms (the non-voice path is first-class too) */
+el.formWatch.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (vaultState === "locked") { openVault(); return; }
+  const raw = el.watchSym.value.trim();
+  if (!raw) return;
+  const hit = dirFind(raw)[0];
+  const sym = /^[A-Za-z0-9./=-]{1,12}$/.test(raw) && raw === raw.toUpperCase() ? normalizeSymbol(raw) : (hit ? hit.sym : normalizeSymbol(raw));
+  if (!sym) return;
+  if (!book.watch.includes(sym)) { book.watch.push(sym); persistBook(); renderBoard(); }
+  el.watchSym.value = "";
+  refreshBoard();
+});
+el.formHolding.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (vaultState === "locked") { openVault(); return; }
+  const sym = normalizeSymbol(el.holdSym.value);
+  const qty = Number(el.holdQty.value);
+  const cost = Number(el.holdCost.value);
+  if (!sym || !(qty > 0) || !(cost >= 0)) return;
+  const existing = book.holdings.find(h => h.sym === sym);
+  if (existing) {
+    const totalQty = existing.qty + qty;
+    existing.cost = (existing.qty * existing.cost + qty * cost) / totalQty;
+    existing.qty = totalQty;
+  } else {
+    book.holdings.push({ sym, qty, cost });
+  }
+  persistBook(); renderBoard();
+  el.holdSym.value = el.holdQty.value = el.holdCost.value = "";
+  refreshBoard();
+});
+el.formAlert.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (vaultState === "locked") { openVault(); return; }
+  const sym = normalizeSymbol(el.alertSym.value);
+  const level = Number(el.alertLevel.value);
+  if (!sym || !isFinite(level) || level <= 0) return;
+  book.alerts.push({ id: "a" + Date.now() + Math.random().toString(36).slice(2, 6), sym, level, dir: el.alertDir.value, hit: false });
+  persistBook(); renderBoard();
+  el.alertSym.value = el.alertLevel.value = "";
+  refreshBoard();
+});
+
+async function refreshBoard() {
+  if (vaultState === "locked") return;
+  const syms = snapshotSymbols();
+  if (!syms.length) return;
+  el.btnRefresh.disabled = true;
+  try {
+    const { errors } = await fetchQuotes(syms);
+    if (errors.length) footError(errors[0]);
+  } finally {
+    el.btnRefresh.disabled = false;
+  }
+}
+el.btnRefresh.addEventListener("click", refreshBoard);
+
+/* auto-refresh (opt-in, disclosed) */
+function syncAutoRefresh() {
+  const on = store.get(LS.AUTO, "0") === "1";
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  if (on) {
+    autoTimer = setInterval(() => {
+      if (document.visibilityState === "visible" && !busy && vaultState !== "locked" && snapshotSymbols().length) {
+        refreshBoard();
+      }
+    }, 60000);
+  }
+}
+
+/* ---------- price alerts (client-side only, honestly) ---------- */
+function checkAlerts() {
+  let changed = false;
+  for (const a of book.alerts) {
+    if (a.hit) continue;
+    const q = quotes.get(a.sym);
+    if (!q) continue;
+    if ((a.dir === "above" && q.price >= a.level) || (a.dir === "below" && q.price <= a.level)) {
+      a.hit = true;
+      changed = true;
+      chime();
+      const msg = "Price alert: " + a.sym + " is " + a.dir + " " + fmtNum(a.level) + " — now " + fmtPrice(q) + ".";
+      addSystemNote("⚑ " + msg);
+      tts.enqueue(msg + " Quotes may be delayed.");
+    }
+  }
+  if (changed) { persistBook(); renderBoard(); }
+}
+
+/* small on-device chime via WebAudio */
+function chime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    [523.25, 659.25, 783.99].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, now + i * 0.18);
+      g.gain.linearRampToValueAtTime(0.22, now + i * 0.18 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.9);
+      o.connect(g).connect(ctx.destination);
+      o.start(now + i * 0.18); o.stop(now + i * 0.18 + 1);
+    });
+    setTimeout(() => ctx.close(), 2500);
+  } catch {}
+}
+
+/* ============================================================
+   Vault — at rest. Adopts the ONE postern-sdk wiring seam
+   (globalThis.PosternSDK): when a Postern host shell has installed the wasm
+   core, holdings are sealed with the REAL Argon2id(64 MiB, t=3) +
+   XChaCha20-Poly1305 from postern-core — killing stand-in S2. In a plain
+   browser tab (this page's strict CSP forbids fetching wasm) the seam is
+   absent and we keep the honest classical stand-in: PBKDF2-SHA-256 (310,000
+   it.) → AES-256-GCM. Never silently weaker — the on-disk blob is tagged with
+   the KDF that produced it, and a real-sealed blob refuses to open without the
+   core (fail-closed). The derived key stays an opaque handle; only ciphertext
+   is stored.
+   ============================================================ */
+const VSDK = {
+  get() { return (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null; },
+  real() { const s = this.get(); return !!(s && s.kdf && s.kdf.available); },
+};
+const KDF_REAL = "Argon2id-postern-sdk";   // on-disk tag for real-core seals
+function b64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function unb64(s) {
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+/* Derive an at-rest key wrapper: { real, key, label }. `useReal` picks the
+   primitive — the caller passes VSDK.real() when sealing fresh, or the blob's
+   own tag when opening, so the key type always matches the ciphertext. */
+async function deriveVaultKey(passphrase, saltBytes, iterations, useReal) {
+  if (useReal) {
+    const s = VSDK.get();
+    return { real: true, label: (s.kdf.label || "Argon2id"), key: s.kdf.deriveKey(te.encode(passphrase), saltBytes) };
+  }
+  const base = await crypto.subtle.importKey("raw", te.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,                      // non-extractable: the key can't be exported from memory
+    ["encrypt", "decrypt"],
+  );
+  return { real: false, key };
+}
+/* Seal → a self-describing cipher object tagged with the AEAD used. */
+async function aeadEncrypt(keyWrap, plaintext, aad) {
+  if (keyWrap.real) {
+    const blob = VSDK.get().kdf.seal(keyWrap.key, te.encode(aad), te.encode(plaintext));
+    return { algo: "XChaCha20-Poly1305", blob: b64(blob) };
+  }
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // fresh IV per write, always
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: te.encode(aad) },
+    keyWrap.key, te.encode(plaintext),
+  );
+  return { algo: "AES-256-GCM", iv: b64(iv), ct: b64(ct) };
+}
+/* Open a cipher object; dispatch on its stored algo. Throws on auth failure —
+   zero partial plaintext — or if a real-sealed blob is opened without the core. */
+async function aeadDecrypt(keyWrap, cipher, aad) {
+  if (cipher.algo === "XChaCha20-Poly1305") {
+    if (!keyWrap.real) throw new Error("sealed with the real postern-sdk core — open it in the Postern shell");
+    const pt = VSDK.get().kdf.open(keyWrap.key, te.encode(aad), unb64(cipher.blob));
+    return td.decode(pt);
+  }
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: unb64(cipher.iv), additionalData: te.encode(aad) },
+    keyWrap.key, unb64(cipher.ct),
+  );
+  return td.decode(pt); // throws OperationError on auth failure — zero partial plaintext
+}
+
+let vaultSalt = null, vaultIter = PBKDF2_ITER;
+
+function vaultBlob() {
+  try { return JSON.parse(store.get(LS.VAULT, "null")); } catch { return null; }
+}
+async function persistBook() {
+  if (vaultState !== "open" || !vaultKey) { renderVaultBanner(); return; }
+  try {
+    const cipher = await aeadEncrypt(vaultKey, JSON.stringify(book), VAULT_AAD);
+    store.set(LS.VAULT, JSON.stringify({
+      v: 1,
+      kdf: { algo: vaultKey.real ? KDF_REAL : "PBKDF2-SHA-256", iter: vaultIter, label: vaultKey.label, salt: b64(vaultSalt) },
+      cipher,
+    }));
+  } catch (e) {
+    addSystemNote("Vault save failed: " + e.message);
+  }
+}
+
+function openVault() {
+  el.vaultNone.hidden = vaultState !== "none";
+  el.vaultLocked.hidden = vaultState !== "locked";
+  el.vaultOpen.hidden = vaultState !== "open";
+  el.vaultErrCreate.textContent = el.vaultErrUnlock.textContent = el.vaultErrOpen.textContent = "";
+  el.dlgVault.showModal();
+  if (vaultState === "none") el.vaultPass1.focus();
+  else if (vaultState === "locked") el.vaultPassUnlock.focus();
+}
+el.btnVault.addEventListener("click", openVault);
+
+el.btnVaultCreate.addEventListener("click", async () => {
+  const p1 = el.vaultPass1.value, p2 = el.vaultPass2.value;
+  if (p1.length < 6) { el.vaultErrCreate.textContent = "Use at least 6 characters — it protects your holdings."; return; }
+  if (p1 !== p2) { el.vaultErrCreate.textContent = "The passphrases don't match."; return; }
+  try {
+    vaultSalt = crypto.getRandomValues(new Uint8Array(16));
+    vaultIter = PBKDF2_ITER;
+    vaultKey = await deriveVaultKey(p1, vaultSalt, vaultIter, VSDK.real());
+    vaultState = "open";
+    await persistBook();
+    el.vaultPass1.value = el.vaultPass2.value = "";
+    el.dlgVault.close();
+    renderBoard();
+    addSystemNote("Vault created. Watchlist, portfolio, and alerts are now " + (vaultKey.real ? "sealed with the real XChaCha20-Poly1305 + Argon2id core (postern-sdk)" : "AES-256-GCM encrypted") + " on this device. Forget the passphrase and they're honestly unrecoverable — there is no server.");
+  } catch (e) {
+    el.vaultErrCreate.textContent = "Couldn't create the vault: " + e.message;
+  }
+});
+
+el.btnVaultUnlock.addEventListener("click", async () => {
+  const blob = vaultBlob();
+  if (!blob) { el.vaultErrUnlock.textContent = "No vault found."; return; }
+  try {
+    // Back-compat: legacy blobs carried salt/iter/iv/ct at top level; new blobs
+    // carry tagged { kdf, cipher }. Dispatch on the KDF tag so the key type always
+    // matches the ciphertext, and never downgrade a real-sealed vault.
+    const kdf = blob.kdf || { algo: "PBKDF2-SHA-256", iter: blob.iter, salt: blob.salt };
+    const cipher = blob.cipher || { algo: "AES-256-GCM", iv: blob.iv, ct: blob.ct };
+    const wantReal = kdf.algo === KDF_REAL;
+    if (wantReal && !VSDK.real()) { el.vaultErrUnlock.textContent = "This vault was sealed by the real postern-sdk core, which isn't loaded here. Open it inside the Postern host shell."; return; }
+    const salt = unb64(kdf.salt);
+    const key = await deriveVaultKey(el.vaultPassUnlock.value, salt, kdf.iter || PBKDF2_ITER, wantReal);
+    const plain = await aeadDecrypt(key, cipher, VAULT_AAD);
+    const data = JSON.parse(plain);
+    book = { watch: data.watch || [], holdings: data.holdings || [], alerts: data.alerts || [] };
+    vaultKey = key; vaultSalt = salt; vaultIter = kdf.iter || PBKDF2_ITER;
+    vaultState = "open";
+    el.vaultPassUnlock.value = "";
+    el.dlgVault.close();
+    renderBoard();
+    refreshBoard();
+  } catch {
+    el.vaultErrUnlock.textContent = "Wrong passphrase (or the vault data is corrupted). Decryption is all-or-nothing — no partial reads.";
+  }
+});
+
+el.btnVaultLock.addEventListener("click", () => {
+  vaultKey = null;
+  book = { watch: [], holdings: [], alerts: [] };
+  quotes.clear(); quotesAsOf = null;
+  vaultState = "locked";
+  el.dlgVault.close();
+  renderBoard();
+});
+
+el.btnVaultChange.addEventListener("click", async () => {
+  const p = el.vaultPassNew.value;
+  if (p.length < 6) { el.vaultErrOpen.textContent = "Use at least 6 characters."; return; }
+  try {
+    vaultSalt = crypto.getRandomValues(new Uint8Array(16));
+    vaultIter = PBKDF2_ITER;
+    vaultKey = await deriveVaultKey(p, vaultSalt, vaultIter, VSDK.real());
+    await persistBook();
+    el.vaultPassNew.value = "";
+    el.vaultErrOpen.textContent = "";
+    el.dlgVault.close();
+    addSystemNote("Vault passphrase changed; contents re-encrypted with a fresh salt and key.");
+  } catch (e) {
+    el.vaultErrOpen.textContent = "Couldn't change the passphrase: " + e.message;
+  }
+});
+
+el.btnVaultDestroy.addEventListener("click", () => {
+  if (!confirm("Destroy the encrypted vault? The watchlist, portfolio, and alerts inside are gone forever — there is no server copy.")) return;
+  store.del(LS.VAULT);
+  vaultKey = null; vaultSalt = null;
+  book = { watch: [], holdings: [], alerts: [] };
+  vaultState = "none";
+  el.dlgVault.close();
+  renderBoard();
+});
+
+/* ============================================================
+   Composer, chips, controls
+   ============================================================ */
+el.composer.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = el.input.value.trim();
+  if (!text || busy) return;
+  el.input.value = "";
+  send(text);
+});
+
+el.chips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip && !busy) send(chip.textContent.trim());
+});
+
+el.btnStop.addEventListener("click", () => {
+  if (abortCtl) abortCtl.abort();
+  tts.stop();
+  setState("idle");
+  syncStopBtn();
+  idleStatus();
+});
+function syncStopBtn() {
+  el.btnStop.disabled = !busy && !ttsSpeaking && ttsQueue.length === 0;
+}
+setInterval(syncStopBtn, 400);
+
+el.btnMute.addEventListener("click", () => {
+  const muted = !(store.get(LS.MUTE, "0") === "1");
+  store.set(LS.MUTE, muted ? "1" : "0");
+  applyMuteUI();
+  if (muted) tts.stop();
+});
+function applyMuteUI() {
+  const muted = store.get(LS.MUTE, "0") === "1";
+  el.btnMute.setAttribute("aria-pressed", String(muted));
+  el.btnMute.setAttribute("aria-label", muted ? "Unmute spoken replies" : "Mute spoken replies");
+  el.btnMute.title = muted ? "Unmute spoken replies" : "Mute spoken replies";
+  el.spkWaves.style.display = muted ? "none" : "";
+  el.spkSlash.style.display = muted ? "" : "none";
+}
+
+/* ============================================================
+   Dialogs & settings
+   ============================================================ */
+function openSettings() { syncSettingsUI(); el.dlgSettings.showModal(); el.apiKey.focus(); }
+el.btnSettings.addEventListener("click", openSettings);
+el.modelHint.addEventListener("click", openSettings);
+el.btnPrivacy.addEventListener("click", () => el.dlgPrivacy.showModal());
+document.querySelectorAll("dialog [data-close]").forEach(b =>
+  b.addEventListener("click", (e) => e.target.closest("dialog").close()));
+[el.dlgSettings, el.dlgPrivacy, el.dlgVault].forEach(d =>
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); })); // click backdrop to close
+
+el.apiKey.addEventListener("change", () => { setKey(el.apiKey.value.trim()); idleStatus(); });
+el.apiKey.addEventListener("input", () => { setKey(el.apiKey.value.trim()); });
+
+/* ---- optional keys lock (seal at rest) ---- */
+function keyLockMsg(text, isErr) {
+  el.keyLockState.textContent = text;
+  el.keyLockState.style.color = isErr ? "#c0392b" : "";
+}
+function refreshSealLabel() {
+  if (!el.keyLockHelp) return;
+  if (KeySeal.real()) {
+    el.keyLockHelp.innerHTML = 'Locking seals your Anthropic <em>and</em> Finnhub keys with the real ' +
+      '<b>XChaCha20-Poly1305 + Argon2id</b> core (<code>postern-core</code>, wired through <code>postern-sdk</code>) — 64&nbsp;MiB, t=3, memory-hard. ' +
+      'localStorage then holds only ciphertext; you unlock once per session, and forgetting the passphrase means re-entering the keys. ' +
+      '<b>Without a lock, the keys sit readable in this browser’s localStorage</b> — any code or person with access to this browser profile can read them.';
+  } else {
+    el.keyLockHelp.innerHTML = 'Locking seals your Anthropic <em>and</em> Finnhub keys with <b>AES-256-GCM</b> under a key ' +
+      'derived from your passphrase (<b>PBKDF2-SHA-256, 310,000 it.</b> — a WebCrypto stand-in for the product’s <b>Argon2id</b>, the same construction as the vault below ' +
+      'and Chiave, our sign-in reference). localStorage then holds only ciphertext; you unlock once per session, ' +
+      'and forgetting the passphrase means re-entering the keys. <b>Without a lock, the keys sit readable in this ' +
+      'browser’s localStorage</b> — any code or person with access to this browser profile can read them. <em>(postern-sdk core not loaded here — honest stand-in.)</em>';
+  }
+}
+function syncKeyLockUI() {
+  const sealed = KeySeal.isSealed(), locked = KeySeal.isLocked();
+  refreshSealLabel();
+  el.apiKey.disabled = locked;
+  el.finnhubKey.disabled = locked;
+  el.apiKey.value = locked ? "" : getKey();
+  el.finnhubKey.value = locked ? "" : getFinnhubKey();
+  el.apiKey.placeholder = locked ? "sealed — unlock below" : "sk-ant-…";
+  el.finnhubKey.placeholder = locked ? "sealed — unlock in Keys at rest" : "finnhub API key";
+  el.keyPass.style.display = (sealed && !locked) ? "none" : "";
+  el.btnKeyLock.textContent = locked ? "unlock" : sealed ? "remove lock" : "lock keys";
+  if (locked) keyLockMsg("Sealed. localStorage holds only " + KeySeal.cipherLabel() + " ciphertext — enter your passphrase to unlock both keys for this session.");
+  else if (sealed) keyLockMsg("Sealed and unlocked for this session. Edits re-seal automatically; the readable keys live only in this tab’s memory.");
+  else keyLockMsg("Not locked — the keys sit readable in this browser’s localStorage. Set a passphrase to seal them.");
+}
+el.btnKeyLock.addEventListener("click", async () => {
+  if (KeySeal.isLocked()) {
+    const ok = await KeySeal.unlock(el.keyPass.value);
+    el.keyPass.value = "";
+    if (!ok) { syncKeyLockUI(); keyLockMsg("Wrong passphrase. Decryption is all-or-nothing — nothing was revealed.", true); return; }
+    syncKeyLockUI(); idleStatus();
+    return;
+  }
+  if (KeySeal.isSealed()) { // currently unlocked → remove the lock
+    if (!confirm("Remove the lock? Your API keys will again be stored readable (plaintext) in this browser’s localStorage.")) return;
+    KeySeal.removeLock();
+    syncKeyLockUI();
+    return;
+  }
+  const key = el.apiKey.value.trim(), finn = el.finnhubKey.value.trim();
+  if (!key && !finn) { keyLockMsg("Add at least one key first — then lock it.", true); return; }
+  if (el.keyPass.value.length < 6) { keyLockMsg("Use at least 6 characters — it protects your keys.", true); return; }
+  await KeySeal.lock(el.keyPass.value, { key, finnhub: finn });
+  el.keyPass.value = "";
+  syncKeyLockUI();
+});
+el.btnShowKey.addEventListener("click", () => {
+  const isPw = el.apiKey.type === "password";
+  el.apiKey.type = isPw ? "text" : "password";
+  el.btnShowKey.textContent = isPw ? "hide" : "show";
+});
+el.modelSel.addEventListener("change", () => { store.set(LS.MODEL, el.modelSel.value); syncModelHint(); });
+el.voiceSel.addEventListener("change", () => store.set(LS.VOICE, el.voiceSel.value));
+el.rate.addEventListener("input", () => {
+  store.set(LS.RATE, el.rate.value);
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+});
+document.querySelectorAll('input[name="stt"]').forEach(r =>
+  r.addEventListener("change", () => { store.set(LS.STT, r.value); idleStatus(); }));
+document.querySelectorAll('input[name="stockProv"]').forEach(r =>
+  r.addEventListener("change", () => { store.set(LS.SPROV, r.value); renderBoard(); }));
+el.finnhubKey.addEventListener("input", () => setFinnhubKey(el.finnhubKey.value.trim()));
+el.customUrl.addEventListener("input", () => store.set(LS.CUSTOM, el.customUrl.value.trim()));
+el.decoys.addEventListener("input", () => store.set(LS.DECOYS, el.decoys.value.trim()));
+el.autoRefresh.addEventListener("change", () => { store.set(LS.AUTO, el.autoRefresh.checked ? "1" : "0"); syncAutoRefresh(); });
+
+el.btnErase.addEventListener("click", () => {
+  if (!confirm("Erase your API keys, all settings, the encrypted vault, and this conversation from the browser?")) return;
+  Object.values(LS).forEach(store.del); // includes the sealed-keys ciphertext
+  KeySeal.forget();
+  history = [];
+  book = { watch: [], holdings: [], alerts: [] };
+  quotes.clear(); quotesAsOf = null;
+  vaultKey = null; vaultSalt = null; vaultState = "none";
+  tts.stop();
+  if (abortCtl) abortCtl.abort();
+  el.transcript.innerHTML = "";
+  el.emptyHint.style.display = "";
+  renderBoard();
+  syncSettingsUI();
+  syncModelHint();
+  applyMuteUI();
+  applyTheme();
+  syncAutoRefresh();
+  el.dlgSettings.close();
+  setState("idle");
+  setStatus("Everything erased. Nothing about you exists anywhere anymore — there was never a server copy.");
+});
+
+function syncSettingsUI() {
+  syncKeyLockUI();
+  el.modelSel.value = getModel();
+  el.rate.value = store.get(LS.RATE, "1");
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+  const sttPref = store.get(LS.STT, "webspeech");
+  el.sttWeb.checked = sttPref === "webspeech";
+  el.sttLocal.checked = sttPref === "ondevice";
+  el.sttLocal.disabled = !OnDeviceWhisperEngine.available();
+  el.sttWeb.disabled = !WebSpeechEngine.available();
+  const prov = store.get(LS.SPROV, "yahoo");
+  el.provYahoo.checked = prov === "yahoo";
+  el.provFinnhub.checked = prov === "finnhub";
+  el.provCustom.checked = prov === "custom";
+  el.customUrl.value = store.get(LS.CUSTOM, "");
+  el.decoys.value = store.get(LS.DECOYS, "");
+  el.autoRefresh.checked = store.get(LS.AUTO, "0") === "1";
+  tts.loadVoices();
+}
+function syncModelHint() { el.modelHint.textContent = MODELS[getModel()] || getModel(); }
+
+/* ---------- theme ---------- */
+el.btnTheme.addEventListener("click", () => {
+  const cur = store.get(LS.THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS.THEME, next);
+  applyTheme();
+});
+function applyTheme() {
+  const t = store.get(LS.THEME, "auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = t;
+  el.btnTheme.textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  el.btnTheme.setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+
+/* ---------- misc ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ============================================================
+   boot
+   ============================================================ */
+vaultState = vaultBlob() ? "locked" : "none";
+applyTheme();
+applyMuteUI();
+syncModelHint();
+tts.loadVoices();
+idleStatus();
+syncStopBtn();
+renderBoard();
+syncAutoRefresh();
+document.documentElement.dataset.booted = "1"; // init completed without throwing
+</script>
+</body>
+</html>

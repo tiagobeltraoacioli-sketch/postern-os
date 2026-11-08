@@ -1,0 +1,111 @@
+# shellcheck shell=sh disable=SC2034
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# ─────────────────────────────────────────────────────────────────────────────
+#  NoporIS — dual-persona bridge posture (operator config sample)
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  HONESTY: this configures NoporIS, the guarded BRIDGE between two personas
+#     on ONE stock-Android handset. It is an APP on stock Android. It is NEVER
+#     "Postern OS", never Porog (the container), never a "Seal". Its isolation is
+#     Android's own work-profile mechanism, configured by an unprivileged app —
+#     only as strong as the kernel underneath it.
+#
+#     The GOOGLE-PLAY PERSONA is the LESS-PRIVATE side, by construction. A
+#     persona running Google Play Services (GMS) phones home to Google. NoporIS
+#     sells SEPARATION + CONVENIENCE, not privacy on that side. It cannot make a
+#     Google-Android persona private, cannot give it a separate hardware
+#     identity, and cannot hide the device from Google.
+#
+#     A rooted / unlocked / kernel-compromised host DEFEATS the separation.
+#     UNAUDITED reference-prototype (DESIGN ONLY, not yet staffed); attests
+#     NOTHING. Play Integrity STRONG fails on both personas by design. The coin
+#     is worthless and is not a security. Personal use is free. Not legal advice.
+#
+#  Copy to one of (first match wins):
+#     ~/.config/noporis/noporis.conf
+#     /etc/noporis/noporis.conf
+#  Sourced as POSIX sh (KEY=VALUE). Anything you don't set keeps the private,
+#  default-safe value baked in. Defaults are the MOST-CONTAINED choice.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Trust tier. FIXED, not an input. NoporIS is on stock Android; nothing here
+#     is attestable. There is no measured-boot roothash of a persona. Leave it.
+#       non-attestable   the only honest value; do not change
+NIS_TIER=non-attestable
+
+# --- Isolation mechanism for the second persona. NoporIS does NOT own this — it
+#     configures Android's own DevicePolicyManager. The fence is real but it is
+#     Android's, not Postern's, and only as strong as the shared kernel.
+#       WORK_PROFILE   AOSP managed profile (user 10+): the realistic NoporIS
+#       APP_CLONE      OEM dual-apps / cloning (often weaker, per-app only)
+#     Waydroid-style guest userland is OUT OF SCOPE for stock Android — that is
+#     the apps/sloboda escape hatch, a different product.
+NIS_MECHANISM=WORK_PROFILE
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CLEAN PERSONA — the Google-vs-Google-free choice.
+#  A USER-SELECTABLE CONFIG INPUT, never hardcoded to Google. Default is the
+#  private, Google-free base. These are OPTIONS with real trade-offs
+#  (compatibility vs contained), NOT promises. NONE unlock integrity-gated apps:
+#  banking / Wallet / DRM still refuse — STRONG fails regardless of this choice.
+#       VANILLA  AOSP, no Google, no microG   most private, least compatible
+#                                             (many mainstream apps degrade)
+#       MICROG   Google-free re-implementation  most apps work; FCM/maps/sign-in
+#                                             relayed. Recommended when you want
+#                                             compatibility with less Google.
+#                                             Honest limit: microG still contacts
+#                                             Google's servers for what it relays
+#                                             and can't reliably pass Play
+#                                             Integrity — no rescue for banking.
+#       GAPPS    Google Play Services         least private; plants Google's
+#                                             blobs in the persona. Still won't
+#                                             pass STRONG — little gain.
+# ─────────────────────────────────────────────────────────────────────────────
+NIS_CLEAN_PERSONA_SYSTEM_TYPE=VANILLA
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  GOOGLE-PLAY PERSONA — the LESS-PRIVATE side, off by default.
+#  Turning this on creates a Google-Android persona that talks to Google: your
+#  Google account, device + hardware identifiers, installed-app inventory, and
+#  (with permission) location leave the device. NoporIS gives this persona a
+#  SEPARATE BOX for its data and accounts — not a separate phone, and not
+#  privacy. If a thing would be unsafe for Google to see, don't do it here.
+#       0  no Google persona (default)
+#       1  create the less-private Google-Play persona (EXPLICIT opt-in)
+# ─────────────────────────────────────────────────────────────────────────────
+NIS_GOOGLE_PERSONA_ENABLED=0
+
+# --- Route the Google persona's egress separately (e.g. a distinct VPN/exit).
+#     HONESTY: even routed elsewhere, device-wide hardware identity still
+#     correlates the two personas — same SIM/IMEI/serial, one physical device.
+#     This reduces NETWORK correlation only; it does not hide the device.
+#       0  share the clean side's network (default; personas correlate by IP)
+#       1  attempt separate egress for the Google persona
+NIS_GOOGLE_PERSONA_SEPARATE_EGRESS=0
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CROSS-PERSONA BRIDGES — clipboard, contacts, files sharing between personas.
+#  DENY-BY-DEFAULT. Everything here starts OFF. Each bridge is a hole you open on
+#  purpose; turn it off when you're done. Anything but the literal value below is
+#  treated as OFF. NoporIS never opens a bridge you didn't open.
+#       0  closed (default)   1  open (explicit)
+# ─────────────────────────────────────────────────────────────────────────────
+NIS_BRIDGE_CLIPBOARD=0
+NIS_BRIDGE_CONTACTS=0
+NIS_BRIDGE_FILES=0
+
+# --- Consent-gate bridge state file. OWNED BY THE CONSENT-GATE COMPONENT.
+#     NoporIS only READS it and treats anything but a first line of exactly
+#     "enabled" as OFF. Do NOT point this at a file NoporIS can write — the whole
+#     point is that the bridge cannot open itself.
+# NIS_BRIDGE_STATE=/run/noporis/consent/persona-bridge.state
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  BADGE / ATTESTATION DISPLAY POSTURE. See badges.json for the full rules.
+#  Attestation is shown ONLY where it is true. On stock Android it never is, so a
+#  padlock / "attested" / "verified" badge is NEVER rendered for either persona.
+#  The Google persona is badged "less private", never a padlock it hasn't earned.
+#       strict  render attestation badges only where genuinely true (default)
+#     There is no other honest setting; this key exists to be auditable, not
+#     tunable. A relaxed mode would over-claim, so it is not offered.
+# ─────────────────────────────────────────────────────────────────────────────
+NIS_BADGE_MODE=strict

@@ -1,0 +1,36 @@
+# security.txt for posternlabs.com and posternpool.com
+# Format: RFC 9116 (https://www.rfc-editor.org/rfc/rfc9116)
+#
+# TODO (SIGNING): This file SHOULD be cryptographically signed so that its
+# contents cannot be tampered with in transit or on a compromised host.
+# RFC 9116 specifies an OpenPGP cleartext signature (`gpg --clear-sign`) wrapping
+# every field below. We can additionally publish a detached minisign signature
+# (security.txt.minisig) using the same release key flow we use for artifacts.
+# Until that is done, treat this file as UNSIGNED and cross-check the contact
+# address out of band. Do NOT paste a fake signature here.
+#
+# When signed, the OpenPGP signature MUST cover all fields, and the signing key
+# SHOULD be referenced by the Encryption field and published at a stable URL.
+
+Contact: mailto:tiagobeltraoacioli@gmail.com
+
+# Expires: keep this under one year out and refresh before it lapses.
+Expires: 2027-01-11T00:00:00.000Z
+
+Preferred-Languages: en, pt-BR
+
+# Coordinated vulnerability disclosure policy (scope, safe harbor, how to report).
+# TODO (BUILD): SECURITY.md currently lives at the repository root and is NOT
+# copied into public/. Ensure the deploy publishes it at this exact URL (copy or
+# render it into public/), or repoint this field to wherever the policy is served.
+Policy: https://posternlabs.com/SECURITY.md
+
+# Canonical location(s) of this file. The same file is served on both properties.
+Canonical: https://posternlabs.com/.well-known/security.txt
+Canonical: https://posternpool.com/.well-known/security.txt
+
+# TODO (SIGNING): publish the disclosure/signing public key at a stable URL and
+# uncomment. We already publish a minisign release key
+# (RWTSe98wfKKHuVRDnywuQmH/cMyP/HNuD/hFFLQeKdQeAHENliqJpmKs); an OpenPGP key for
+# encrypted reports is recommended for RFC 9116 compliance.
+# Encryption: https://posternlabs.com/.well-known/pgp-key.txt

@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'sha256-SMLID9BWNjKkKtuDRZ6i3E+tksgAGbTfYINb1WxwXcA=' 'unsafe-hashes' 'sha256-duB80EBga2D8sM4uqBxfocWSpMpdPUKhDJEws/AJJEY=' 'sha256-vyaCh9A5MeESrzYoay95A6yLQjJ388e8La2tXHqoVQQ=' 'sha256-49u6Cy0rhn1sPTOXK3ewj9YIySFZYgbgjB3KtaK+jRU=' 'sha256-p5s7vsDU5UwGcb7Rp9gBTt6v38hiFs4+6heUz6Ezq/s=' 'sha256-J1Upz7OJln8QdCtyKtuBl1UjNXHUVwfebMoX4jYIKPk=' 'sha256-4iJu4dJEVlLsp43cuBg9TpN5wEAMYlnmaW3Z26yY2aA=' 'sha256-3p55CX7FeWNXWoGkE//0fd5qTtRTVeOvSpSPrExoh/Y=' 'sha256-OlxvY+TnEqUOhMuPg5bJA4df0HJNnIpQF51oaa+oX34=' 'sha256-F/GSlOEj8wPaOKZjkAfy/on9tq0Tz38YHlEYP8BSrzo=' 'sha256-3+Fr/Zzjy1AQuk7yVrWMjOlB28e0zWP1v3If6wqWgVU=' 'sha256-g47mmueVKdx5Q6rzUmrSJlNKJ64AV0laCQipaWeb2hU=' 'sha256-/8bPNTwQpOj3ZluB4/gq33E+uCo9ilMR0qHN6pKAjZM='; img-src 'self'; media-src 'self'; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests">
+<meta name="description" content="How to run the Postern beta: self-contained web apps, the reproducible Nix-built OS, and the Tauri desktop app — all from source, all unaudited.">
+<meta name="color-scheme" content="dark light">
+<title>Downloads — get the beta · Postern Labs</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="index.html">Home</a>
+      <a href="postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="products.html">Products</a>
+      <a href="downloads.html" aria-current="page">Downloads</a>
+      <a href="run-a-node.html">Run a node</a>
+      <a href="migration.html">SHA-256 migration</a>
+      <a href="snapshot.html">Snapshot sync</a>
+      <a href="pool.html">Pool</a>
+      <a href="asic.html">ASIC</a>
+      <a href="releases.html">Releases</a>
+      <a href="security.html">Security</a>
+      <a href="/explorer/">Explorer</a>
+      <a href="disclaimer.html">Disclaimer</a>
+      <a href="acknowledgments.html">Acknowledgments</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) · very few nodes, low hashrate, 51%-attackable · not a security · for evaluation —
+  <strong>not to protect real secrets yet</strong>. <a href="disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Get the beta</p>
+    <h1>Everything ships as source. On purpose.</h1>
+    <p class="lede">Postern's integrity story is reproducibility: you build what you run, and the same inputs produce the same artifact. The <strong>x86_64 Postern OS ISOs are now hosted, release-signed, and click-downloadable below</strong> — with their SHA-256 digests and a minisign signature beside them, so you verify before you boot. the <strong>node ISO now QEMU/TCG-boots to a login prompt (boot log recorded)</strong>; the <strong>desktop ISO's QEMU boot is still pending, and a physical-hardware boot is further out</strong>; the aarch64 mobile image is now <strong>built, hosted, and release-signed too — but not yet boot-tested on any platform</strong> (no QEMU-aarch64 or hardware boot), so treat it as the least-proven download. Building from source remains the strongest verification, and it's still here. Here is exactly what you can run today, and how.</p>
+    <div class="warnpanel" role="note">
+  <h3>Honest status — read before anything else</h3>
+  <ul>
+    <li><strong>Everything here is pre-production.</strong> The Rust product <strong>cores</strong> are built and test-verified. The <strong>OS images have started to exist</strong>: the x86_64 node and desktop ISOs are <strong>built, hosted, and release-signed</strong> — the <strong>node ISO now QEMU/TCG-boots to a login prompt (boot log recorded, grader rc=0)</strong>; the <strong>desktop ISO's QEMU boot is still pending, and a physical-hardware boot is further out</strong>; the mobile image (aarch64, PinePhone / Mobile NixOS) is now <strong>built, hosted, and release-signed, but not yet boot-tested on any platform</strong> — it has not been booted on QEMU aarch64 or on hardware, so it is the least-proven of the three. The UIs and cloud/enterprise editions remain designs and reference prototypes. <strong>Hosting a signed image is not attestation, and built is not booted — we don't claim otherwise.</strong> Each item is labelled with its exact status wherever it appears.</li>
+    <li>The underlying protocol now runs a <strong>mainnet beta — a designation, not a security claim</strong>. As of node v0.1.0-alpha2 the fixed k=8 Module-SIS gate is <strong>retired</strong>: the gate is a <strong>difficulty-driven k-ramp</strong> — k=4 today, rising 5→6→7→8 as the network's own ASERT difficulty (the on-chain hashrate proxy) sustains above spaced thresholds, and easing back if hashrate falls (the Bitcoin model). Raising k adds <strong>no cryptographic hardness</strong> at β=q/16 — the ramp is a structural/throughput filter, <strong>not a security claim</strong>, and no security is claimed. Real security is <strong>cumulative SHAKE-256 hashcash work — hashrate × time</strong>. A brand-new node can <strong>sync from genesis again</strong> under the ramp, or use the <strong>signed snapshot</strong> as an optional one-command fast-sync. The network is <strong>nascent: very few nodes, low hashrate → 51%-attackable</strong>. It is <strong>unaudited</strong> — a third-party audit is contracted but <strong>not done yet</strong>, and the concrete-security analysis and IACR ePrint are still outstanding.</li>
+    <li><strong>The coin is not a security and not an asset.</strong> No token sale, no listing effort, no market-making, no price. Disclosed in full: a <strong>17% founder premine</strong> (10-year cliff, 40-year vest), structurally passive.</li>
+    <li><strong>Do not use any of this to protect real secrets yet.</strong> It is a public beta for evaluation, feedback, and reproduction of our claims.</li>
+  </ul>
+</div>
+    <p class="prose small" style="margin-top:1.2rem"><strong>Want to see what's <em>not</em> done yet? Two roadmaps — because the two layers must never blur.</strong> The old single "Future Roadmap" PDF mixed the ownerless protocol and the owned products in one plan; it is <strong>replaced</strong> by two documents. <a href="/Bloch-Roadmap.md">Bloch — open protocol items (Markdown)&nbsp;↓</a> is <strong>not a company plan and has no owner</strong>: the base follows the Bitcoin model — no authority, no schedule, no dates — so it is an honest list of candidate items <strong>any node operator or community member may pursue</strong>, BIP-style: further gate/difficulty tuning beyond the difficulty-driven k-ramp, the third-party audit, the no-shortcut proof and IACR ePrint, a live multi-node WAN network, Coherence (shielded txs — no privacy claim today), and the neutral permissionless tokens / fork / L2 capability. Nobody schedules these; the community may create a foundation someday if it chooses — its prerogative, not Postern's; Postern does not drive the protocol. And the base stays <strong>pure PoW</strong>: BFT and oracles were <strong>removed from base consensus</strong> and stay out — the base's only built-in finality is checkpoint reorg-depth protection, a normal PoW feature, not a gadget and not governance. Distinct from the base, a post-quantum <strong>FFG-BFT finality <em>overlay</em></strong> (hashrate-weighted, anchored as ordinary zero-value transactions — <strong>not</strong> a base-consensus change; coins still do not vote) is a <strong>candidate</strong> item with a declared activation target of block 1,000,000, <strong>not built</strong> (see <a href="blochprotocol.html">the roadmap note</a>). <a href="/Postern-Roadmap.md">Postern — products roadmap (Markdown)&nbsp;↓</a> <strong>is</strong> a real owned plan a company builds and answers for: the apps, the Postern OS images (node / desktop / mobile — the node ISO now QEMU-boots), Vestnik (the messenger, renamed off "Messenger"), the vault / courier / hygiene / keys / seal / panic cores plus Tauri/TUF signed packaging, Terem, and the owned Layer-2 products — <strong>RWA / BaaS</strong> — that anchor to the ownerless base as ordinary transactions. The rule: <em>the base is ownerless; anything with an operator, a service, or a "who runs it?" answer is a Postern product.</em> Everything on both lists is <strong>unaudited</strong>, the chain's gate is the <strong>difficulty-driven k-ramp</strong> (k=4 today — a structural filter, not a security claim by itself), there are no promises and no dates on the ownerless side, and BLCH is <strong>not a security</strong> — Postern's revenue never touches the token.</p>
+    <p class="prose small" style="margin-top:.6rem"><strong>Where the protocol is headed — ownership.</strong> Two documents on Bloch-SIS-PoW's intended path to community ownership: the <a href="/Bloch-Community-Transition-Model.pdf">Community Transition Model (PDF)&nbsp;↓</a> — a Bitcoin-model handover where <strong>coins do not vote</strong>, changes flow by voluntary node/miner adoption, and the founder <strong>steps fully away</strong> — and a <a href="/Bloch-Community-Transition-Letter.pdf">letter to the community (PDF)&nbsp;↓</a>. These concern the <strong>ownerless protocol</strong>, not Postern's products; they are <strong>letters of intent</strong> — nothing is decentralized or safe yet, and BLCH is <strong>not a security</strong>.</p>
+    <p class="prose small" style="margin-top:.6rem"><strong>For engineers &amp; auditors — the deep technical read.</strong> Two code-derived documents written for adversarial senior review: the <a href="/Postern-Technical-Whitepaper.pdf">Technical Whitepaper (PDF)&nbsp;↓</a> — a dense, honest description of every layer (the two crypto hubs, each product core, the NixOS/pmOS profiles, phone-as-signer, and the Bloch-SIS-PoW base), with every <em>planned / scaffold / UNAUDITED / not-booted</em> marker left in — and the <a href="/Postern-Audit-Readiness-Dossier.pdf">Audit-Readiness Dossier (PDF)&nbsp;↓</a>, the packaging that unblocks a contracted external audit (full primitive inventory, threat model, in-scope vs out). Neither is an audit or an assurance: <strong>everything remains a reference prototype and unaudited</strong>, and the coin is <strong>worthless by design</strong>.</p>
+    <p class="prose small" style="margin-top:.6rem"><strong>For developers — build on the ownerless protocol.</strong> The <a href="/Bloch-RPC-API.pdf">Bloch RPC/API reference (PDF)&nbsp;↓</a> documents the protocol's <strong>entire</strong> public surface (the JSON-RPC methods) — because Bloch-SIS-PoW is <strong>ownerless</strong>, that surface is all there is, and <strong>anyone can run a node and build on it</strong> (an explorer, a wallet, a service; there is no official API host). <a href="/Postern-Two-Layers.pdf">The Two Layers (PDF)&nbsp;↓</a> draws the line between the <strong>ownerless base</strong> and the <strong>owned Postern products</strong> — including where <strong>RWA / BaaS</strong> sit — and <a href="/Postern-Roadmap-Status.pdf">Roadmap &amp; Status (PDF)&nbsp;↓</a> is the honest done / scaffold / blocked snapshot.</p>
+    <p class="prose small" style="margin-top:.6rem"><strong>For a first read — the institutional presentation.</strong> An overview of who Postern Labs is, the owned-products&#8869;ownerless-protocol model, the product cores and apps, the OS surfaces, and the standing disclosures — the same honest labels as everywhere else (<em>built / reference prototype / design / unaudited</em>), nothing softened for a deck. Two formats, two languages: the <strong>slide deck</strong> (11 slides, to present) — <a href="/Postern-Labs-Institutional-Presentation-EN.pdf">English (PDF)&nbsp;↓</a> · <a href="/Postern-Labs-Institutional-Presentation-PT.pdf">Português (PDF)&nbsp;↓</a> — and the <strong>detailed document</strong> (a denser one-page-per-section read) — <a href="/Postern-Labs-Institutional-Overview-EN.pdf">English (PDF)&nbsp;↓</a> · <a href="/Postern-Labs-Institutional-Overview-PT.pdf">Português (PDF)&nbsp;↓</a>.</p>
+  </div>
+</section>
+
+<section aria-labelledby="web-h">
+  <div class="wrap">
+    <p class="kicker" id="web-h">1 · The web apps</p>
+    <h2>Self-contained HTML — open the file, that's the install.</h2>
+    <div class="prose">
+      <p>Each app is one self-contained HTML file — <strong>open it live right here</strong>, or grab the file from the source tree under <code>apps/</code> and open it locally (Chrome for the voice features). No build step, no server, no network dependency of its own. Where an AI concierge is offered you bring your own Claude key; every app carries an honest privacy panel. For exactly what leaves your machine — the Anthropic key path, the browser-speech-to-Google exception, and Vedetta's market-data providers — see <a href="products.html#ai-h">AI interactions · bring your own key</a>.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>App</th><th>Open</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Sotto</strong></td><td><a href="/apps/sotto/">Open&nbsp;→</a></td><td>Privacy-first voice assistant</td></tr>
+          <tr><td><strong>Vedetta</strong></td><td><a href="/apps/vedetta/">Open&nbsp;→</a></td><td>Voice markets lookout — holdings never leave the device</td></tr>
+          <tr><td><strong>Tolmach</strong></td><td><a href="/apps/tolmach/">Open&nbsp;→</a></td><td>Private interpreter + meeting minutes</td></tr>
+          <tr><td><strong>Postern Store</strong></td><td><a href="/apps/store/">Open&nbsp;→</a></td><td>Say what you need; it parameterizes the search</td></tr>
+          <tr><td><strong>Chiave</strong></td><td><a href="/apps/login/">Open&nbsp;→</a></td><td>Sign in with your wallet — no email, no account</td></tr>
+          <tr><td><strong>Sarto</strong></td><td><a href="/apps/onboard/">Open&nbsp;→</a></td><td>Onboarding configurator + transparent controls</td></tr>
+          <tr><td><strong>Consiglio</strong></td><td><a href="/apps/enterprise/">Open&nbsp;→</a></td><td>Enterprise admin console</td></tr>
+          <tr><td><strong>Gramota</strong></td><td><a href="/apps/gramota/">Open&nbsp;→</a></td><td>Enterprise license onboarding — tier → DUNS → signed license</td></tr>
+          <tr><td><strong>Gramota&nbsp;KYC</strong></td><td><a href="/apps/gramota-kyc/">Open&nbsp;→</a></td><td>On-device KYC — binds an owner to a company, PII-free verdict</td></tr>
+          <tr><td><strong>NoporIS&nbsp;Gate</strong></td><td><a href="/apps/noporis-gate/">Open&nbsp;→</a></td><td>Deny-by-default consent levers between two personas (reference)</td></tr>
+          <tr><td><strong>NoporIS&nbsp;Switcher</strong></td><td><a href="/apps/noporis-switcher/">Open&nbsp;→</a></td><td>The guarded persona bridge — a managed-profile persona switch (reference)</td></tr>
+          <tr><td><strong>Sloboda&nbsp;Gate</strong></td><td><a href="/apps/sloboda-gate/">Open&nbsp;→</a></td><td>Deny-by-default lever store for the Android compat tier (reference)</td></tr>
+          <tr><td><strong>Izbushka</strong></td><td><a href="/apps/izbushka/">Open&nbsp;→</a></td><td>Task portal — the door into Yagabona; authors signed manifests, makes no calls (<code>connect-src 'none'</code>)</td></tr>
+          <tr><td><strong>Ezekiel&nbsp;1</strong></td><td><a href="/apps/ezekiel1/">Open&nbsp;→</a></td><td>Access-layer governance console (personal + business) — runs fully offline (<code>connect-src 'none'</code>)</td></tr>
+          <tr><td><strong>Postern</strong> <span class="small dim">— full mobile PWA</span></td><td><a href="/apps/postern/">Open&nbsp;→</a></td><td><strong>REAL post-quantum keygen and signing</strong> (ML-DSA-65&nbsp;&#8214;&nbsp;Falcon-1024, in WASM on your device); create a wallet or import a <code>bloch-cli</code> <code>wallet.json</code>; balances read live via the hosted <code>/rpc</code>. <strong>Installable PWA</strong> — open on your phone, add to home screen. Unaudited beta, software keystore (not a Secure Enclave), zero-value testnet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="video-h">
+  <div class="wrap">
+    <p class="kicker" id="video-h">2 · Demo videos</p>
+    <h2>What it looks like — labelled for what it is.</h2>
+    <div class="prose">
+      <p>Three short videos, each labelled on its own frames. The two <strong>Postern OS</strong> videos are <strong>UI design previews — concept walkthroughs, not screen recordings of a built image</strong>. Status has moved since they were made: the desktop x86_64 ISO is now <strong>built, hosted, and release-signed, with a QEMU boot still pending (no boot log published yet)</strong>, and its UI is hardened GNOME, not the concept shown; the <strong>mobile image is now built, hosted, and release-signed, but has not been boot-tested on any platform</strong> (so this remains a design preview, not a recording of a running phone). The real, signed x86_64 ISOs are in <a href="#os-h">section 3 below</a> with checksums and a signature — a QEMU boot is not a hardware boot, and we won't fake an installer for anything we haven't hosted. The <strong>Sarto</strong> video is a walkthrough of the onboarding web app you can open today from <code>apps/postern-onboard/index.html</code>. Nothing shown here is finished, audited, or a security claim.</p>
+    </div>
+    <div class="videos">
+      <figure>
+        <video controls muted playsinline preload="metadata">
+          <source src="/media/postern-os-mobile-v2.mp4" type="video/mp4">
+        </video>
+        <figcaption class="small"><strong>Postern OS · mobile — UI design preview.</strong> A concept walkthrough of the mobile interface. This is the design, not a recording of a running OS: the mobile image is now <strong>built, hosted, and release-signed, but not yet boot-tested on any platform</strong>.</figcaption>
+      </figure>
+      <figure>
+        <video controls muted playsinline preload="metadata">
+          <source src="/media/postern-os-desktop-v2.mp4" type="video/mp4">
+        </video>
+        <figcaption class="small"><strong>Postern OS · desktop — UI design preview.</strong> A concept walkthrough of the desktop interface. This is the design, not a recording of a built OS. <strong>Update: the desktop x86_64 ISO is now built, hosted, and release-signed — a QEMU boot is still pending (no boot log published yet) and a hardware boot is further out — and its real UI is hardened GNOME, not this concept. Download it in <a href="#os-h">section 3</a>.</strong></figcaption>
+      </figure>
+      <figure>
+        <video controls muted playsinline preload="metadata">
+          <source src="/media/postern-sarto-tutorial.mp4" type="video/mp4">
+        </video>
+        <figcaption class="small"><strong>Sarto — onboarding tutorial.</strong> A walkthrough of the Sarto web app: configuring Postern and connecting the AI concierge with <strong>your own Claude API key</strong> (bring-your-own-key; no key of ours, no account). Sarto is beta and unaudited, like everything here.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="os-h">
+  <div class="wrap">
+    <p class="kicker" id="os-h">3 · The reproducible OS</p>
+    <h2>Postern OS — download, verify, then boot.</h2>
+    <div class="prose">
+      <p>The <code>os/</code> directory holds declarative NixOS profiles: a minimal image that boots into a running node as a hardened systemd service (dedicated user, <code>ProtectSystem=strict</code>, syscall filtering), plus desktop, mobile, browser, cloud, and attestation profiles. Because it's Nix, <strong>the same inputs produce the same image</strong> — that reproducibility is the product.</p>
+      <p><strong>Honest status:</strong> the <strong>x86_64 node and desktop ISOs are now hosted, release-signed, and downloadable below</strong>, each with its SHA-256 digest and a minisign signature. A <strong>QEMU boot is still pending for both</strong> — no boot log or <code>.evidence</code> sidecar is published next to either ISO yet, so we make no boot claim — and a <strong>boot on physical hardware is further out</strong>. Hosting and signing a release <strong>is not attestation</strong>; built is not booted; we won't imply otherwise. The <strong>mobile image (aarch64, PinePhone / Mobile NixOS) is now built, hosted, and release-signed and is downloadable below</strong> with its SHA-256 and the same signed checksum list — but it has <strong>not been boot-tested on any platform</strong> (neither QEMU-aarch64 nor hardware), so it is the least-proven artifact here and "built + signed" is emphatically not "it boots." Prefer to build it yourself? That path is still below, and it remains the strongest verification.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Artifact</th><th>Size</th><th>Status</th><th>Download</th><th>SHA-256</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Postern OS — node appliance ISO</strong><br><span class="small dim">x86_64 · UEFI</span></td>
+            <td>1.47&nbsp;GB</td>
+            <td><span class="badge built">built · hosted + signed · QEMU boot pending</span></td>
+            <td><a href="/dl/postern-os-node-x86_64.iso">Download ISO&nbsp;→</a></td>
+            <td><code>8f575705fd437314c9f2dd4a873d523890294b36e3fc323df54cbfea026c0f4b</code></td>
+          </tr>
+          <tr>
+            <td><strong>Postern OS — desktop ISO</strong><br><span class="small dim">x86_64 · UEFI</span></td>
+            <td>2.66&nbsp;GB</td>
+            <td><span class="badge built">built · hosted + signed · QEMU boot pending</span></td>
+            <td><a href="/dl/postern-os-desktop-x86_64.iso">Download ISO&nbsp;→</a></td>
+            <td><code>e6344619c50f283030388fb2083655ce69140315b7879cb58744cae37d999c16</code></td>
+          </tr>
+          <tr>
+            <td><strong>Postern OS — mobile image</strong><br><span class="small dim">aarch64 · PinePhone (Mobile NixOS)</span></td>
+            <td>1.31&nbsp;GB</td>
+            <td><span class="badge proto">built · hosted + signed · not yet boot-tested (QEMU or hardware)</span></td>
+            <td><a href="/dl/postern-os-mobile-pinephone-aarch64.img">Download .img&nbsp;→</a></td>
+            <td><code>708aeffc48142db003a1f8ce1305ec2fdf3422090800f47ef1513fcaf0271639</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose small">Signed checksum list: <a href="https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/v0.1/SHA256SUMS">SHA256SUMS</a> · signature: <a href="https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/v0.1/SHA256SUMS.minisig">SHA256SUMS.minisig</a> · minisign public key: <a href="https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/keys/postern-os-minisign.pub">postern-os-minisign.pub</a>.</p>
+
+    <div class="warnpanel" role="note">
+      <h3>Verify before you boot — both steps, every time</h3>
+      <p>A download you haven't verified is a download you're trusting to the network. Fetch the <a href="https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/v0.1/SHA256SUMS">SHA256SUMS</a> list and its <a href="https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/v0.1/SHA256SUMS.minisig">minisign signature</a> into the same folder as the ISOs, then run both checks — neither is optional:</p>
+<pre><code># 1. Checksum — every ISO you downloaded must verify against the signed list
+sha256sum -c SHA256SUMS
+
+# 2. Signature — proves the checksum list itself was published by Postern.
+#    The key is inline below; or fetch it:
+#    https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/keys/postern-os-minisign.pub
+minisign -Vm SHA256SUMS -P RWTSe98wfKKHuVRDnywuQmH/cMyP/HNuD/hFFLQeKdQeAHENliqJpmKs</code></pre>
+      <p>The checksum proves the file is intact; the signature proves the checksum list came from us. You need both. The minisign public key <code>RWTSe98wfKKHuVRDnywuQmH/cMyP/HNuD/hFFLQeKdQeAHENliqJpmKs</code> is published here, <a href="https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/os/keys/postern-os-minisign.pub">as a file</a>, and in the release notes, so you can cross-check it from more than one independent place.</p>
+    </div>
+
+    <div class="warnpanel" role="note">
+      <h3>Before you install — read these</h3>
+      <ul>
+        <li><strong>Back up first. The installer repartitions the target disk</strong> and everything on it is gone. There is no undo.</li>
+        <li><strong>Full-disk encryption (LUKS) means your passphrase is the data.</strong> Lose it and nobody — including us, by design — can recover the disk. Store it somewhere that isn't the same machine.</li>
+        <li><strong>Secure Boot: these images are not signed for Microsoft-endorsed Secure Boot yet.</strong> Disable Secure Boot in firmware, or enroll your own keys — both change your machine's security posture. Signed-shim support is planned, not shipped.</li>
+        <li><strong>No boot has been observed yet.</strong> Neither ISO has a published QEMU boot log, and neither has booted on physical hardware. Treat both a QEMU boot and a real-hardware install as unproven until the boot evidence is published.</li>
+        <li><strong>The mobile .img is the least-proven artifact — it has not booted anywhere.</strong> It is built, hosted, and release-signed, but it has never been booted on QEMU-aarch64 or on a PinePhone. Flashing it to a device is genuinely experimental; the first hardware boot has not happened. Verify the signature, but don't expect it to come up yet.</li>
+        <li><strong>Mainnet beta, unaudited — not a security claim.</strong> Hosting a signed image is not attestation. Evaluate it and reproduce our builds; don't protect real secrets with it yet.</li>
+      </ul>
+    </div>
+
+    <div class="videos" style="margin:1.6rem 0">
+      <figure>
+        <video controls muted playsinline preload="metadata">
+          <source src="/media/postern-os-install-v2.mp4" type="video/mp4">
+        </video>
+        <figcaption class="small"><strong>How to build &amp; install Postern OS — desktop + mobile (walkthrough).</strong> Shows the build-from-source process (<code>nix build .#iso</code> / <code>.#mobile-image</code>), flashing, and booting on a compatible device. Since this video was made: the <strong>x86_64 node and desktop ISOs are now hosted and release-signed (download them above)</strong> with a <strong>QEMU boot still pending (no boot log published yet)</strong>; a <strong>physical-hardware boot is further out</strong> (first targets: a PinePhone + a PC); the <strong>mobile image is now built, hosted, and release-signed but not yet boot-tested on any platform</strong>, so the flashing/booting portion of this walkthrough remains the plan, not a demonstrated process. Mainnet-beta, unaudited; not a security claim. Mobile targets only the listed Mobile-NixOS devices — <strong>not any Android</strong>.</figcaption>
+      </figure>
+    </div>
+    <div class="prose">
+      <p><strong>Prefer to build it yourself?</strong> That is still the strongest verification — the same inputs produce the same image, which is the whole point:</p>
+    </div>
+<pre><code># On a Linux host with Nix + flakes, from the source tree:
+
+# Bootable node ISO  ->  ./result/iso/*.iso
+nix build .#iso
+
+# Desktop ISO  ->  ./result/iso/*.iso
+nix build .#desktop-iso
+
+# Just the node package
+nix build .#bloch &amp;&amp; ./result/bin/bloch --help
+
+# Try it in a VM without flashing anything
+nixos-rebuild build-vm --flake .#bloch-os &amp;&amp; ./result/bin/run-*-vm</code></pre>
+    <p class="prose small">The mobile edition is <strong>built, hosted, and release-signed, but not yet boot-tested on any platform</strong>. See the honest labels on the <a href="products.html">products page</a>.</p>
+  </div>
+</section>
+
+<section aria-labelledby="pmos-h">
+  <div class="wrap">
+    <p class="kicker" id="pmos-h">3b · The non-attestable tier</p>
+    <h2>Postern for postmarketOS — community edition. The apk repo is now published.</h2>
+    <div class="prose">
+      <p>A separate, deliberately humbler product: the Postern suite packaged as ordinary postmarketOS/Alpine <strong>apk</strong> packages for phones postmarketOS already supports. It is <strong>not “Postern OS”</strong> and never will be called that: Alpine packages are <strong>not reproducible and not attestable</strong> — our apk signature proves <em>who published it</em>, not <em>what it was built from</em> — and wallet keys on this platform are <strong>software-backed, not hardware-backed</strong>. The attestable images are the Nix-built “Postern OS” family above, only.</p>
+      <p><strong>Honest status: three packages are now built, signed, and published for aarch64</strong>, in one signed Alpine apk repository on our public R2 bucket (one signing key for all three): <code>postern-wallet</code> (the real light-wallet CLI), <code>postern-apps</code> (the web-app bundle), and <code>postern</code> (a meta that pulls the two and declares the pmOS runtime deps — phosh + tor — which only resolve on a booted pmOS). Built natively on an aarch64 host (no qemu, no cross) in an Alpine container with <code>abuild</code>, from source tarballs pinned to the <code>v0.1.0-alpha1</code> tags.</p>
+      <p><strong>What that is <em>not</em>, spelled out:</strong> it is <strong>three apks and an index — not an operating system</strong>; the flavor / bootable image is <strong>not built</strong>. It is signed with an <strong>alpha build key</strong> (<code>builder-6a52d247</code>), not a stable, long-lived Postern release key — treat the signature as “this build, this key,” not a trust anchor. It has <strong>never been booted or run on a physical device</strong> — “built + signed + installs via apk” is not “runs correctly on your phone.” Non-attestable (Alpine/musl, not Nix), <strong>unaudited</strong>, and the coin the wallet holds is <strong>worthless by design</strong>.</p>
+    </div>
+
+    <h3 style="margin-top:1.6rem">Which phones can it reach?</h3>
+    <div class="prose">
+      <p>Because these are plain <strong>aarch64 apk packages</strong>, they add onto <strong>any 64-bit postmarketOS install</strong> — and postmarketOS itself now reaches on the order of <strong>~700 device models</strong>. But <em>reachable</em> is postmarketOS's word, not ours: <strong>we have booted Postern on none of them.</strong> "the apks install" is not "it runs on your phone."</p>
+      <p>postmarketOS sorts devices by how complete their support is. Since the v24.12 release the top <em>main</em> tier is essentially QEMU-only; the real, actively-maintained phones live in <strong>community</strong>, and the long tail (<strong>254 devices</strong> in the v26.06 release the apks target) sits in <strong>testing</strong>, where core hardware — modem, camera, GPU — may simply not work yet. <strong>postmarketOS's own device pages at <span class="mono">wiki.postmarketos.org</span> are the source of truth</strong> for what each one can and can't do; check yours before you expect anything.</p>
+    </div>
+    <p class="prose small" style="margin-top:.6rem">Better-supported <strong>community-tier, aarch64</strong> phones — the realistic targets (this is <strong>postmarketOS</strong>'s support, <strong>not</strong> Postern-tested):</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Device</th><th>postmarketOS codename</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PINE64 PinePhone</strong></td><td><code>pine64-pinephone</code></td></tr>
+          <tr><td><strong>PINE64 PinePhone Pro</strong></td><td><code>pine64-pinephonepro</code></td></tr>
+          <tr><td><strong>PINE64 PineTab 2</strong></td><td><code>pine64-pinetab2</code></td></tr>
+          <tr><td><strong>Purism Librem 5</strong></td><td><code>purism-librem5</code></td></tr>
+          <tr><td><strong>OnePlus 6 / 6T</strong></td><td><code>oneplus-enchilada</code> / <code>oneplus-fajita</code></td></tr>
+          <tr><td><strong>Google Pixel 3a / 3a XL</strong></td><td><code>google-sargo</code> / <code>google-bonito</code></td></tr>
+          <tr><td><strong>Xiaomi Poco F1</strong></td><td><code>xiaomi-beryllium</code></td></tr>
+          <tr><td><strong>Fairphone 4 / 5</strong></td><td><code>fairphone-fp4</code> / <code>fairphone-fp5</code></td></tr>
+          <tr><td><strong>SHIFT SHIFT6mq</strong></td><td><code>shift-axolotl</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose small">Only the <strong>PinePhone</strong> is also the Mobile-NixOS <em>"Postern OS"</em> image target in section 3a — and even that image has <strong>not booted anywhere yet</strong>. Every row here is a place the apks <em>can be added</em>, not a device we have run. <strong>32-bit (armv7) phones are out of scope</strong> — these packages are aarch64 only. The list is a moving target; postmarketOS's device wiki, not this page, is authoritative.</p>
+
+    <p class="prose small">Add it on a pmOS / Alpine aarch64 device:</p>
+    <pre><code>wget -O /etc/apk/keys/builder-6a52d247.rsa.pub \
+  https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/pmos/keys/builder-6a52d247.rsa.pub
+echo "https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/pmos/postern" &gt;&gt; /etc/apk/repositories
+apk update
+apk add postern-wallet      # just the wallet CLI, or:
+apk add postern             # the meta (wallet + apps + phosh + tor) — on a real pmOS</code></pre>
+    <p class="prose small">Signing key: <code>builder-6a52d247</code> — an alpha build key. A stable release key with a documented rotation, published in at least two places, is a prerequisite before this repo is recommended broadly. When the flavor image is built and a device has actually booted it, that milestone will appear here with the same zero-count honesty.</p>
+    <figure style="margin:1.6rem 0">
+      <video controls muted playsinline preload="metadata" src="/media/postern-for-postmarketos-walkthrough.mp4"></video>
+      <figcaption class="small"><strong>Postern for postmarketOS — walkthrough.</strong> A screen recording of the real web apps, the wallet CLI, and the <code>apk add</code> install captured on screen — two of the apps running live against a user's own Anthropic key. It is <strong>not</strong> a recording of a booted device: nothing here has run on phone hardware.</figcaption>
+    </figure>
+    <div class="warnpanel" role="note">
+      <h3>Signed is not attestable</h3>
+      <ul>
+        <li>The apk signature proves <strong>who published it</strong>, not <strong>what it was built from</strong>. No reproducibility, no attestation claim.</li>
+        <li>Wallet keys on this tier are <strong>software-backed, not hardware-backed</strong> — a software keystore.</li>
+        <li>The attestable path is the Nix-built <strong>“Postern OS”</strong> family above, only.</li>
+        <li>Mainnet beta, <strong>unaudited</strong>; the coin carries <strong>no value claim</strong>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="desk-h">
+  <div class="wrap">
+    <p class="kicker" id="desk-h">4 · The desktop app</p>
+    <h2>Postern Desktop — Tauri, build from source.</h2>
+    <div class="prose">
+      <p>A desktop app for the OS you already run (Linux first; cross-platform): start/stop and monitor a node, hold a wallet (mnemonic shown once, byte-identical addresses to the mobile core), watch the miner, stream the logs. Rust backend, dependency-free web UI.</p>
+      <p><strong>Postern Desktop includes an Encrypted Backup pane and a Swap pane</strong> — both <strong>reference prototypes, unaudited</strong>:</p>
+      <ul>
+        <li><strong>Encrypted Backup → Filecoin.</strong> The pane seals a file <strong>locally</strong> with the Postern AEAD seal (XChaCha20-Poly1305), writes a <strong>post-quantum SHAKE-256 “DATA0” integrity anchor</strong>, then performs a <strong>real upload of the sealed ciphertext to Filecoin</strong> through a Lighthouse S3 token — a real content ID (CID) comes back. <strong>Only sealed ciphertext ever leaves the device</strong>; keys and plaintext do not. It spools through a <strong>durable, crash-safe on-disk backup queue</strong> (the <code>DirBackend</code> spool). A <strong>reference prototype, unaudited</strong> — don't entrust a real backup to it yet.</li>
+      </ul>
+      <p>It builds from source in <code>desktop/</code> with the standard Rust + Tauri toolchain (<code>cargo tauri build</code> after the Tauri prerequisites for your platform). The desktop command surface is hardened — a <strong>sidecar sha256 integrity-pin (fail-closed)</strong>, default-deny capabilities, a strict CSP — but that is a pin, not an audit, and everything here is a beta.</p>
+      <div style="margin:1.4rem 0 0;border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;background:rgba(180,140,60,.06)">
+        <p style="margin:0 0 .4rem"><strong>Download — Postern Desktop 0.1.0 · public beta (macOS)</strong> &nbsp;<span class="small dim">unaudited reference build</span></p>
+        <p class="small dim" style="margin:0 0 .7rem">Building from source (above) is the primary, fully-verifiable path. This <code>.dmg</code> is a convenience build for <strong>testing only</strong> — <strong>unaudited, not production</strong>; don't entrust anything real to it yet.</p>
+        <p style="margin:0 0 .7rem"><a class="btn primary" href="/dl/Postern-Desktop-macOS.dmg" download>Download the .dmg (macOS · ~11&nbsp;MB) →</a></p>
+        <ul class="small dim" style="margin:.2rem 0 0">
+          <li><strong>Verify before opening.</strong> SHA-256 <code>09382424f009c27fc102f2993a2afd8981acc28f7bfe95a3dd4ec6af0d46128c</code> — run <code>shasum -a 256 Postern-Desktop-macOS.dmg</code> and compare. <strong>This replaces the build published earlier on 2026-07-18</strong> (<code>d9166d7a…</code>), which was withdrawn: it came from a partial branch and its Swap pane badged itself &ldquo;live&rdquo;. Discard that one.</li>
+          <li><strong>Swap reads &ldquo;preview&rdquo; here, and that is correct.</strong> The constant-product quote math and the EVM calldata are real and tested, but <strong>chain_id 700771 is unregistered, WBLCH was never deployed and no pools exist</strong> — nothing can be signed or broadcast, and the v1 bridge vault is custody.</li>
+          <li><strong>Not Apple-notarized.</strong> Ad-hoc signed only. Gatekeeper will warn: <strong>right-click the app → Open</strong> the first time, or run <code>xattr -dr com.apple.quarantine &quot;/Applications/Postern Desktop.app&quot;</code>.</li>
+          <li><strong>Intel x86_64 build</strong> — runs on Intel Macs and on Apple Silicon via <strong>Rosetta&nbsp;2</strong>.</li>
+        </ul>
+      </div>
+      <div style="margin:1.4rem 0 0;border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;background:rgba(70,120,180,.06)">
+        <p style="margin:0 0 .4rem"><strong>Postern — mobile (PWA)</strong> &nbsp;<span class="small dim">the full app, no install store</span></p>
+        <p class="small dim" style="margin:0 0 .7rem">The whole Postern app running in your phone's browser: a real post-quantum wallet (ML-DSA-65&nbsp;&#8214;&nbsp;Falcon-1024 keygen and signing in WASM, keys never leave the phone; create one or import a <code>bloch-cli</code> <code>wallet.json</code>), plus node status, vault, encrypted backup and the other panes. Add it to your home screen — iPhone and Android, no store, no signup.</p>
+        <p style="margin:0 0 .7rem"><a class="btn primary" href="/apps/postern/">Open Postern →</a></p>
+        <ul class="small dim" style="margin:.2rem 0 0">
+          <li><strong>Unaudited beta, zero-value testnet.</strong> Your recovery phrase is the only backup — write it on paper before you use it.</li>
+          <li>Software keystore in the browser, <strong>not</strong> the phone's Secure Enclave/StrongBox; installing the PWA is not a security upgrade. Panes that need a native host (run-a-node, hardware vault) show a clearly-labelled preview.</li>
+        </ul>
+      </div>
+      <div class="warnpanel" role="note" style="margin:1rem 0 0">
+        <h3>Windows installer — still withdrawn</h3>
+        <p>The <code>.msi</code> published earlier (<code>f54772ad…</code>) came from the same partial branch and carries the same live-badged Swap pane, so it stays down. It cannot simply be rebuilt alongside the macOS one: <strong>Tauri does not cross-bundle</strong> — <code>.msi</code>/NSIS are only emitted on Windows — and the <code>bloch-desktop-win</code> CI runner is not provisioned yet. Until one exists, <strong>build from source</strong> on Windows (see <code>desktop/BUILD.md</code>). Linux is in the same position.</p>
+      </div>
+    </div>
+    <figure style="margin:1.4rem 0 0">
+      <video controls muted playsinline preload="metadata" style="width:100%;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#000">
+        <source src="/media/postern-desktop-features-v2.mp4" type="video/mp4">
+      </video>
+      <figcaption class="small dim" style="margin-top:.6rem"><strong>Postern Desktop — features walkthrough</strong>, including the real Encrypted Backup and Swap panes. A demo of the app you build from source; unaudited reference prototype, not a security claim.</figcaption>
+    </figure>
+    <figure style="margin:1.4rem 0 0">
+      <video controls muted playsinline preload="metadata" style="width:100%;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#000">
+        <source src="/media/postern-encrypted-backup-filecoin.mp4" type="video/mp4">
+      </video>
+      <figcaption class="small dim" style="margin-top:.6rem"><strong>Encrypted Backup → Filecoin — tutorial.</strong> Sealing a file locally, anchoring a SHAKE-256 DATA0 integrity commitment, then uploading the sealed ciphertext to Filecoin (real CID returned). Only ciphertext leaves the device. Reference prototype, unaudited.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section aria-labelledby="src-h">
+  <div class="wrap">
+    <p class="kicker" id="src-h">5 · The source itself</p>
+    <h2>Where the code lives.</h2>
+    <div class="prose">
+      <p>The <strong>product suite</strong> (crates, apps, OS profiles, desktop, mobile) is the Postern Labs source tree — MIT / Apache-2.0 per crate. <code>cargo build --workspace</code> builds the product cores; the crates that need protocol crypto pull it as a pinned git dependency.</p>
+      <p>The <strong>protocol</strong> is not ours to host: Bloch-SIS-PoW lives in its own ownerless repository at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> — rendered as text, not a link, because this site makes no external requests and the protocol has no official site. See <a href="postern-vs-bloch.html">Postern &amp; Bloch — two different things</a>.</p>
+    </div>
+    <div class="warnpanel" role="note">
+      <h3>Before you run anything</h3>
+      <p>All of it is <strong>beta and unaudited</strong>. Evaluate it, break it, reproduce our builds, file findings — but <strong>do not put real secrets in the vault, real files through the courier, or treat the chain's coins as a store of value</strong>. The chain is a <strong>mainnet beta</strong>: unaudited, 51%-attackable, running the <strong>difficulty-driven k-ramp</strong> (k=4 today, rising with hashrate — a structural filter, not a security claim) — and its coins carry <strong>no value claim</strong>. Not a security, not an asset; use at your own risk.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Postern Labs</h4>
+        <p>Privacy &amp; security products, sold the honest way — the BlackBerry model, on permissive Linux, built on an ownerless post-quantum commons.</p>
+        <p>No tracking. No analytics. This site makes zero network requests beyond its own pages.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="products.html">Products</a>
+          <a href="downloads.html">Downloads</a>
+          <a href="run-a-node.html">Run a node</a>
+          <a href="/explorer/">Explorer</a>
+          <a href="disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="acknowledgments.html">Acknowledgments &amp; homage</a>
+          <a href="blochprotocol.html">The blochprotocol.com domain</a>
+          <a href="https://t.me/posternlabs" rel="noopener">Community · Telegram</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>The underlying protocol runs a <strong>mainnet beta</strong> — <strong>unaudited</strong> (audit contracted, not done), nascent, <strong>low-hashrate and 51%-attackable</strong>. The Module-SIS gate is now a <strong>difficulty-driven k-ramp</strong> (v0.1.0-alpha2): k=4 today, rising 5→6→7→8 as the network's own difficulty grows, easing back if hashrate falls — the Bitcoin model. The ramp is a <em>structural</em> filter, <strong>not a security claim</strong>: real security is cumulative SHAKE-256 hashcash work — hashrate × time. Nothing here is a certified security product yet.</p>
+        <p>The coin is <strong>not a security and not an asset</strong>. No token sale, no listing effort, no price. Disclosed in full: a 17% founder premine (10-year cliff, 40-year vest), structurally passive.</p>
+      </div>
+    </div>
+    <p class="legal">MIT / Apache-2.0, per crate — no copyleft embedded in the products. The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; it lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to). <strong>Postern Labs holds no ownership of, representation of, or prerogative over the protocol</strong>, and for that reason maintains <strong>no website for Bloch-SIS-PoW</strong> (including <code>blochprotocol.com</code>) — <a href="blochprotocol.html">read the full statement</a>.</p>
+  </div>
+</footer>
+
+</body>
+</html>

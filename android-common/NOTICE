@@ -1,0 +1,24 @@
+android-common — shared managed-profile plumbing
+Copyright (c) 2026 Postern Labs
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+
+This module is original work. It INTEROPERATES WITH the Android platform by calling
+public Android framework APIs (android.app.admin.DevicePolicyManager,
+android.app.admin.DeviceAdminReceiver, androidx.activity.ComponentActivity, and the
+AndroidX ActivityResult / annotation / coroutines libraries).
+
+It does NOT redistribute any Android Open Source Project (AOSP) source code, and it
+does NOT bundle, embed, or redistribute Google Mobile Services (GMS) / Google Play
+Services. AndroidX artifacts it depends on at build time are fetched from their
+canonical Maven repositories under their own Apache-2.0 licenses and are not vendored
+here.
+
+"Android" and "Google Play" are trademarks of Google LLC and are used nominatively
+only, to describe interoperation with the platform. Nothing here is affiliated with,
+endorsed by, or certified by Google.
+
+Third-party build-time dependencies (AndroidX: androidx.activity, androidx.annotation;
+JetBrains: kotlinx-coroutines-android) are licensed by their respective owners under
+the Apache License 2.0. Their license texts travel with those artifacts; consult each
+artifact's POM/NOTICE for the authoritative terms.

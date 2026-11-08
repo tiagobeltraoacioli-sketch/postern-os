@@ -1,0 +1,589 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>NoporIS — persona switch, per-crossing consent & kill-switch (UX prototype)</title>
+<!--
+  NoporIS persona-switch UX PROTOTYPE — surface design only, UNAUDITED.
+  Self-contained: no network, no telemetry, no external resources.
+  Deny-by-default is the visual default; refusing / closing / the kill-switch are
+  the safe, obvious, always-available actions. The far (Google-Play) persona is
+  rendered in an unmistakable amber "less-private" hazard chrome that never hides.
+  The logic below is a condensed, behavior-equivalent port of ./consent-kernel.mjs
+  (the node-checkable canonical reference) — kept in sync by hand and machine-checked
+  by ./test-kernel-parity.mjs, which extracts the inline block and asserts behavioural
+  identity against the .mjs. Every state mutation routes through the kernel transforms.
+  The on-device switcher, the two pairings, and the world-badged signer prompt DO
+  NOT EXIST YET (UNTESTED). This is an app on stock Android — never "Postern OS".
+-->
+<style>
+  :root{
+    --bg:#0d1014; --panel:#161b21; --panel2:#1e242c; --panel3:#252d37; --line:#2b333d;
+    --ink:#e7edf3; --dim:#95a2af; --faint:#69737e;
+    --near:#3fb27f; --near-bg:#12241c; --near-line:#255c44;
+    --far:#e08a3a; --far-bg:#2a1d0e; --far-line:#7a4f1c; --far-ink:#f4c88a;
+    --deny:#7d8894; --allow:#3fb27f;
+    --kill:#e0544a; --kill-bg:#2a1513; --kill-line:#7a2a24;
+    --focus:#5aa9e6; --sign:#5aa9e6; --sign-bg:#0f2436;
+    --shadow:0 10px 40px rgba(0,0,0,.5);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#e9edf2; --panel:#ffffff; --panel2:#f1f4f8; --panel3:#e7ecf2; --line:#d3dbe4;
+      --ink:#14202b; --dim:#54606e; --faint:#8593a1;
+      --near:#1d8a5c; --near-bg:#e7f6ee; --near-line:#a9dcc3;
+      --far:#b56612; --far-bg:#fdf1df; --far-line:#e6bd7c; --far-ink:#8a5410;
+      --deny:#6b7682; --allow:#1d8a5c;
+      --kill:#c23a30; --kill-bg:#fdecea; --kill-line:#f0b6b0;
+      --focus:#2b6cb0; --sign:#2b6cb0; --sign-bg:#e8f1fb;
+      --shadow:0 10px 40px rgba(20,40,60,.15);
+    }
+  }
+  :root[data-theme="dark"]{ color-scheme:dark; }
+  :root[data-theme="light"]{ color-scheme:light; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:440px;margin:0 auto;padding:16px 14px 96px;}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 12px;}
+  .top h1{font-size:17px;margin:0;letter-spacing:.01em;}
+  .top .sub{color:var(--dim);font-size:12px;margin:1px 0 0;}
+  .themebtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel2);color:var(--dim);border-radius:8px;padding:5px 9px;}
+  .honesty{background:var(--far-bg);border:1px solid var(--far-line);color:var(--far-ink);
+    border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:12.5px;}
+  .honesty b{color:var(--far-ink);}
+
+  /* ---- persona toggle: the two worlds, one keyring, one door at a time ---- */
+  .switcher{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:12px;margin:0 0 14px;box-shadow:var(--shadow);}
+  .worlds{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:8px;}
+  .world{border:1px solid var(--line);border-radius:12px;padding:12px 12px 13px;cursor:pointer;
+    background:var(--panel2);position:relative;text-align:left;font:inherit;color:var(--ink);transition:.18s;}
+  .world:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .world .wlabel{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px;}
+  .world .wsub{color:var(--dim);font-size:11px;margin-top:3px;line-height:1.35;}
+  .world .dot{width:9px;height:9px;border-radius:50%;background:var(--faint);flex:0 0 auto;}
+  .world.near[aria-pressed="true"]{border-color:var(--near-line);background:var(--near-bg);}
+  .world.near[aria-pressed="true"] .dot{background:var(--near);box-shadow:0 0 0 4px color-mix(in srgb,var(--near) 22%,transparent);}
+  /* the FAR world carries hazard chrome ALWAYS — even unselected it looks unsafe */
+  .world.far{border-color:var(--far-line);
+    background:
+      repeating-linear-gradient(135deg, transparent 0 11px, color-mix(in srgb,var(--far) 8%,transparent) 11px 22px),
+      var(--far-bg);}
+  .world.far .wlabel{color:var(--far-ink);}
+  .world.far[aria-pressed="true"]{box-shadow:0 0 0 2px var(--far) inset;}
+  .world.far[aria-pressed="true"] .dot{background:var(--far);box-shadow:0 0 0 4px color-mix(in srgb,var(--far) 26%,transparent);}
+  .hazbadge{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.08em;
+    color:#1a1206;background:var(--far);border-radius:4px;padding:1px 5px;margin-top:6px;text-transform:uppercase;}
+  .deck{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    color:var(--faint);font-size:10px;min-width:34px;}
+  .deck .beam{width:3px;height:34px;border-radius:2px;background:var(--line);position:relative;overflow:hidden;}
+  .deck .beam > i{position:absolute;left:0;right:0;bottom:0;height:0;transition:height .45s ease;
+    background:linear-gradient(0deg,var(--near),var(--far));}
+  .deck.up .beam > i{height:100%;}
+
+  .liveline{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line);
+    font-size:12.5px;color:var(--dim);}
+  .liveline .lk{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto;}
+  .liveline.on-near .lk{background:var(--near);} .liveline.on-far .lk{background:var(--far);}
+
+  /* ---- section ---- */
+  .sec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:0 0 12px;}
+  .sec > h2{font-size:13px;margin:0 0 2px;letter-spacing:.02em;display:flex;align-items:center;gap:7px;}
+  .sec > p.note{color:var(--dim);font-size:11.5px;margin:2px 0 10px;}
+  .lock{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:1px 6px;}
+
+  .cap{display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid var(--line);}
+  .cap:first-of-type{border-top:0;}
+  .cap .ico{width:30px;height:30px;border-radius:8px;background:var(--panel3);display:flex;align-items:center;
+    justify-content:center;flex:0 0 auto;color:var(--dim);}
+  .cap .body{flex:1;min-width:0;}
+  .cap .cname{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;}
+  .cap .cdesc{color:var(--dim);font-size:11.5px;line-height:1.35;margin-top:1px;}
+  .loudtag{font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--far-ink);border:1px solid var(--far-line);
+    border-radius:4px;padding:0 4px;text-transform:uppercase;}
+  .state{font-size:10.5px;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:999px;
+    border:1px solid var(--line);color:var(--deny);white-space:nowrap;}
+  .state.on{color:var(--allow);border-color:var(--allow);
+    background:color-mix(in srgb,var(--allow) 12%,transparent);}
+  .state.masked{color:var(--far);border-color:var(--far-line);}
+  .capbtn{font:inherit;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;padding:6px 11px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--ink);white-space:nowrap;}
+  .capbtn.open{border-color:var(--far-line);color:var(--far-ink);}
+  .capbtn.revoke{border-color:var(--near-line);color:var(--near);background:var(--near-bg);}
+  .capbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .capbtn[disabled]{opacity:.4;cursor:not-allowed;}
+
+  /* the "stand on the bridge" primary + the always-safe leave */
+  .enterrow{display:flex;gap:9px;flex-wrap:wrap;}
+  .btn{font:inherit;font-size:13px;font-weight:600;cursor:pointer;border-radius:10px;padding:10px 14px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--ink);}
+  .btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .btn.enter{background:var(--far);border-color:var(--far);color:#1a1206;flex:1;}
+  .btn.safe{flex:1;} /* leave / cancel — neutral, calm, obvious */
+  .btn.wide{width:100%;}
+
+  /* ---- kill-switch: big, red, always reachable ---- */
+  .killbar{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(0deg,var(--bg) 55%,transparent);
+    padding:12px 14px calc(12px + env(safe-area-inset-bottom));}
+  .killinner{max-width:440px;margin:0 auto;display:flex;gap:10px;align-items:center;}
+  .killbtn{flex:1;font:inherit;font-size:14px;font-weight:800;letter-spacing:.02em;cursor:pointer;
+    border-radius:12px;padding:13px;border:1px solid var(--kill-line);background:var(--kill-bg);color:var(--kill);}
+  .killbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .killbtn.engaged{background:var(--kill);color:#fff;border-color:var(--kill);}
+  .walletnote{font-size:10.5px;color:var(--dim);flex:0 0 118px;line-height:1.3;}
+  .walletnote b{color:var(--near);}
+
+  /* ---- consent / signer sheet ---- */
+  .scrim{position:fixed;inset:0;background:rgba(4,7,10,.62);display:none;align-items:flex-end;justify-content:center;
+    z-index:20;padding:0;}
+  .scrim.show{display:flex;}
+  @media (min-width:520px){ .scrim.show{align-items:center;} }
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;
+    width:100%;max-width:440px;padding:16px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:var(--shadow);
+    max-height:92vh;overflow-y:auto;}
+  @media (min-width:520px){ .sheet{border-radius:18px;} }
+  .sheet h3{margin:2px 0 2px;font-size:16px;display:flex;align-items:center;gap:8px;}
+  .sheet .stier{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:#1a1206;background:var(--far);border-radius:5px;padding:2px 7px;}
+  .grid{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin:12px 0;font-size:12.5px;}
+  .grid dt{color:var(--dim);}
+  .grid dd{margin:0;}
+  .dirflow{display:inline-flex;align-items:center;gap:6px;font-weight:700;}
+  .dirflow .cln{color:var(--near);} .dirflow .lp{color:var(--far-ink);}
+  .scopes{display:flex;gap:7px;margin:6px 0 4px;}
+  .scopes label{flex:1;border:1px solid var(--line);border-radius:9px;padding:8px 6px;text-align:center;
+    font-size:11.5px;cursor:pointer;color:var(--dim);}
+  .scopes label.sel{border-color:var(--sign);color:var(--ink);background:var(--sign-bg);}
+  .scopes input{position:absolute;opacity:0;pointer-events:none;}
+  .scopes .stt{display:block;font-weight:700;color:var(--ink);font-size:12.5px;}
+  .wysiwys{background:var(--sign-bg);border:1px dashed var(--sign);border-radius:10px;padding:10px 11px;margin:10px 0;}
+  .wysiwys .wlab{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sign);font-weight:800;}
+  .wysiwys .wval{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;margin-top:5px;word-break:break-word;color:var(--ink);}
+  .loudwarn{background:var(--far-bg);border:1px solid var(--far-line);color:var(--far-ink);border-radius:9px;
+    padding:9px 11px;font-size:12px;margin:8px 0;display:none;}
+  .loudwarn.show{display:block;}
+  .sheet-actions{display:flex;gap:9px;margin-top:6px;}
+  /* HOLD-TO-SIGN: the affirmative action carries friction; cancel is one calm tap */
+  .hold{flex:1;position:relative;overflow:hidden;font:inherit;font-size:13px;font-weight:800;cursor:pointer;
+    border-radius:11px;padding:13px;border:1px solid var(--far);background:var(--far-bg);color:var(--far-ink);
+    -webkit-user-select:none;user-select:none;touch-action:none;}
+  .hold .fill{position:absolute;inset:0;width:0;background:var(--far);z-index:0;transition:width .05s linear;}
+  .hold .txt{position:relative;z-index:1;}
+  .hold.armed .txt{color:#1a1206;}
+  .hold:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .cancel{flex:0 0 128px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;border-radius:11px;padding:13px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--ink);}
+  .cancel:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .holdhint{text-align:center;font-size:11px;color:var(--dim);margin:8px 0 0;}
+
+  .foot{color:var(--faint);font-size:11px;margin:18px 2px 0;line-height:1.55;}
+  .foot a{color:var(--dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>NoporIS — the guarded crossing</h1>
+      <p class="sub">One keyring · one door at a time · nothing crosses you didn't hand across</p>
+    </div>
+    <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle theme">◐ theme</button>
+  </div>
+
+  <div class="honesty" role="note">
+    <b>The Google-Play side is the less-private side, by construction.</b> It runs Google Play
+    Services and <b>phones home to Google</b>. NoporIS sells <b>separation and convenience — not
+    privacy</b> there. Sandboxed by Android's work profile, <b>not sealed</b>; a rooted phone
+    defeats it. <b>Reference-prototype, UNAUDITED — not a security control.</b>
+  </div>
+
+  <!-- ============ persona switcher ============ -->
+  <div class="switcher">
+    <div class="worlds">
+      <button class="world near" id="worldNear" aria-pressed="true" type="button">
+        <span class="wlabel"><span class="dot"></span>Clean side</span>
+        <span class="wsub">De-Googled wallet world. Tor-only, fail-closed. Where the sealed base lives.</span>
+      </button>
+      <div class="deck" id="deck"><span>bridge</span><span class="beam"><i></i></span></div>
+      <button class="world far" id="worldFar" aria-pressed="false" type="button">
+        <span class="wlabel"><span class="dot"></span>Google-Play side</span>
+        <span class="wsub">Real Google Android you bring. GMS on. Normal networking. Phones home.</span>
+        <span class="hazbadge">Less private · non-attestable</span>
+      </button>
+    </div>
+    <div class="liveline" id="liveline">
+      <span class="lk"></span><span id="liveText">At rest. The keyring is presented at neither door. No world is live.</span>
+    </div>
+  </div>
+
+  <!-- ============ stand-on-the-bridge (first-entry consent) ============ -->
+  <div class="sec" id="enterSec">
+    <h2>Stand on the bridge <span class="lock" id="tierLock">tier: non-attestable</span></h2>
+    <p class="note" id="enterNote">First-entry consent. You must accept that the far side is less-private,
+      phones home to Google, and is non-attestable before any crossing can open.</p>
+    <div class="enterrow" id="enterRow"></div>
+  </div>
+
+  <!-- ============ per-capability crossings ============ -->
+  <div class="sec">
+    <h2>Per-crossing consent</h2>
+    <p class="note">Each is a lever you throw for one capability — off by default, disclosed, individually
+      revocable. Mic and camera ask again, louder. NoporIS never opens a crossing you didn't open.</p>
+    <div id="caps"></div>
+  </div>
+
+  <p class="foot">
+    NoporIS is the guarded <b>bridge</b>; <b>Porog</b> is the guarded <b>door</b> — two products, one shared
+    signer. The world badge is derived from the pairing, so the less-private side can't spoof the clean side.
+    An app on <b>stock Android — never “Postern OS”</b>. UNTESTED: the on-device switcher, the two pairings,
+    and the world-badged signer prompt do not exist yet. The coin is not a security; personal use is free;
+    not legal advice.
+  </p>
+</div>
+
+<!-- ============ fixed kill-switch bar ============ -->
+<div class="killbar">
+  <div class="killinner">
+    <button class="killbtn" id="killBtn" type="button">Kill-switch — drop the span</button>
+    <div class="walletnote" id="walletNote"><b>Sealed base preserved.</b> Kill never touches the wallet or keys.</div>
+  </div>
+</div>
+
+<!-- ============ consent / signer sheet ============ -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet">
+    <h3 id="sheetTitle">Hand across <span id="sheetCap"></span> <span class="stier">less private</span></h3>
+    <dl class="grid">
+      <dt>What data</dt><dd id="sheetWhat"></dd>
+      <dt>Direction</dt><dd><span class="dirflow"><span class="cln">Clean side</span> → <span class="lp">Google-Play side</span></span></dd>
+      <dt>Lands where</dt><dd>The less-private persona. It may sync it to Google.</dd>
+    </dl>
+
+    <div style="font-size:11.5px;color:var(--dim);margin-bottom:4px;">How long does this hold?</div>
+    <div class="scopes" id="scopes">
+      <label data-scope="single" class="sel"><input type="radio" name="scope" checked><span class="stt">Once</span>single item, then re-ask</label>
+      <label data-scope="session"><input type="radio" name="scope"><span class="stt">Session</span>until next boot</label>
+      <label data-scope="persistent"><input type="radio" name="scope"><span class="stt">Persist</span>opt-in, until revoked</label>
+    </div>
+
+    <div class="loudwarn" id="loudWarn">
+      <b>Loud tier.</b> A live sensor feed from your clean side will stream to Google's Android. This is the
+      highest-consequence hand-over — confirm you mean it.
+    </div>
+
+    <div class="wysiwys">
+      <div class="wlab">What the signer will sign — WYSIWYS</div>
+      <div class="wval" id="wysVal"></div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="cancel" id="sheetCancel" type="button">Cancel</button>
+      <button class="hold" id="holdBtn" type="button" aria-label="Press and hold to sign consent">
+        <span class="fill" id="holdFill"></span><span class="txt" id="holdTxt">Press &amp; hold to sign</span>
+      </button>
+    </div>
+    <p class="holdhint">Signing is deliberate. Release early to cancel — cancelling crosses nothing.</p>
+  </div>
+</div>
+
+<script type="module">
+/* ===== condensed, behavior-equivalent port of consent-kernel.mjs (kept in sync manually — the .mjs is canonical; machine-checked by test-kernel-parity.mjs). TIERS here carries only id/product/farLabel — the badge inputs; the honesty prose, role and attestability flags live in the .mjs and in this page's VISIBLE banner, deliberately not duplicated as JS constants (asserted ABSENT by the parity test). ===== */
+const CAPABILITIES = ["clipboard", "files", "location", "mic", "camera"];
+const LOUD_CAPABILITIES = ["mic", "camera"];
+const SCOPES = ["single", "session", "persistent"];
+const CAP_INFO = {
+  clipboard: { label: "Clipboard", what: "The text or image currently copied on the clean side.", dir: "clean → less-private" },
+  files:     { label: "Files",     what: "The one file or folder you pick — nothing else on the clean side.", dir: "clean → less-private" },
+  location:  { label: "Location",  what: "A single coarse or precise GPS fix, when asked.", dir: "clean → less-private" },
+  mic:       { label: "Microphone",what: "A live audio feed from the clean side's mic. Loud tier.", dir: "clean → less-private" },
+  camera:    { label: "Camera",    what: "A live video feed from the clean side's camera. Loud tier.", dir: "clean → less-private" },
+};
+const TIERS = {
+  noporis: { id: "noporis", product: "NoporIS", farLabel: "Google-Play side · less private" },
+  porog:   { id: "porog",   product: "Porog",   farLabel: "key-attested device — not a measured-boot workspace" },
+  sloboda: { id: "sloboda", product: "Sloboda", farLabel: "non-attestable escape hatch — data leaves the sealed base" },
+};
+const asBool = (v) => v === true;
+const oneOf = (v, allowed, fb) => (allowed.includes(v) ? v : fb);
+const asIso = (v) => (typeof v === "string" && v.length > 0 ? v : null);
+const closedCap = () => ({ open: false, scope: "single", openedAtIso: null });
+function safeDefault(tierId = "noporis") {
+  const caps = {};
+  for (const k of CAPABILITIES) caps[k] = closedCap();
+  return { tier: tierId, onBridge: false, scope: "session", capabilities: caps,
+    killSwitch: { engaged: false, engagedAtIso: null }, sealedBase: { preserved: true } };
+}
+function normalize(input, tierId = "noporis") {
+  const out = safeDefault(tierId);
+  if (!input || typeof input !== "object") return out;
+  out.onBridge = asBool(input.onBridge);
+  out.scope = oneOf(input.scope, SCOPES, "session");
+  const ci = input.capabilities && typeof input.capabilities === "object" ? input.capabilities : {};
+  for (const k of CAPABILITIES) {
+    const x = ci[k] && typeof ci[k] === "object" ? ci[k] : {};
+    const open = asBool(x.open);
+    out.capabilities[k] = { open, scope: oneOf(x.scope, SCOPES, "single"), openedAtIso: open ? asIso(x.openedAtIso) : null };
+  }
+  const ks = input.killSwitch && typeof input.killSwitch === "object" ? input.killSwitch : {};
+  out.killSwitch.engaged = asBool(ks.engaged);
+  out.killSwitch.engagedAtIso = out.killSwitch.engaged ? asIso(ks.engagedAtIso) : null;
+  return out;
+}
+function bridgeStanding(state) {
+  const s = normalize(state, state && state.tier);
+  return !s.killSwitch.engaged && s.onBridge === true;
+}
+function activeCapabilities(state) {
+  const s = normalize(state, state && state.tier);
+  if (!bridgeStanding(s)) return [];
+  return CAPABILITIES.filter((k) => s.capabilities[k].open === true);
+}
+function sealedBasePreserved(state) {
+  return normalize(state, state && state.tier).sealedBase.preserved === true;
+}
+function standOnBridge(state, { scope = "session", atIso = null } = {}) {
+  const s = normalize(state, state && state.tier);
+  s.onBridge = true;
+  s.scope = oneOf(scope, SCOPES, "session");
+  s.acceptedAtIso = asIso(atIso);
+  return s;
+}
+function leaveBridge(state) {
+  const s = normalize(state, state && state.tier);
+  s.onBridge = false;
+  for (const k of CAPABILITIES) s.capabilities[k] = closedCap();
+  return s;
+}
+function openCapability(state, key, { scope = "single", atIso = null } = {}) {
+  const s = normalize(state, state && state.tier);
+  if (!CAPABILITIES.includes(key)) return s;
+  if (!bridgeStanding(s)) return s;
+  s.capabilities[key] = { open: true, scope: oneOf(scope, SCOPES, "single"), openedAtIso: asIso(atIso) };
+  return s;
+}
+function revokeCapability(state, key) {
+  const s = normalize(state, state && state.tier);
+  if (!CAPABILITIES.includes(key)) return s;
+  s.capabilities[key] = closedCap();
+  return s;
+}
+function engageKillSwitch(state, { atIso = null } = {}) {
+  const s = normalize(state, state && state.tier);
+  s.killSwitch = { engaged: true, engagedAtIso: asIso(atIso) };
+  s.sealedBase = { preserved: true };
+  return s;
+}
+function disengageKillSwitch(state) {
+  const s = normalize(state, state && state.tier);
+  s.killSwitch = { engaged: false, engagedAtIso: null };
+  return s;
+}
+function signerBadge({ tierId = "noporis", capability = "clipboard", peer = "the paired device", scope = "single" } = {}) {
+  const t = TIERS[tierId] || TIERS.noporis;
+  const cap = CAP_INFO[capability] ? CAP_INFO[capability].label.toLowerCase() : capability;
+  const qual = t.id === "noporis" ? " · non-attestable" : "";
+  return `${t.product} · ${t.farLabel}${qual} · ${cap} (${scope}) · ${peer}`;
+}
+
+/* ===== UI (demo only; in-memory, nothing persisted, nothing leaves the page).
+   EVERY state mutation below routes through the kernel transforms above —
+   the buttons never poke fields on `state` directly, so the deny-by-default,
+   no-silent-grant and sealed-base rails hold on this page exactly as in the
+   canonical .mjs. ===== */
+let world = "near";                 // which door the single keyring is presented at
+let state = safeDefault("noporis");
+let pending = null;                 // { cap, scope } — sheet-local UI selection only
+const PEER = "Tiago's Chromebook";
+const nowIso = () => new Date().toISOString();
+const $ = (id) => document.getElementById(id);
+
+/* minimal inline glyphs (no external images) — presentation only, not kernel state */
+const CAP_ICON = { clipboard: "clip", files: "file", location: "pin", mic: "mic", camera: "cam" };
+function glyph(kind){
+  const p = {
+    clip:"M8 4h5a3 3 0 0 1 3 3v8a4 4 0 0 1-8 0V6a2 2 0 0 1 4 0v8",
+    file:"M7 3h6l4 4v14H7zM13 3v4h4",
+    pin:"M12 21s6-5.3 6-10a6 6 0 0 0-12 0c0 4.7 6 10 6 10zM12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+    mic:"M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4",
+    cam:"M4 8h4l1-2h6l1 2h4v11H4zM12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  }[kind] || "";
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${p}"/></svg>`;
+}
+
+function setWorld(w){
+  world = w;
+  $("worldNear").setAttribute("aria-pressed", String(w==="near"));
+  $("worldFar").setAttribute("aria-pressed", String(w==="far"));
+  render();
+}
+$("worldNear").onclick = ()=>setWorld("near");
+$("worldFar").onclick  = ()=>setWorld("far");
+
+function render(){
+  const standing = bridgeStanding(state);
+  const active = activeCapabilities(state);
+  const killed = state.killSwitch.engaged;
+
+  // deck / live line reflect which world is live and whether the span is up
+  $("deck").classList.toggle("up", standing && world==="far");
+  const ll = $("liveline");
+  ll.classList.toggle("on-near", world==="near");
+  ll.classList.toggle("on-far", world==="far" && standing);
+  $("liveText").textContent = killed
+    ? "Span dropped by the kill-switch. The far side is stopped. Nothing crosses."
+    : world==="near"
+      ? "Clean side is live. Tor-only, fail-closed. The bridge is a separate, deliberate step."
+      : standing
+        ? `Standing on the bridge (${state.scope}). ${active.length} of 5 crossings lent to the less-private side.`
+        : "Google-Play side selected — but you are NOT on the bridge. Deny-by-default: nothing crosses yet.";
+
+  // first-entry consent row — enter/leave go through the kernel transforms
+  const row = $("enterRow"); row.innerHTML = "";
+  $("enterNote").style.display = "";
+  if(killed){
+    $("enterNote").textContent = "Kill-switch engaged. Disengage it below to stand on the bridge again.";
+  } else if(!state.onBridge){
+    $("enterNote").textContent = "First-entry consent. Accept that the far side is less-private, phones home to Google, and is non-attestable before any crossing can open.";
+    for(const sc of ["session","persistent"]){
+      const b = document.createElement("button");
+      b.className = "btn enter"; b.type="button";
+      b.textContent = sc==="session" ? "Stand on the bridge · this session" : "Stand on the bridge · persist";
+      b.onclick = ()=>{ state = standOnBridge(state, { scope: sc, atIso: nowIso() }); render(); };
+      row.appendChild(b);
+    }
+  } else {
+    $("enterNote").textContent = `Standing (${state.scope}). Leaving withdraws every open crossing at once — the calm, safe action.`;
+    const b = document.createElement("button");
+    b.className = "btn safe wide"; b.type="button"; b.textContent = "Leave the bridge (withdraw everything)";
+    b.onclick = ()=>{ state = leaveBridge(state); render(); };
+    row.appendChild(b);
+  }
+
+  // capability rows — revoke goes through the kernel transform
+  const host = $("caps"); host.innerHTML = "";
+  for(const k of CAPABILITIES){
+    const info = CAP_INFO[k], cap = state.capabilities[k], on = active.includes(k), loud = LOUD_CAPABILITIES.includes(k);
+    const el = document.createElement("div"); el.className = "cap";
+    const ico = document.createElement("div"); ico.className="ico"; ico.innerHTML = glyph(CAP_ICON[k]);
+    const body = document.createElement("div"); body.className="body";
+    body.innerHTML = `<div class="cname">${info.label.toLowerCase()}${loud?' <span class="loudtag">loud</span>':''}</div>`+
+      `<div class="cdesc">${info.what}</div>`;
+    const st = document.createElement("span");
+    const masked = cap.open && !standing;
+    st.className = "state"+(on?" on":"")+(masked?" masked":"");
+    st.textContent = on ? "CROSSING" : (masked ? "MASKED" : "DENIED");
+    const btn = document.createElement("button"); btn.type="button";
+    if(cap.open){
+      btn.className="capbtn revoke"; btn.textContent="Revoke";
+      btn.onclick=()=>{ state = revokeCapability(state, k); render(); };
+    } else {
+      btn.className="capbtn open"; btn.textContent="Hand across…";
+      btn.disabled = !standing;
+      btn.onclick=()=>openSheet(k);
+    }
+    el.appendChild(ico); el.appendChild(body); el.appendChild(st); el.appendChild(btn);
+    host.appendChild(el);
+  }
+
+  // kill-switch — engage/disengage go through the kernel transforms
+  const kb = $("killBtn");
+  kb.classList.toggle("engaged", killed);
+  kb.textContent = killed ? "Kill-switch ENGAGED — restore the span" : "Kill-switch — drop the span";
+  kb.onclick = ()=>{
+    state = killed ? disengageKillSwitch(state) : engageKillSwitch(state, { atIso: nowIso() });
+    render();
+  };
+  $("walletNote").innerHTML = sealedBasePreserved(state)
+    ? "<b>Sealed base preserved.</b> Kill never touches the wallet or keys."
+    : "STATE ERROR — refuse everything."; // unreachable: the kernel pins preserved:true
+}
+
+/* ===== consent sheet + hold-to-sign (the signed-consent moment) ===== */
+function openSheet(cap){
+  pending = { cap, scope:"single" };
+  const info = CAP_INFO[cap];
+  $("sheetCap").textContent = info.label.toLowerCase();
+  $("sheetWhat").textContent = info.what;
+  $("loudWarn").classList.toggle("show", LOUD_CAPABILITIES.includes(cap));
+  // reset scope selection to the safest ("single")
+  document.querySelectorAll('#scopes label').forEach(l=>{
+    const sel = l.dataset.scope==="single";
+    l.classList.toggle("sel", sel);
+    l.querySelector("input").checked = sel;
+  });
+  updateWys();
+  $("scrim").classList.add("show");
+  $("sheetCancel").focus();
+}
+function closeSheet(){ pending=null; resetHold(); $("scrim").classList.remove("show"); }
+function updateWys(){
+  if(!pending) return;
+  $("wysVal").textContent = signerBadge({ tierId: state.tier, capability: pending.cap, peer: PEER, scope: pending.scope });
+}
+document.querySelectorAll('#scopes label').forEach(l=>{
+  l.onclick = ()=>{
+    document.querySelectorAll('#scopes label').forEach(x=>x.classList.remove("sel"));
+    l.classList.add("sel"); l.querySelector("input").checked = true;
+    if(pending){ pending.scope = l.dataset.scope; updateWys(); }
+  };
+});
+$("sheetCancel").onclick = closeSheet;
+$("scrim").addEventListener("click",(e)=>{ if(e.target===$("scrim")) closeSheet(); });
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape" && $("scrim").classList.contains("show")) closeSheet(); });
+
+/* hold-to-sign: affirmative action requires ~900ms of deliberate hold */
+const HOLD_MS = 900;
+let holdStart = 0, holdRAF = 0, holdDone = false;
+function resetHold(){
+  cancelAnimationFrame(holdRAF); holdStart=0; holdDone=false;
+  $("holdFill").style.width="0"; $("holdBtn").classList.remove("armed"); $("holdTxt").textContent="Press & hold to sign";
+}
+function holdTick(t){
+  if(!holdStart) holdStart=t;
+  const p = Math.min(1,(t-holdStart)/HOLD_MS);
+  $("holdFill").style.width = (p*100)+"%";
+  $("holdBtn").classList.toggle("armed", p>0.5);
+  $("holdTxt").textContent = p<1 ? "Keep holding…" : "Signed";
+  if(p>=1){ holdDone=true; commit(); return; }
+  holdRAF = requestAnimationFrame(holdTick);
+}
+function startHold(e){ e.preventDefault(); if(!pending||holdDone) return; holdRAF=requestAnimationFrame(holdTick); }
+function endHold(){ if(holdDone) return; resetHold(); }
+function commit(){
+  if(!pending) return;
+  const {cap,scope} = pending;
+  // the ONLY grant path — the kernel refuses it unless the bridge is standing
+  // (no silent grant) and never bundles more than the one capability asked for.
+  state = openCapability(state, cap, { scope, atIso: nowIso() });
+  // brief "signed" flash, then close
+  setTimeout(()=>{ closeSheet(); render(); }, 260);
+}
+const hb = $("holdBtn");
+hb.addEventListener("mousedown",startHold);
+hb.addEventListener("touchstart",startHold,{passive:false});
+hb.addEventListener("mouseup",endHold);
+hb.addEventListener("mouseleave",endHold);
+hb.addEventListener("touchend",endHold);
+hb.addEventListener("touchcancel",endHold);
+// keyboard: hold Enter/Space
+hb.addEventListener("keydown",(e)=>{ if((e.key==="Enter"||e.key===" ")&&!holdStart){ e.preventDefault(); startHold(e); }});
+hb.addEventListener("keyup",(e)=>{ if(e.key==="Enter"||e.key===" ") endHold(); });
+
+/* theme toggle */
+$("themeBtn").onclick = ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+};
+
+render();
+</script>
+</body>
+</html>

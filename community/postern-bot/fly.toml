@@ -1,0 +1,15 @@
+# Vestnik — Postern Labs community Telegram bot (long-poller; no inbound service).
+# Secrets are set out-of-band (never in this file):
+#   flyctl secrets set TELEGRAM_BOT_TOKEN=... ANTHROPIC_API_KEY=...  -a postern-vestnik
+app = "postern-vestnik"
+primary_region = "gru"
+
+[build]
+
+# No [http_service] on purpose — the bot dials out to Telegram/Anthropic and
+# accepts no inbound traffic. One always-on machine.
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

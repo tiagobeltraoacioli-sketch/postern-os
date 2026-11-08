@@ -1,0 +1,6 @@
+{
+  "_WARNING": "INTENTIONALLY-PUBLIC POC TEST KEY — never a real credential. This keypair exists only so apps/postern-store/repo-poc's scripts (gen-keys.mjs/build-index.mjs/build-crl.mjs/verify-cli.mjs/verify-crl-cli.mjs) run end-to-end without a human generating a fresh key first, and so the checked-in fixtures/dist/index.json.sig + revocations.json (already signed with this exact key) keep verifying. It is committed on purpose — see fixtures/README.md — and is regenerable at any time via `node scripts/gen-keys.mjs` (then re-run build-index.mjs/build-crl.mjs to re-sign dist/). Never reuse this key, or this pattern, for a real repo-signing key — SIGNING.md's real-world rule is that the private half is never committed.",
+  "publicKey": "rGMxMlw1IPm1s18WGnkmmPXqa79P5iYdcSRgTDpkd24=",
+  "privateKey": "azp47jjusmVdQuXWZ/1RiNHHA7liEnyW4usv7bhnMOE=",
+  "keyId": "f4fc0998d2d20473"
+}

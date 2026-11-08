@@ -1,0 +1,14 @@
+[Desktop Entry]
+# XDG autostart entry for the Postern first-run honesty notice.
+# Installed to /etc/xdg/autostart/postern-first-run.desktop so it runs once per
+# user on first graphical login (the helper self-limits to a single show).
+# UNBOOTED: never triggered under a real phosh session (../README, section 4).
+Type=Application
+Name=Postern first-run notice
+Comment=Show the Postern for postmarketOS tier/honesty notice once
+Exec=/usr/libexec/postern/postern-first-run.sh
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=Phosh;GNOME;
+X-Postern-Edition=postmarketOS-community

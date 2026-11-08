@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- connect-src is https: + localhost (not pinned to one node) so users can point
+     the explorer at any node they run or trust; scripts stay inline-only, so no
+     external code can load. See explorer/build.js for the full tradeoff note. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="description" content="This page moved: the Bloch explorer now lives at index.html, with a dedicated network page. Unaudited, 51%-attackable mainnet beta; no value claim on the coin.">
+<meta name="color-scheme" content="dark light">
+<meta http-equiv="refresh" content="2; url=index.html">
+<title>Bloch Explorer (moved) — Postern Labs</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="/index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="/index.html">Home</a>
+      <a href="/postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="/products.html">Products</a>
+      <a href="/downloads.html">Downloads</a>
+      <a href="/run-a-node.html">Run a node</a>
+      <a href="/disclaimer.html">Disclaimer</a>
+      <a href="index.html" aria-current="page">Explorer</a>
+      <a href="hashrate.html">Hashrate</a>
+      <a href="network.html">Network</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) ·
+  very few nodes, low hashrate — 51%-attackable · the coin carries <strong>no value claim</strong> and is not a security.
+  <a href="/disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<div class="beta-ribbon" role="note" aria-label="Node update notice">
+  <strong>🛰 Running a node?</strong> Node <strong>v0.1.0-alpha2</strong> retires the fixed k=8 gate for a <strong>difficulty-driven k-ramp</strong> — genesis sync works again, and the <strong>signed snapshot</strong> is an optional one-command fast-sync. <a href="/snapshot.html">Snapshot fast-sync — how&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="toolhero">
+  <div class="wrap narrow">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Postern Labs · tools · mainnet beta</p>
+    <h1>This page moved.</h1>
+    <p class="lede">The old <code>bloch-pow-explorer.html</code> page was reworked into the Postern Labs identity. Everything it did — network overview, block lookup, address lookup, recent blocks — now lives in the <a href="index.html">Bloch Explorer</a>, and peer/connectivity tracking has its own <a href="network.html">Network page</a>.</p>
+    <p class="prose small">You are being redirected automatically. Reminder: this chain is an <strong>unaudited mainnet beta</strong> — very few nodes, low hashrate, 51%-attackable; the Module-SIS gate is a difficulty-driven k-ramp (k=4 today, rising with hashrate — not a security claim by itself); the coin carries no value claim and is not a security.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="index.html">Open the explorer</a>
+      <a class="btn" href="network.html">Network page</a>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Bloch Explorer — a Postern Labs tool</h4>
+        <p>Reads the ownerless <strong>Bloch-SIS-PoW</strong> protocol through a node's public JSON-RPC: <code>getnetworkinfo</code>, <code>getblockcount</code>, <code>getdaginfo</code>, <code>getrecentblocks</code>, <code>getblock</code>, <code>getblockbyheight</code>, <code>getaddressinfo</code>, <code>getpeers</code>. Nothing privileged — anyone can build the same.</p>
+        <p>No tracking. No analytics. The only network requests these pages make are the JSON-RPC calls to the node endpoint(s) you configure.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="/index.html">Home</a>
+          <a href="/postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="/products.html">Products</a>
+          <a href="/downloads.html">Downloads</a>
+          <a href="/run-a-node.html">Run a node</a>
+          <a href="/disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="index.html">Explorer</a>
+          <a href="network.html">Network</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>This chain is a <strong>mainnet beta</strong> — a designation, not a security claim: <strong>unaudited</strong> (audit contracted, not done), with <strong>very few nodes and low hashrate — 51%-attackable</strong>. The Module-SIS gate is a <strong>difficulty-driven k-ramp</strong> (node v0.1.0-alpha2): k=4 today, rising toward k=8 as the network's own difficulty grows and easing back if hashrate falls. It is <strong>not a security claim by itself</strong> (real security is cumulative SHAKE-256 hashcash work — raising k adds no cryptographic hardness at β=q/16). A brand-new node can <strong>sync from genesis</strong> or fast-sync from the optional <strong>signed snapshot</strong>. Whatever network string a node reports, treat confirmations as reversible.</p>
+        <p>The coin is <strong>not a security and not an asset</strong> — it carries no value claim. No token sale, no listing effort, no market-making, no price. A 17% founder premine is disclosed in full. Do not attach value.</p>
+      </div>
+    </div>
+    <p class="legal">The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; there is no official node, site, or explorer. This explorer is one independent tool on that commons, by Postern Labs. It lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to).</p>
+  </div>
+</footer>
+</body>
+</html>

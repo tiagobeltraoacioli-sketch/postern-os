@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# SCAFFOLD — not a secure, audited, or deployed system.
+#
+# A REAL LAN transport + discovery for the `postern-pairing` scaffold. This is a
+# NEW, standalone crate: it carries its OWN empty `[workspace]` table so it is
+# intentionally NOT a member of the ancestor bloch-protocol workspace and builds
+# and tests in isolation. It does NOT modify `integration/pairing`; it only
+# implements the two seams that crate already defines:
+#
+#   * `postern_pairing::transport::Transport`  ->  framed TCP over the LAN
+#   * `postern_pairing::transport::Discovery`  ->  mDNS/DNS-SD (`_postern-pair._tcp`)
+#
+# RAILS (carry these wherever this crate's concepts appear):
+#   * LAN-ONLY. No cloud, no relay, no internet, no telemetry, no phone-home.
+#     Multicast is link-local (224.0.0.251); TCP dials a LAN peer only.
+#   * The transport is a DUMB PIPE. It carries the pairing crate's already-sealed,
+#     length-prefixed frames as opaque bytes. ALL crypto (PQ-hybrid KEM, SAS,
+#     channel AEAD, anti-replay) lives in `postern-pairing`, never here.
+#   * SCAFFOLD / UNAUDITED — nothing here is built, secure, attested, or deployed.
+#   * A rooted/malware endpoint (A5) defeats the whole feature: ring-0 on either
+#     device reads keys from RAM. This byte pipe cannot and does not defend that.
+#   * The coin (BLCH) is not a security and is not involved. Personal use is free
+#     forever, no token, no login. Community mobile edition is "Postern for
+#     postmarketOS — community edition", never "Postern OS"; assurance name is
+#     never "BABA YAGA".
+[workspace]
+
+[package]
+name = "postern-pairing-transport-lan"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — unaudited LAN-only (no cloud/relay/telemetry) real Transport (length-prefixed TCP) + Discovery (mDNS/DNS-SD _postern-pair._tcp) for postern-pairing. A dumb byte pipe; the pairing crate owns all crypto. Not secure, not deployed."
+publish = false
+
+[lib]
+name = "postern_pairing_transport_lan"
+path = "src/lib.rs"
+
+[dependencies]
+# The seam definitions we implement (Transport, Discovery, PeerHint, the frame
+# codec). Path dependency, NOT edited by this crate. It builds offline.
+postern-pairing = { path = "../pairing" }
+
+# socket2 — a small, well-audited (rust-lang org; the socket layer under mio /
+# tokio) wrapper we use ONLY to set SO_REUSEADDR/SO_REUSEPORT and IPv4 multicast
+# membership so an mDNS responder can coexist with the OS resolver on :5353.
+# Everything else uses std::net. No async runtime, no heavyweight framework.
+# The "all" feature exposes SO_REUSEPORT (so the responder can share :5353 with
+# the OS mDNS daemon). It gates methods, not extra crates — still offline.
+socket2 = { version = "0.5", features = ["all"] }

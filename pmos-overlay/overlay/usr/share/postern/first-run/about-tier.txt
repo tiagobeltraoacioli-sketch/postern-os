@@ -1,0 +1,61 @@
+================================================================
+ About this tier -- Postern for postmarketOS (community edition)
+================================================================
+
+Read this once. We would rather tell you plainly than have you assume
+something we did not promise.
+
+WHAT THIS IS
+------------
+You installed Postern SOFTWARE on postmarketOS. This is the community
+edition: the LOWER-TRUST, NON-ATTESTABLE tier.
+
+It is NOT "Postern OS". It is always "Postern for postmarketOS".
+
+  Postern software on postmarketOS. No reproducibility or attestation
+  guarantee. The attestable images are "Postern OS" (Mobile NixOS) only.
+
+NOT COVERED BY THE POSTERN SEAL
+-------------------------------
+The Postern Seal covers only the reproducible, verity-sealed Postern OS
+(Mobile NixOS) images, on a shorter list of devices. This installation
+carries no Seal and makes no attestation claim.
+
+  - Packages are cryptographically SIGNED: you can verify who published
+    them and that they were not tampered with in transit.
+  - They are NOT reproducible: nobody -- including us -- can rebuild a
+    bit-for-bit identical file, because postmarketOS/Alpine is not
+    bit-reproducible as a distro property.
+  - There is no hardware anchor: pmOS devices ship with an unlocked
+    bootloader, so there is no device attestation here.
+
+YOUR WALLET KEYS
+----------------
+Your wallet keys are stored in SOFTWARE, encrypted at rest (Argon2id).
+There is NO hardware-backed keystore on this platform -- no TEE, no
+StrongBox. Fine for daily use; not for keys you cannot afford to lose.
+
+PRIVACY IS TRANSPARENT, NOT SECRET
+----------------------------------
+  - Network traffic routes through Tor using Arti (the Rust Tor stack):
+    the node embeds it in-process, and an on-device SOCKS proxy on
+    localhost:9150 serves the app suite. Config: /etc/postern/arti.toml.
+  - A default-deny firewall (nftables) blocks unsolicited inbound
+    traffic. Config: /etc/nftables.d/postern.nft.
+  - NO covert telemetry. Nothing here phones home. Any future analytics
+    will be OPT-IN and disclosed before a single byte leaves the device.
+
+ABOUT THE COIN
+--------------
+The Postern coin has no monetary value, and no value is claimed for it.
+Postern's revenue never touches the coin. Personal use is free.
+
+NOT ADVICE
+----------
+Nothing in Postern is legal or financial advice.
+
+WANT THE ATTESTABLE TIER?
+-------------------------
+That is exactly what Postern OS (the Nix images) provides, on a shorter
+list of devices. The supported-device list is on the site, honestly
+labeled.

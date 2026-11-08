@@ -1,0 +1,39 @@
+# bloch-l2-evm — SCAFFOLD, UNAUDITED, not a working L2.
+#
+# Execution-layer state-transition scaffold for the Bloch EVM L2
+# (docs/specs/BLOCH-L2-EVM-DESIGN.md §1): UNMODIFIED revm at SpecId::CANCUN
+# over an in-memory alloy/revm state layer, with deposit-mint (bridged BLCH
+# only, zero issuance) and vault fee routing (never burn).
+#
+# This is NOT a Reth node, NOT a sequencer, NOT a prover. Everything that
+# would make this a working L2 (keccak-MPT state root, eth_* RPC, txpool,
+# Reth-SDK node embedding, SP1 guest target) is an honest labelled stub.
+#
+# Standalone-workspace pattern (same as crates/bloch-tokens): its own empty
+# [workspace] table so it builds outside the frozen root members list and
+# can carry the heavy revm dependency tree independently.
+[package]
+name = "bloch-l2-evm"
+version = "0.0.0-scaffold"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "SCAFFOLD, UNAUDITED, not a working L2. Execution-layer state-transition scaffold for the Bloch EVM L2 design: unmodified revm pinned at CANCUN, bridged-BLCH deposit mints (zero issuance), basefee/priority-fee vault routing (never burn). Testnet / zero-value posture; see docs/specs/BLOCH-L2-EVM-DESIGN.md."
+
+# Deliberately empty: this crate is its own workspace root, excluded from
+# the product root workspace (crates/bloch-tokens pattern).
+[workspace]
+
+[dependencies]
+# revm is pinned to ONE exact version (design rule: the guest and the node
+# must re-execute byte-identical code; any bump is a documented program
+# upgrade). Record of the pin also lives in README.md.
+revm = "=41.0.0"
+# alloy-primitives resolves to the same version revm 41.0.0 uses (1.6.x),
+# so Address/U256/B256 are one type family across the crate.
+alloy-primitives = "1.6.0"
+# keccak-256 hexary Merkle-Patricia trie (the Ethereum state/storage root the
+# design mandates for anchoring + eth_getProof) and RLP for account/slot values.
+# Pure-Rust, no_std-capable — compatible with the future SP1 guest target.
+alloy-trie = "0.9"
+alloy-rlp = "0.3"

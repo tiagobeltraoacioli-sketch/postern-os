@@ -1,0 +1,460 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────
+#  SLOBODA — Waydroid gateway wrapper (sloboda)
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  HONESTY HEADER — read before trusting anything this tool does  ⚠
+#
+#  NON-ATTESTABLE escape-hatch tier. This wrapper manages a Waydroid container:
+#  a full Google/AOSP Android userland in LXC on the host kernel.
+#    • THIS IS "Postern for postmarketOS — community edition." It is NOT "Porog"
+#      (the stock-Android managed-profile container, a DIFFERENT product) and is
+#      NEVER "Postern OS." Different host, different tier — do not conflate.
+#    • ENTERING ANDROID = DATA LEAVES the sealed base. Keep secrets out.
+#    • Play Integrity STRONG WILL FAIL — banking / Wallet / DRM refuse to run.
+#    • NOT covered by the Postern Seal. The coin is worthless. Personal = free.
+#    • UNTESTED: no Waydroid in the build sandbox. Every waydroid call is a
+#      SCAFFOLD, validated only by shellcheck + a mock trace. Not legal advice.
+#    • DEFAULT-SAFE: opens NO privacy bridge; only READS the consent-gate toggle.
+#
+#  microG-vs-GApps is a CONFIG INPUT (PAW_SYSTEM_TYPE / config file), defaulting
+#  to the private, Google-free VANILLA base — it is NEVER hardcoded to Google.
+# ─────────────────────────────────────────────────────────────────────────────
+set -eu
+
+# Resolve our own dir so we can source the library next to us.
+_paw_self="$0"
+case "$_paw_self" in
+    */*) PAW_BIN_DIR="$(unset CDPATH; cd -- "$(dirname -- "$_paw_self")" && pwd)" ;;
+    *)   PAW_BIN_DIR="$(unset CDPATH; cd -- "$(dirname -- "$(command -v -- "$_paw_self")")" && pwd)" ;;
+esac
+
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=./paw-lib.sh
+. "$PAW_BIN_DIR/paw-lib.sh"
+
+paw_load_config
+
+usage() {
+    cat <<'EOF'
+sloboda — Waydroid gateway wrapper (NON-ATTESTABLE tier, UNTESTED)
+  "Postern for postmarketOS — community edition". NOT "Porog" (the stock-Android
+  container) and NOT "Postern OS". Different host, different tier.
+
+USAGE:
+  sloboda <command> [args]
+
+LIFECYCLE:
+  init            Provision the Android image (waydroid init).
+                  System type from config (default VANILLA = Google-free).
+  start           Start session/container on demand, then wait-for-ready.
+  status          Show session state + honest posture (bridge, integrity).
+  stop            Stop the session (and container) cleanly.
+  kill            KILL-SWITCH: stop everything AND clear session runtime state.
+
+ENTER ANDROID:
+  ui              Enter the FULL Android desktop (waydroid show-full-ui).
+  app <pkg>       Launch a single Android app (waydroid app launch <pkg>).
+  store           App-store-first: land on the store (Aurora by default).
+
+HOST INTEGRATION:
+  launchers       One-shot: write host .desktop icons for installed Android
+                  apps (each runs `waydroid app launch <pkg>`).
+  install-watch   Long-running: keep host .desktop launchers in sync as apps
+                  are installed/removed inside Android.
+
+DIAGNOSTICS:
+  doctor          Report environment readiness WITHOUT touching Waydroid.
+  config          Print the effective configuration.
+  help            This message.
+
+Every command honours PAW_DRYRUN=1 (trace, don't exec) and the config file at
+~/.config/sloboda/sloboda.conf (or /etc/sloboda/…).
+EOF
+}
+
+# --- honest posture banner (shown on state-changing entries) ----------------
+paw_posture_banner() {
+    paw_warn "─────────────────────────────────────────────────────────────"
+    paw_warn "You are using the NON-ATTESTABLE Android tier. Data leaves the"
+    paw_warn "sealed base. Play Integrity STRONG fails (banking/Wallet/DRM"
+    paw_warn "refuse). Not covered by the Postern Seal. UNTESTED scaffold."
+    paw_warn "─────────────────────────────────────────────────────────────"
+}
+
+# ---------------------------------------------------------------------------
+# init — provision the Android system image.
+# ---------------------------------------------------------------------------
+cmd_init() {
+    paw_posture_banner
+    _paw_sys="$PAW_SYSTEM_TYPE"
+    case "$_paw_sys" in
+        VANILLA) paw_log "init: VANILLA image — AOSP, NO Google, NO microG (private default)." ;;
+        FOSS)    paw_warn "init: FOSS (microG-preinstalled) — upstream images are flaky; prefer VANILLA + microG post-init." ;;
+        GAPPS)   paw_warn "init: GAPPS — EXPLICIT Google Play Services opt-in. Less private: plants Google's blobs in the container." ;;
+        *)       paw_die  "unknown PAW_SYSTEM_TYPE='$_paw_sys' (expected VANILLA|FOSS|GAPPS)." ;;
+    esac
+
+    _paw_priv="$(paw_priv)"
+    paw_log "init runs as root and PULLS a system image over the network (not from the sealed rootfs)."
+    # `waydroid init -s <TYPE> -f`. -f re-inits if already provisioned.
+    if [ -n "$_paw_priv" ]; then
+        paw_log "invoking: $_paw_priv $PAW_WAYDROID init -s $_paw_sys"
+        if [ "$PAW_DRYRUN" = "1" ]; then
+            printf 'TRACE would run: %s %s init -s %s\n' "$_paw_priv" "$PAW_WAYDROID" "$_paw_sys" >&2
+        else
+            "$_paw_priv" "$PAW_WAYDROID" init -s "$_paw_sys"
+        fi
+    else
+        paw_waydroid init -s "$_paw_sys"
+    fi
+
+    if [ "$PAW_MICROG" = "1" ] && [ "$_paw_sys" = "VANILLA" ]; then
+        paw_warn "PAW_MICROG=1: microG is a SEPARATE community step (waydroid_script),"
+        paw_warn "not shipped here. On-device: fetch waydroid-script and run its microG"
+        paw_warn "installer AFTER init. UNTESTED — documented, not automated."
+    fi
+    paw_log "init scaffold complete (UNTESTED — no image was actually pulled here)."
+}
+
+# ---------------------------------------------------------------------------
+# start — bring the session up on demand and wait for readiness.
+# ---------------------------------------------------------------------------
+cmd_start() {
+    paw_posture_banner
+    paw_require_container_allowed "start the Android session" || return 1
+    paw_bridge_report
+    paw_log "requesting Android session (container is launched on-demand by the session service)."
+    # `waydroid session start` starts user services; the waydroid-container
+    # systemd service brings up the LXC container underneath.
+    paw_waydroid session start &
+    # The session command runs in the foreground on a real device; we background
+    # it so we can poll readiness, then detach. In dry-run it returns instantly.
+    _paw_pid=$!
+    # Give the mock/real session a moment, then poll status.
+    if [ "$PAW_DRYRUN" = "1" ]; then
+        # Let the mock flip state; don't hang the trace.
+        wait "$_paw_pid" 2>/dev/null || true
+    fi
+    paw_wait_ready || {
+        paw_err "session did not reach RUNNING. Common on-device causes below (UNTESTED here):"
+        paw_err "  • no active Wayland compositor (Phosh/cage) to display Waydroid"
+        paw_err "  • kernel missing CONFIG_ANDROID_BINDER_IPC / _BINDERFS"
+        paw_err "  • waydroid-container service not started (needs root/systemd)"
+        return 1
+    }
+    paw_log "Android is up. Next: 'sloboda store' (app-store-first) or 'ui' / 'app <pkg>'."
+}
+
+# ---------------------------------------------------------------------------
+# stop — clean shutdown of session + container.
+# ---------------------------------------------------------------------------
+cmd_stop() {
+    paw_log "stopping Android session (this also stops the container)."
+    paw_waydroid session stop || paw_warn "session stop returned non-zero (may already be stopped)."
+    paw_log "stopped."
+}
+
+# ---------------------------------------------------------------------------
+# kill — KILL-SWITCH. Stop everything and clear session RUNTIME state.
+#   Clears the per-user runtime session dir so nothing lingers. Does NOT delete
+#   the provisioned image (that is `waydroid` teardown, a bigger hammer) — this
+#   is the "panic: get Android OUT of memory now" switch.
+# ---------------------------------------------------------------------------
+cmd_kill() {
+    paw_posture_banner
+    paw_warn "KILL-SWITCH: stopping session + container and clearing session state."
+    paw_waydroid session stop  || paw_warn "session stop non-zero (continuing)."
+
+    # Ask the container to stop too (root-owned). On systemd hosts this is the
+    # waydroid-container service; we surface the manual command if we can't.
+    _paw_priv="$(paw_priv)"
+    if [ "$PAW_DRYRUN" = "1" ]; then
+        printf 'TRACE would run: %s %s container stop\n' "$_paw_priv" "$PAW_WAYDROID" >&2
+        printf 'TRACE fallback:  %s systemctl stop waydroid-container\n' "$_paw_priv" >&2
+    elif [ -n "$_paw_priv" ] || [ "$(id -u 2>/dev/null || echo 1000)" = "0" ]; then
+        # `waydroid container stop` needs root; on systemd hosts the container is
+        # the waydroid-container service, so fall back to stopping that unit
+        # directly before we give up and print the manual command.
+        if ${_paw_priv:+$_paw_priv} "$PAW_WAYDROID" container stop 2>/dev/null; then
+            paw_log "container stopped."
+        elif command -v systemctl >/dev/null 2>&1 \
+             && ${_paw_priv:+$_paw_priv} systemctl stop waydroid-container 2>/dev/null; then
+            paw_log "container stopped via systemctl (waydroid-container)."
+        else
+            paw_warn "could not stop the container automatically — run: sudo systemctl stop waydroid-container."
+        fi
+    else
+        paw_warn "no root: stop the container with 'sudo systemctl stop waydroid-container'."
+    fi
+
+    # Clear per-user session runtime state. Waydroid keeps a session runtime dir
+    # under XDG_RUNTIME_DIR; removing it drops leftover sockets/session markers.
+    _paw_rt="${XDG_RUNTIME_DIR:-/run/user/$(id -u 2>/dev/null || echo 1000)}/waydroid"
+    if [ "$PAW_DRYRUN" = "1" ]; then
+        printf 'TRACE would clear session state: %s\n' "$_paw_rt" >&2
+    else
+        [ -d "$_paw_rt" ] && rm -rf "$_paw_rt" 2>/dev/null || true
+        paw_log "cleared session runtime state: $_paw_rt (if it existed)."
+    fi
+    paw_log "kill-switch complete. Android session is down; provisioned image is untouched."
+    paw_log "To wipe the image too (bigger hammer, UNTESTED here): remove /var/lib/waydroid + ~/.local/share/waydroid as root."
+}
+
+# ---------------------------------------------------------------------------
+# status — session state + honest posture, no side effects.
+# ---------------------------------------------------------------------------
+cmd_status() {
+    _paw_state="$(paw_session_state)"
+    printf 'session:    %s\n' "$_paw_state"
+    printf 'image type: %s (config)\n' "$PAW_SYSTEM_TYPE"
+    printf 'store pkg:  %s\n' "$PAW_STORE_PKG"
+    if paw_bridge_enabled; then
+        _paw_caps="$(paw_bridge_caps | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+        printf 'bridge:     ENABLED (per consent-gate; this wrapper did not open it)\n'
+        [ -n "$_paw_caps" ] && printf 'bridge caps: %s\n' "$_paw_caps"
+    else
+        printf 'bridge:     off (default-safe)\n'
+    fi
+    if paw_container_allowed; then
+        printf 'container:  allowed (consent given, kill-switch clear)\n'
+    else
+        printf 'container:  BLOCKED (%s)\n' "$(paw_container_block_reason)"
+    fi
+    # Tor-only network-egress posture, SURFACED from the consent-gate projection.
+    # Read-only + non-load-bearing: enforcement is the tor-glue's job, we only show
+    # it. Fail-safe — a missing/unreadable/blocked projection reads as blocked.
+    case "$(paw_egress_posture)" in
+        tor)  printf 'egress:     tor (Tor-only rail; circuit live per consent-gate)\n' ;;
+        held) printf 'egress:     held (fail-closed; container allowed, waiting for Tor circuit)\n' ;;
+        *)    printf 'egress:     blocked (no network; container not permitted / no projection)\n' ;;
+    esac
+    printf 'attestation: NONE — non-attestable tier, Play Integrity STRONG fails.\n'
+    printf 'tested:     NO — UNTESTED scaffold; no Waydroid in this sandbox.\n'
+}
+
+# ---------------------------------------------------------------------------
+# ui — enter the full Android desktop.
+# ---------------------------------------------------------------------------
+cmd_ui() {
+    paw_posture_banner
+    paw_require_container_allowed "enter the full Android UI" || return 1
+    paw_log "entering FULL Android UI (needs an active Wayland session to display)."
+    paw_waydroid show-full-ui
+}
+
+# ---------------------------------------------------------------------------
+# app <pkg> — single-app launch path.
+# ---------------------------------------------------------------------------
+cmd_app() {
+    [ "$#" -ge 1 ] || paw_die "usage: sloboda app <package.name>"
+    _paw_pkg="$1"
+    # A launcher click routes here; the gate governs entry even from the grid.
+    paw_require_container_allowed "launch $_paw_pkg" || return 1
+    paw_log "launching single Android app: $_paw_pkg"
+    paw_waydroid app launch "$_paw_pkg"
+}
+
+# ---------------------------------------------------------------------------
+# store — app-store-first landing (Aurora by default).
+# ---------------------------------------------------------------------------
+cmd_store() {
+    paw_posture_banner
+    paw_require_container_allowed "open the store" || return 1
+    paw_log "app-store-first: opening $PAW_STORE_PKG"
+    paw_log "(Aurora delivers APKs account-free — it does NOT defeat Play Integrity;"
+    paw_log " protected apps still refuse to run once installed.)"
+    paw_waydroid app launch "$PAW_STORE_PKG" || {
+        paw_warn "store launch failed. If the store isn't installed yet, on-device you can:"
+        paw_warn "  waydroid app install /path/to/AuroraStore.apk   (UNTESTED here)"
+        return 1
+    }
+}
+
+# ---------------------------------------------------------------------------
+# launchers — write host .desktop icons for installed Android apps.
+#   Enumerates `waydroid app list` (Name + packageName) and writes one .desktop
+#   per app into PAW_DESKTOP_DIR, each Exec'ing `sloboda app <pkg>`.
+# ---------------------------------------------------------------------------
+cmd_launchers() {
+    paw_ensure_desktop_dir || return 1
+    paw_log "syncing host launchers into $PAW_DESKTOP_DIR from 'waydroid app list'."
+
+    # `waydroid app list` prints blocks like:
+    #   Name: Aurora Store
+    #   packageName: com.aurora.store
+    # Real output may indent the block bodies, so strip leading whitespace before
+    # matching — this keeps the parser aligned with cmd_prune_launchers (which
+    # already tolerates leading space) and with the real waydroid app-list shape.
+    _paw_list="$(paw_waydroid app list 2>/dev/null || true)"
+    if [ -z "$_paw_list" ]; then
+        paw_warn "no apps returned (session down, or UNTESTED without Waydroid). Nothing written."
+        return 0
+    fi
+
+    _paw_name=""
+    printf '%s\n' "$_paw_list" | while IFS= read -r _paw_line; do
+        _paw_line="$(printf '%s' "$_paw_line" | sed 's/^[[:space:]]*//')"
+        case "$_paw_line" in
+            Name:*)        _paw_name="$(printf '%s' "${_paw_line#Name:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')" ;;
+            packageName:*) _paw_pkg="$(printf '%s' "${_paw_line#packageName:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                           [ -n "$_paw_pkg" ] || continue
+                           [ -n "$_paw_name" ] || _paw_name="$_paw_pkg"
+                           paw_write_desktop "$_paw_pkg" "$_paw_name"
+                           _paw_name="" ;;
+        esac
+    done
+    # Re-index so a live shell grid picks up the new icons (best-effort, §4.1).
+    paw_refresh_desktop_db
+    paw_log "launcher sync complete (see $PAW_DESKTOP_DIR)."
+}
+
+# Write a single .desktop file. Kept a function so install-watch reuses it.
+# The Exec calls THIS wrapper's `app` subcommand so the honesty/posture path is
+# always taken — never a bare `waydroid app launch`.
+paw_write_desktop() {
+    _pwd_pkg="$1"; _pwd_name="$2"
+    _pwd_file="$PAW_DESKTOP_DIR/sloboda-$_pwd_pkg.desktop"
+    _pwd_self="$PAW_BIN_DIR/sloboda"
+    if [ "$PAW_DRYRUN" = "1" ]; then
+        printf 'TRACE would write launcher: %s -> app launch %s\n' "$_pwd_file" "$_pwd_pkg" >&2
+        return 0
+    fi
+    cat > "$_pwd_file" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=$_pwd_name (Android)
+Comment=Runs in Waydroid (NON-ATTESTABLE tier — data leaves the sealed base)
+Exec=$_pwd_self app $_pwd_pkg
+Terminal=false
+Categories=X-Sloboda;
+X-Postern-Tier=sloboda-compat-non-attestable
+X-Postern-Package=$_pwd_pkg
+EOF
+    paw_log "wrote launcher: $_pwd_file"
+}
+
+# Best-effort refresh of the host desktop-entry index so newly written/pruned
+# launchers appear in the shell app grid without a session restart. Guarded by
+# `command -v` (the tool is absent off-device / on headless hosts) and honours
+# dry-run (trace only). Purely cosmetic and non-load-bearing: a failure never
+# blocks a launcher write, and it touches NO consent state. On-device item —
+# proven only on a real Phosh/desktop session (README on-device #9).
+paw_refresh_desktop_db() {
+    command -v update-desktop-database >/dev/null 2>&1 || return 0
+    if [ "$PAW_DRYRUN" = "1" ]; then
+        printf 'TRACE would refresh desktop db: update-desktop-database %s\n' "$PAW_DESKTOP_DIR" >&2
+        return 0
+    fi
+    update-desktop-database "$PAW_DESKTOP_DIR" 2>/dev/null \
+        || paw_warn "update-desktop-database failed — new launchers may need a manual session refresh."
+}
+
+# ---------------------------------------------------------------------------
+# install-watch — keep host launchers in sync as Android apps come and go.
+#   Polls `waydroid app list` on an interval and re-syncs launchers, pruning
+#   .desktop files for packages that no longer exist. Long-running.
+# ---------------------------------------------------------------------------
+cmd_install_watch() {
+    : "${PAW_WATCH_INTERVAL:=15}"
+    : "${PAW_WATCH_ONCE:=0}"
+    paw_log "install-watch: syncing launchers every ${PAW_WATCH_INTERVAL}s (Ctrl-C to stop)."
+    paw_log "UNTESTED: Waydroid has no install-event API; this is a polling scaffold."
+    while :; do
+        cmd_prune_launchers
+        cmd_launchers
+        # Single-pass exits: dry-run trace, or PAW_WATCH_ONCE=1 (cron-style use).
+        if [ "$PAW_DRYRUN" = "1" ] || [ "$PAW_WATCH_ONCE" = "1" ]; then
+            paw_log "single pass complete, exiting watch."
+            break
+        fi
+        sleep "$PAW_WATCH_INTERVAL"
+    done
+}
+
+# Remove launchers whose package is no longer present in `waydroid app list`.
+cmd_prune_launchers() {
+    [ -d "$PAW_DESKTOP_DIR" ] || return 0
+    _paw_present="$(paw_waydroid app list 2>/dev/null | sed -n 's/^[[:space:]]*packageName:[[:space:]]*//p')"
+    _paw_pruned=0
+    for _paw_df in "$PAW_DESKTOP_DIR"/sloboda-*.desktop; do
+        [ -e "$_paw_df" ] || continue
+        _paw_dpkg="$(sed -n 's/^X-Postern-Package=//p' "$_paw_df" 2>/dev/null)"
+        [ -n "$_paw_dpkg" ] || continue
+        case "
+$_paw_present
+" in
+            *"
+$_paw_dpkg
+"*) : ;;  # still installed, keep
+            *) _paw_pruned=1
+               if [ "$PAW_DRYRUN" = "1" ]; then
+                   printf 'TRACE would prune launcher: %s\n' "$_paw_df" >&2
+               else
+                   rm -f "$_paw_df"; paw_log "pruned stale launcher: $_paw_df"
+               fi ;;
+        esac
+    done
+    # Re-index only when something actually went away (best-effort, §4.1) — keeps
+    # the install-watch loop from churning the desktop DB every interval on a no-op.
+    [ "$_paw_pruned" = "1" ] && paw_refresh_desktop_db
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# doctor — environment readiness WITHOUT touching Waydroid.
+# ---------------------------------------------------------------------------
+cmd_doctor() {
+    printf '== sloboda doctor (read-only; no Waydroid calls) ==\n'
+    if paw_have_waydroid; then
+        printf 'waydroid binary:  found (%s)\n' "$(command -v "$PAW_WAYDROID")"
+    else
+        printf 'waydroid binary:  NOT FOUND — expected off-device; wrapper is UNTESTED.\n'
+    fi
+    printf 'wayland session:  %s\n' "${WAYLAND_DISPLAY:+present ($WAYLAND_DISPLAY)}"
+    [ -z "${WAYLAND_DISPLAY:-}" ] && printf '                  none — show-full-ui needs a Wayland compositor.\n'
+    if [ -r /proc/config.gz ] || [ -r "/boot/config-$(uname -r 2>/dev/null)" ]; then
+        printf 'kernel config:    present — check ANDROID_BINDER_IPC / _BINDERFS on-device.\n'
+    else
+        printf 'kernel config:    not readable here — verify binder support on-device.\n'
+    fi
+    printf 'binderfs:         %s\n' "$( [ -d /dev/binderfs ] && echo 'mounted' || echo 'absent (verify on-device)')"
+    printf 'system type:      %s\n' "$PAW_SYSTEM_TYPE"
+    paw_bridge_report
+    # Surface (never enforce) the consent-gate's Tor-only egress posture. Fail-safe:
+    # a missing/unreadable/blocked projection reads as blocked. Enforcement is the
+    # tor-glue's job; doctor only reports what the gate projected.
+    printf 'egress posture:   %s (Tor-only rail; surfaced from consent-gate, enforced by the tor-glue)\n' "$(paw_egress_posture)"
+    printf 'REMINDER:         non-attestable tier; STRONG integrity fails; UNTESTED scaffold.\n'
+}
+
+cmd_config() {
+    printf 'PAW_SYSTEM_TYPE   = %s\n' "$PAW_SYSTEM_TYPE"
+    printf 'PAW_MICROG        = %s\n' "$PAW_MICROG"
+    printf 'PAW_STORE_PKG     = %s\n' "$PAW_STORE_PKG"
+    printf 'PAW_READY_TIMEOUT = %s\n' "$PAW_READY_TIMEOUT"
+    printf 'PAW_DESKTOP_DIR   = %s\n' "$PAW_DESKTOP_DIR"
+    printf 'PAW_BRIDGE_STATE  = %s\n' "$PAW_BRIDGE_STATE"
+    printf 'PAW_WAYDROID      = %s\n' "$PAW_WAYDROID"
+    printf 'PAW_DRYRUN        = %s\n' "$PAW_DRYRUN"
+}
+
+# --- dispatch ---------------------------------------------------------------
+_paw_cmd="${1:-help}"
+[ "$#" -ge 1 ] && shift || true
+case "$_paw_cmd" in
+    init)           cmd_init "$@" ;;
+    start)          cmd_start "$@" ;;
+    stop)           cmd_stop "$@" ;;
+    kill)           cmd_kill "$@" ;;
+    status)         cmd_status "$@" ;;
+    ui|show|full)   cmd_ui "$@" ;;
+    app|launch)     cmd_app "$@" ;;
+    store)          cmd_store "$@" ;;
+    launchers|sync) cmd_launchers "$@" ;;
+    install-watch|watch) cmd_install_watch "$@" ;;
+    doctor)         cmd_doctor "$@" ;;
+    config)         cmd_config "$@" ;;
+    help|-h|--help) usage ;;
+    *)              paw_err "unknown command: $_paw_cmd"; usage; exit 2 ;;
+esac

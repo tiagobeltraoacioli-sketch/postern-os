@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Generated wasm-bindgen artifacts are NEVER committed — they are reproducible
+# from build-wasm.sh (which pins the CLI version to the wasm-bindgen crate in
+# Cargo.lock). Committing a binary blob would be an unauditable, unreproducible
+# trust hole for a security product. Rebuild locally instead.
+#
+# TRACKED (do not add here): build-wasm.sh, postern-sdk.js (the hand-written
+# loader — hyphenated), README.md.
+#
+# IGNORED: the wasm module + the wasm-bindgen `--target web` glue it emits
+# (crate lib name is `postern_sdk`, underscored — distinct from the loader).
+
+# default --out-dir used by build-wasm.sh
+/pkg/
+
+# defensive: the glue filenames, in case a build writes them next to the loader
+postern_sdk.js
+postern_sdk.d.ts
+postern_sdk_bg.wasm
+postern_sdk_bg.wasm.d.ts
+postern_sdk_bg.js
+package.json

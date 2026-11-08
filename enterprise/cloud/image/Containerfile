@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Containerfile — deployable CLOUD image for the Postern Cloud (hosted) edition.
+#
+# WHAT THIS IS. A deployable container image definition for the *managed / hosted*
+# ("cloud") edition — the artifact an operator builds, pushes to a registry, and
+# deploys onto their own infrastructure. It is the sibling of the self-hosted
+# enterprise skeleton in ../../deployment/packaging/, hardened for a hosted
+# posture (egress-controlled, read-only rootfs, non-root, telemetry off).
+#
+# REPRODUCIBLE-BY-DESIGN, NOT REPRODUCED. This image is written to be rebuilt
+# deterministically (base pinned by DIGEST, pinned build args, SOURCE_DATE_EPOCH
+# honored, no network during final assembly). No independent bit-for-bit
+# reproduction has been performed or attested here. "Reproducible" is a property
+# you can verify yourself (rebuild + sha256 compare, diffoscope), not a claim
+# discharged for you.
+#
+# HOSTED = LESS PRIVATE (DISCLOSED). Running this as a hosted/managed service
+# means the operator can observe traffic, metadata, and timing that a fully
+# self-hosted or on-device deployment would not expose to a third party. Choosing
+# the cloud edition is a deliberate privacy trade-off. It is disclosed here, in
+# BUILD-AND-DEPLOY.md, and should be disclosed to end users. For maximum privacy,
+# self-host (../../deployment/packaging/) or run on-device.
+#
+# NOT hardened beyond what is shown, NOT audited, NOT production-ready. Reference
+# scaffold. It runs the real hosted service: the Node service source is vendored
+# into ./vendor/services and launched by entrypoint.mjs (default: the license
+# verification service). You still pin the base by a digest YOU vetted (below).
+#
+# Build (operator-run; does not push or deploy):
+#   ./build-image.sh -d sha256:<vetted-base-digest>
+# or directly:
+#   podman build \
+#     --build-arg BASE_DIGEST=sha256:<vetted-base-digest> \
+#     --build-arg SOURCE_DATE_EPOCH="$(git log -1 --format=%ct 2>/dev/null || echo 0)" \
+#     -t postern-cloud:local -f Containerfile .
+# (docker works too; podman/buildah are preferred for rootless + reproducible builds.)
+
+# ── Base, pinned by DIGEST (never a floating tag) ───────────────────────────
+# The hosted services are Node (zero runtime deps — Node stdlib only), so the
+# base is the official Node runtime on Debian bookworm-slim. Pin it by a DIGEST
+# you have actually vetted (a tag can move; a digest cannot — this is what makes
+# the base deterministic). Get one you trust, e.g.:
+#   docker buildx imagetools inspect node:22-bookworm-slim   # -> sha256:<digest>
+ARG BASE_DIGEST=sha256:53ada149d435c38b14476cb57e4a7da73c15595aba79bd6971b547ceb6d018bf
+FROM node:22-bookworm-slim@${BASE_DIGEST} AS runtime
+
+# ── Reproducibility knobs ───────────────────────────────────────────────────
+# A fixed timestamp for anything the build stamps; a stable locale/timezone so
+# the image bytes do not depend on the build host's environment.
+ARG SOURCE_DATE_EPOCH=0
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+ENV TZ=UTC LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+# Image edition marker (informational; consumed by tooling/labels, not privileged).
+ARG POSTERN_EDITION=cloud
+ENV POSTERN_EDITION=${POSTERN_EDITION}
+
+# ── OCI labels (provenance the operator fills in at build time) ─────────────
+ARG VCS_REF=unknown
+ARG BUILD_VERSION=0.0.0-dev
+LABEL org.opencontainers.image.title="Postern Cloud" \
+      org.opencontainers.image.description="Postern Cloud (hosted) edition — reference deployable image. Reproducible-by-design, not reproduced. Not audited." \
+      org.opencontainers.image.licenses="MIT OR Apache-2.0" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.source="https://gitlab.com/postern" \
+      com.postern.edition="cloud" \
+      com.postern.telemetry="off" \
+      com.postern.privacy-note="hosted deployment is less private than self-hosting; disclosed."
+
+# ── Non-root by construction ────────────────────────────────────────────────
+# No secrets are baked into the image. Config and secrets are injected at runtime
+# via a read-only mount / secrets manager the operator controls (see compose.yaml).
+RUN groupadd --system --gid 10001 postern \
+ && useradd  --system --uid 10001 --gid postern --home /var/lib/postern \
+             --shell /usr/sbin/nologin postern \
+ && mkdir -p /var/lib/postern /etc/postern \
+ && chown -R postern:postern /var/lib/postern /etc/postern
+
+# ── Copy the vendored hosted-services source (the verified artifact) ─────────
+# The Node service source is vendored into ./vendor/services (integrity record:
+# vendor/services/VENDOR-SHA256SUMS.txt) so the build context is small, committed
+# and network-free — the final assembly fetches nothing, keeping the image bytes
+# deterministic. The app lives under /opt/postern (read-only code), SEPARATE from
+# the writable /var/lib/postern data volume so the volume never shadows the code.
+# Zero runtime dependencies (Node stdlib only) => no `npm install` at build.
+COPY --chown=postern:postern vendor/services/ /opt/postern/
+# ---------------------------------------------------------------------------
+
+USER postern
+WORKDIR /opt/postern
+
+# ── Privacy / egress posture ────────────────────────────────────────────────
+# No telemetry, no analytics, no phone-home. Egress is CONTROLLED: the default
+# posture is egress-closed and any outbound dependency must be declared
+# explicitly in the deployment (compose.yaml egress notes / network policy). This
+# image does not open outbound connections on its own.
+ENV POSTERN_TELEMETRY=off \
+    POSTERN_EGRESS=controlled
+
+# Which hosted service this image runs, and the port it binds. Both are
+# overridable at runtime (fly.toml [env] / compose environment). The license
+# verification service is the default — it serves /healthz, /v1/posture,
+# /v1/vendor-key, /v1/verify, /v1/revocations and /v1/crl.
+ENV POSTERN_SERVICE=license \
+    PORT=8080
+
+# Config is a read-only runtime mount; data persists in the named volume.
+VOLUME ["/var/lib/postern"]
+
+# Documented service port (not privileged; > 1024 so no capability is needed).
+EXPOSE 8080
+
+# Launch the selected hosted service (default: license). entrypoint.mjs is
+# fail-closed (SVC-1): it exits non-zero if VENDOR_PUBLIC_KEY is not injected at
+# runtime, so an unconfigured image cannot run fail-open. It also handles
+# SIGTERM/SIGINT for a clean container stop. Runtime-injected secrets only —
+# nothing is baked into the image.
+ENTRYPOINT ["node", "entrypoint.mjs"]

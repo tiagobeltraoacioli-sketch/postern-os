@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The wallet is a light client: it only talks to a node's JSON-RPC over HTTP. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- StrongBox is optional hardware; declare it as preferred-not-required so the
+         app still installs on devices without a discrete HSM (falls back to TEE). -->
+    <uses-feature
+        android:name="android.hardware.strongbox_keystore"
+        android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:label="Postern Wallet"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Postern Wallet">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

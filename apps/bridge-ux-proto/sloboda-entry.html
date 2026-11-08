@@ -1,0 +1,311 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sloboda — escape-hatch warning & container-entry consent (UX prototype)</title>
+<!--
+  Sloboda container-entry UX PROTOTYPE — surface design only, UNAUDITED. Self-contained.
+  Sloboda is the NON-ATTESTABLE escape hatch — "Postern for postmarketOS, community
+  edition". Entering the Waydroid Android container = DATA LEAVES THE SEALED BASE.
+  Play Integrity STRONG FAILS (banking / Wallet / DRM refuse) — by design. NEVER
+  covered by the Postern Seal (os_roothash says nothing about the mutable image).
+  NEVER "Porog", NEVER "Postern OS". Deny-by-default: the wrapper never opens a
+  bridge on its own; staying in the sealed base is the safe, default action.
+  UNTESTED — nothing here has ever booted a container.
+-->
+<style>
+  :root{
+    --bg:#0d1014; --panel:#161b21; --panel2:#1e242c; --panel3:#252d37; --line:#2b333d;
+    --ink:#e7edf3; --dim:#95a2af; --faint:#69737e;
+    --seal:#3fb27f; --seal-bg:#12241c; --seal-line:#255c44;
+    --haz:#e08a3a; --haz-bg:#2a1d0e; --haz-line:#7a4f1c; --haz-ink:#f4c88a;
+    --danger:#e0544a; --danger-bg:#2a1513; --danger-line:#7a2a24;
+    --tor:#a888e0; --tor-bg:#1e1730; --tor-line:#4a3a72;
+    --focus:#5aa9e6; --shadow:0 10px 40px rgba(0,0,0,.5);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#e9edf2; --panel:#ffffff; --panel2:#f1f4f8; --panel3:#e7ecf2; --line:#d3dbe4;
+      --ink:#14202b; --dim:#54606e; --faint:#8593a1;
+      --seal:#1d8a5c; --seal-bg:#e7f6ee; --seal-line:#a9dcc3;
+      --haz:#b56612; --haz-bg:#fdf1df; --haz-line:#e6bd7c; --haz-ink:#8a5410;
+      --danger:#c23a30; --danger-bg:#fdecea; --danger-line:#f0b6b0;
+      --tor:#6b47b0; --tor-bg:#efe9fb; --tor-line:#c7b6ec;
+      --focus:#2b6cb0; --shadow:0 10px 40px rgba(20,40,60,.15);
+    }
+  }
+  :root[data-theme="dark"]{color-scheme:dark;} :root[data-theme="light"]{color-scheme:light;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:460px;margin:0 auto;padding:16px 14px 96px;}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 12px;}
+  .top h1{font-size:17px;margin:0;}
+  .top .sub{color:var(--dim);font-size:12px;margin:1px 0 0;}
+  .themebtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel2);color:var(--dim);border-radius:8px;padding:5px 9px;}
+
+  /* where you stand now: inside the sealed base (safe) */
+  .standnow{display:flex;align-items:center;gap:11px;background:var(--seal-bg);border:1px solid var(--seal-line);
+    border-radius:12px;padding:12px 13px;margin:0 0 12px;}
+  .standnow .m{width:34px;height:34px;flex:0 0 auto;color:var(--seal);}
+  .standnow b{color:var(--seal);}
+  .standnow .t{font-size:12.5px;color:var(--ink);}
+
+  /* the escape-hatch warning — hazard chrome, unmistakable */
+  .hatch{border:1px solid var(--haz-line);border-radius:14px;overflow:hidden;margin:0 0 12px;box-shadow:var(--shadow);
+    background:
+      repeating-linear-gradient(135deg, transparent 0 13px, color-mix(in srgb,var(--haz) 6%,transparent) 13px 26px),
+      var(--panel);}
+  .hatch .hh{background:var(--haz-bg);border-bottom:1px solid var(--haz-line);padding:12px 14px;display:flex;
+    align-items:center;gap:10px;}
+  .hatch .hh .warn{width:26px;height:26px;flex:0 0 auto;color:var(--haz);}
+  .hatch .hh h2{font-size:14.5px;margin:0;color:var(--haz-ink);letter-spacing:.01em;}
+  .hatch .hh .tag{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:#1a1206;background:var(--haz);border-radius:4px;padding:2px 6px;}
+  .hatch .hb{padding:12px 14px;}
+  .truth{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;line-height:1.4;}
+  .truth:first-child{border-top:0;}
+  .truth .tk{flex:0 0 auto;width:20px;height:20px;border-radius:6px;background:var(--danger-bg);color:var(--danger);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:1px solid var(--danger-line);}
+  .truth b{color:var(--ink);}
+
+  /* Tor-only egress rail */
+  .egress{display:flex;align-items:center;gap:10px;background:var(--tor-bg);border:1px solid var(--tor-line);
+    border-radius:11px;padding:10px 12px;margin:12px 0;font-size:12px;color:var(--ink);}
+  .egress .tm{color:var(--tor);flex:0 0 auto;}
+  .egress b{color:var(--tor);}
+
+  /* container-entry consent: acknowledge each truth, then hold to enter */
+  .acks{margin:6px 0 4px;}
+  .ack{display:flex;align-items:flex-start;gap:10px;padding:9px 0;cursor:pointer;font-size:12.5px;line-height:1.4;}
+  .ack input{position:absolute;opacity:0;}
+  .ack .box{flex:0 0 auto;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line);
+    display:flex;align-items:center;justify-content:center;color:transparent;font-weight:800;font-size:13px;margin-top:1px;}
+  .ack input:checked + .box{background:var(--haz);border-color:var(--haz);color:#1a1206;}
+  .ack input:focus-visible + .box{outline:2px solid var(--focus);outline-offset:2px;}
+
+  .enterrow{display:flex;gap:10px;margin-top:8px;}
+  .stay{flex:1;font:inherit;font-size:14px;font-weight:800;cursor:pointer;border-radius:12px;padding:13px;
+    border:1px solid var(--seal-line);background:var(--seal-bg);color:var(--seal);}
+  .stay:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .hold{flex:1;position:relative;overflow:hidden;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;
+    border-radius:12px;padding:13px;border:1px solid var(--haz);background:var(--haz-bg);color:var(--haz-ink);
+    -webkit-user-select:none;user-select:none;touch-action:none;}
+  .hold[disabled]{opacity:.4;cursor:not-allowed;}
+  .hold .fill{position:absolute;inset:0;width:0;background:var(--haz);z-index:0;}
+  .hold .txt{position:relative;z-index:1;}
+  .hold.armed .txt{color:#1a1206;}
+  .hold:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .hint{text-align:center;font-size:11px;color:var(--dim);margin:8px 0 0;}
+
+  /* per-bridge levers, deny-by-default */
+  .sec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:0 0 12px;}
+  .sec h2{font-size:13px;margin:0 0 2px;}
+  .sec p.note{color:var(--dim);font-size:11.5px;margin:2px 0 10px;}
+  .sec.disabled{opacity:.5;pointer-events:none;}
+  .brow{display:flex;align-items:center;justify-content:space-between;gap:11px;padding:9px 0;border-top:1px solid var(--line);}
+  .brow:first-of-type{border-top:0;}
+  .brow .bn{font-weight:600;font-size:13px;}
+  .brow .bd{color:var(--dim);font-size:11px;margin-top:1px;}
+  .state{font-size:10.5px;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:999px;
+    border:1px solid var(--line);color:var(--faint);}
+  .state.on{color:var(--haz-ink);border-color:var(--haz-line);background:var(--haz-bg);}
+  .lever{position:relative;width:44px;height:26px;border-radius:999px;border:1px solid var(--line);background:var(--panel3);
+    cursor:pointer;flex:0 0 auto;transition:.15s;}
+  .lever::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--dim);transition:.15s;}
+  .lever[aria-pressed="true"]{background:var(--haz);border-color:var(--haz);}
+  .lever[aria-pressed="true"]::after{left:20px;background:#1a1206;}
+  .lever:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+
+  .killbar{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(0deg,var(--bg) 55%,transparent);
+    padding:12px 14px calc(12px + env(safe-area-inset-bottom));}
+  .killinner{max-width:460px;margin:0 auto;display:flex;gap:10px;align-items:center;}
+  .killbtn{flex:1;font:inherit;font-size:14px;font-weight:800;cursor:pointer;border-radius:12px;padding:13px;
+    border:1px solid var(--danger-line);background:var(--danger-bg);color:var(--danger);}
+  .killbtn.engaged{background:var(--danger);color:#fff;border-color:var(--danger);}
+  .killbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .imgnote{font-size:10.5px;color:var(--dim);flex:0 0 130px;line-height:1.3;}
+  .imgnote b{color:var(--seal);}
+
+  .foot{color:var(--faint);font-size:11px;margin:16px 2px 0;line-height:1.55;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Sloboda — the settlement beyond the wall</h1>
+      <p class="sub">The non-attestable escape hatch · a Waydroid Android container</p>
+    </div>
+    <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle theme">◐ theme</button>
+  </div>
+
+  <div class="standnow">
+    <span class="m"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.5-7 9-4-1.5-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4.5"/></svg></span>
+    <div class="t">You are inside the <b>sealed base</b> right now — your post-quantum wallet, attestable, Seal-covered.
+      Nothing here has left it. <b>Staying is the safe, default action.</b></div>
+  </div>
+
+  <!-- ESCAPE-HATCH WARNING -->
+  <div class="hatch" id="hatch">
+    <div class="hh">
+      <span class="warn"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+      <h2>Leaving the sealed base</h2>
+      <span class="tag">Non-attestable</span>
+    </div>
+    <div class="hb">
+      <div class="truth"><span class="tk">!</span><div><b>Data leaves the sealed base.</b> The container is a large, opaque trust surface next to your wallet. Keep seed phrases and secrets <b>out</b> of Android apps.</div></div>
+      <div class="truth"><span class="tk">!</span><div><b>Play Integrity STRONG will fail.</b> Banking apps, Google Wallet/Pay and DRM video detect the container and <b>refuse to run</b>. By design — an uncertified container can't reach STRONG. Not a bug we can fix.</div></div>
+      <div class="truth"><span class="tk">!</span><div><b>Not covered by the Postern Seal.</b> The Android image is mutable state; <code>os_roothash</code> says nothing about what runs inside. Do <b>not</b> treat an app here as attested.</div></div>
+      <div class="truth"><span class="tk">!</span><div>This is <b>Sloboda — the community edition</b>. It is <b>not “Porog”</b> and <b>never “Postern OS”</b>. Sandboxed by LXC on the host kernel — a rooted host defeats it. <b>UNTESTED, UNAUDITED.</b></div></div>
+
+      <div class="egress">
+        <span class="tm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg></span>
+        <div><b>Egress is Tor-only, fail-closed.</b> The container gets no network until Tor is bootstrapped; if Tor drops, egress stops. This is the one privacy rail the community edition keeps — it is <b>not</b> anonymity, and GMS still behaves like GMS.</div>
+      </div>
+
+      <div class="acks" id="acks">
+        <label class="ack"><input type="checkbox" data-ack="1"><span class="box">✓</span><span>I understand data will <b>leave the sealed base</b> and I will keep secrets out of Android apps.</span></label>
+        <label class="ack"><input type="checkbox" data-ack="2"><span class="box">✓</span><span>I understand <b>Play Integrity STRONG fails</b> and nothing here is <b>Seal-covered</b> or attested.</span></label>
+      </div>
+
+      <div class="enterrow">
+        <button class="stay" id="stayBtn" type="button">Stay in the sealed base</button>
+        <button class="hold" id="enterBtn" type="button" disabled aria-label="Press and hold to enter the container">
+          <span class="fill" id="enterFill"></span><span class="txt" id="enterTxt">Press &amp; hold to enter</span>
+        </button>
+      </div>
+      <p class="hint" id="enterHint">Tick both boxes to unlock entry. Entry is a deliberate hold; release early to cancel.</p>
+    </div>
+  </div>
+
+  <!-- PER-BRIDGE LEVERS (only meaningful once entered; deny-by-default) -->
+  <div class="sec disabled" id="bridgeSec">
+    <h2>Data bridges out of the container</h2>
+    <p class="note">Entering runs the container — it is <b>not</b> permission to share. Every bridge is off until you
+      throw its lever, one at a time. Anti-round-up: nothing bundles.</p>
+    <div id="bridges"></div>
+  </div>
+
+  <p class="foot">
+    <b>Sloboda</b> = the settlement outside the fortress walls, the outsiders' quarter — the non-attestable tier where
+    data leaves the keep. <b>Porog</b> = the threshold (a different product); <b>Postern OS</b> = the sealed base
+    (not this). Google / Android / Play Integrity named nominatively; no affiliation. “Sloboda” is a proposed name
+    pending trademark clearance, built on Waydroid. Reference-prototype, <b>UNTESTED</b> — nothing here has booted a
+    container. The coin is worthless; personal use is free; not legal advice.
+  </p>
+</div>
+
+<!-- kill-switch -->
+<div class="killbar">
+  <div class="killinner">
+    <button class="killbtn" id="killBtn" type="button">Kill-switch — stop the container</button>
+    <div class="imgnote" id="imgNote"><b>Image intact.</b> Kill stops the session &amp; clears runtime only; the sealed base is never touched.</div>
+  </div>
+</div>
+
+<script type="module">
+const $ = (id)=>document.getElementById(id);
+const BRIDGES = [
+  {k:"clipboard", n:"Clipboard", d:"Text/image between host and container.", loud:false},
+  {k:"files",     n:"Files",     d:"A shared folder hand-over.",            loud:false},
+  {k:"location",  n:"Location",  d:"GPS fix into the container.",           loud:false},
+  {k:"mic",       n:"Microphone",d:"Live audio into Android. Loud.",        loud:true},
+  {k:"camera",    n:"Camera",    d:"Live video into Android. Loud.",        loud:true},
+];
+let entered = false;
+let killed = false;
+let bridges = Object.fromEntries(BRIDGES.map(b=>[b.k,false]));
+
+/* container-entry consent: two acks unlock the hold-to-enter */
+function acksOk(){ return [...document.querySelectorAll('#acks input')].every(i=>i.checked); }
+function refreshEntry(){
+  const ok = acksOk() && !killed && !entered;
+  $("enterBtn").disabled = !ok;
+  $("enterHint").textContent = killed
+    ? "Kill-switch engaged — disengage below before entering."
+    : entered ? "Container running (prototype — nothing booted). Bridges are still all off."
+    : ok ? "Both understood. Press & hold to enter — release early to cancel."
+    : "Tick both boxes to unlock entry. Entry is a deliberate hold; release early to cancel.";
+}
+document.querySelectorAll('#acks input').forEach(i=>i.addEventListener("change",refreshEntry));
+
+$("stayBtn").onclick = ()=>{
+  entered = false;
+  document.querySelectorAll('#acks input').forEach(i=>i.checked=false);
+  for(const b of BRIDGES) bridges[b.k]=false;
+  $("bridgeSec").classList.add("disabled");
+  $("stayBtn").textContent = "You stayed in the sealed base ✓";
+  setTimeout(()=>{ $("stayBtn").textContent="Stay in the sealed base"; },1400);
+  renderBridges(); refreshEntry();
+};
+
+/* hold-to-enter */
+const HOLD_MS = 950;
+let raf=0, start=0, done=false;
+function resetHold(){ cancelAnimationFrame(raf); start=0; done=false;
+  $("enterFill").style.width="0"; $("enterBtn").classList.remove("armed"); $("enterTxt").textContent="Press & hold to enter"; }
+function tick(t){ if(!start)start=t; const p=Math.min(1,(t-start)/HOLD_MS);
+  $("enterFill").style.width=(p*100)+"%"; $("enterBtn").classList.toggle("armed",p>0.5);
+  $("enterTxt").textContent = p<1 ? "Keep holding…" : "Entering";
+  if(p>=1){ done=true; enterContainer(); return; } raf=requestAnimationFrame(tick); }
+function down(e){ e.preventDefault(); if($("enterBtn").disabled||done) return; raf=requestAnimationFrame(tick); }
+function up(){ if(done) return; resetHold(); }
+function enterContainer(){
+  entered = true;
+  $("bridgeSec").classList.remove("disabled");
+  $("enterBtn").disabled = true;
+  setTimeout(resetHold,300);
+  renderBridges(); refreshEntry();
+}
+const eb=$("enterBtn");
+eb.addEventListener("mousedown",down); eb.addEventListener("touchstart",down,{passive:false});
+eb.addEventListener("mouseup",up); eb.addEventListener("mouseleave",up);
+eb.addEventListener("touchend",up); eb.addEventListener("touchcancel",up);
+eb.addEventListener("keydown",(e)=>{ if((e.key==="Enter"||e.key===" ")&&!start){ e.preventDefault(); down(e); }});
+eb.addEventListener("keyup",(e)=>{ if(e.key==="Enter"||e.key===" ") up(); });
+
+/* per-bridge levers */
+function renderBridges(){
+  const host = $("bridges"); host.innerHTML="";
+  for(const b of BRIDGES){
+    const on = entered && !killed && bridges[b.k]===true;
+    const row = document.createElement("div"); row.className="brow";
+    const left = document.createElement("div");
+    left.innerHTML = `<div class="bn">${b.n}${b.loud?' · <span style="color:var(--haz-ink);font-size:10px;font-weight:800;">LOUD</span>':''}</div><div class="bd">${b.d}</div>`;
+    const right = document.createElement("div"); right.style.display="flex"; right.style.alignItems="center"; right.style.gap="10px";
+    const st = document.createElement("span"); st.className="state"+(on?" on":""); st.textContent = on?"BRIDGING":"OFF";
+    const lv = document.createElement("button"); lv.type="button"; lv.className="lever";
+    lv.setAttribute("aria-pressed", String(on)); lv.setAttribute("aria-label", b.n+" bridge");
+    lv.onclick = ()=>{ bridges[b.k]=!bridges[b.k]; renderBridges(); };
+    right.appendChild(st); right.appendChild(lv);
+    row.appendChild(left); row.appendChild(right); host.appendChild(row);
+  }
+}
+
+/* kill-switch */
+$("killBtn").onclick = ()=>{
+  killed = !killed;
+  if(killed){ entered=false; for(const b of BRIDGES) bridges[b.k]=false; $("bridgeSec").classList.add("disabled"); }
+  $("killBtn").classList.toggle("engaged", killed);
+  $("killBtn").textContent = killed ? "Container STOPPED — disengage kill-switch" : "Kill-switch — stop the container";
+  renderBridges(); refreshEntry();
+};
+
+$("themeBtn").onclick = ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+};
+
+renderBridges(); refreshEntry();
+</script>
+</body>
+</html>

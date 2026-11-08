@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'sha256-SMLID9BWNjKkKtuDRZ6i3E+tksgAGbTfYINb1WxwXcA=' 'unsafe-hashes' 'sha256-hvJDfV+172wotfyNieqDph7XpI/yS4gkt58KFzbxqTI=' 'sha256-7FM7PyvEjyyYD70k8rfJyC1xF3mFQHavDgjZraVRJoA=' 'sha256-9ywgdCUseJnLeaDibLBVT6mMqpQi3JNLn+yfX+RT5JM=' 'sha256-Blea4P3rApMMfzMNE6OB62fZLWPzvZC4SHJ4MJh5AOM=' 'sha256-gfpYM35F+IdaH3RnfUCoG3iiJVc76a78qgIHlJYxKm0=' 'sha256-M+0S+3IBAHorKjpdnI+jX+g0CS3SWv2DGMkDQnPAxkk=' 'sha256-mwUEcbw2dtRqIHv3Fcr9Vb8rgZ2FJs+N03z7z89XrPI=' 'sha256-0QwBbjkUEhTUNvEB+W9+tqUdoKCKp1YEb7sqOL1KFBw=' 'sha256-apY5dd6NCBhi4uIZvXhSKYLG4y00lEyR3JIbSQ8pK1w=' 'sha256-Em6mGEKe5CfVLUmeyEmJkvcfB9NPfqvweP4fAbiG9Xs=' 'sha256-CufHn0OMrH0XXDEtVM8nvQdCNDYQBp4p9k70kpIsj2U=' 'sha256-uRCSK7RpOJxcqGBedDRRQ79NmDD2jreSIJVnbweL4Xo=' 'sha256-5fskDbdUYL8mVRpB+fDztI+3YC60qq7camfbZqkEC+4=' 'sha256-/8bPNTwQpOj3ZluB4/gq33E+uCo9ilMR0qHN6pKAjZM=' 'sha256-hqbmlxuRoriQbxEnMTRql4N48TggPxGLqYqyH3Dx/8I=' 'sha256-baeh2lBm2s5Mr+m2fXuH6pq6qnLEQ1XB++V5U/CG0RY=' 'sha256-vyaCh9A5MeESrzYoay95A6yLQjJ388e8La2tXHqoVQQ=' 'sha256-si2NBiIOGFXrWR9cpm4TO/VwslR9eKOeZh3Ru6qexaM=' 'sha256-GkAdqq8OCihSYM4bNDVdjOANQSvm4+7B6y679OPCvJ4=' 'sha256-TdEOURhsBpFm24LMMqJpmgokSy+/hHpql68dyQF1PhY=' 'sha256-duB80EBga2D8sM4uqBxfocWSpMpdPUKhDJEws/AJJEY=' 'sha256-4mhoGYgI0gQj0/I6Rp2dZKokvnn8OWNFeZIpc9WmcMI='; img-src 'self'; media-src 'self'; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests">
+<meta name="description" content="Owned privacy and security products (the BlackBerry model) built on an ownerless post-quantum commons. Public beta: unaudited products on a nascent, 51%-attackable mainnet beta.">
+<meta name="color-scheme" content="dark light">
+<title>Postern Labs — privacy & security products, sold the honest way</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="products.html">Products</a>
+      <a href="downloads.html">Downloads</a>
+      <a href="run-a-node.html">Run a node</a>
+      <a href="migration.html">SHA-256 migration</a>
+      <a href="snapshot.html">Snapshot sync</a>
+      <a href="pool.html">Pool</a>
+      <a href="asic.html">ASIC</a>
+      <a href="releases.html">Releases</a>
+      <a href="security.html">Security</a>
+      <a href="/explorer/">Explorer</a>
+      <a href="disclaimer.html">Disclaimer</a>
+      <a href="acknowledgments.html">Acknowledgments</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) · very few nodes, low hashrate, 51%-attackable · not a security · for evaluation —
+  <strong>not to protect real secrets yet</strong>. <a href="disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<main id="main">
+
+<div class="wrap" style="padding-top:1.1rem">
+  <div role="note" style="border:1px solid var(--brass);border-left:5px solid var(--brass);background:rgba(180,140,60,.14);border-radius:8px;padding:1.05rem 1.2rem;line-height:1.55;margin-bottom:.9rem">
+    <strong style="color:var(--brass-hi)">⛏️ Bloch is migrating to SHA-256 proof-of-work.</strong>
+    A new node <strong>cannot sync from genesis</strong>: ~95% of block bodies were pruned everywhere and are unrecoverable, so joining today means trusting a downloaded database rather than verifying the chain. The migration is a <strong>new chain carrying every balance over</strong>, bound to a published snapshot commitment — <strong>coins are not affected</strong>, and signatures stay ML-DSA-65&nbsp;&#8214;&nbsp;Falcon-1024, so post-quantum protection of your keys is unchanged.
+    <div class="small dim" style="margin-top:.55rem;border-top:1px solid var(--border);padding-top:.5rem">
+      Said plainly: a small SHA-256 chain is <strong>cheap to attack with rented hashrate</strong>, and the current chain is not exposed that way. FFG finality is the answer and <strong>is not ready yet</strong> — committee at height 250,000, activation at 500,000. The window between genesis and activation is <strong>not yet covered</strong>, and that is an open question, not a solved one. <strong>Nothing is launched.</strong>
+      &nbsp;→&nbsp; <a href="migration.html"><strong>Read the full status →</strong></a>
+    </div>
+  </div>
+  <div role="note" style="border:1px solid var(--border);border-left:5px solid var(--accent, #4a7);border-radius:8px;padding:.9rem 1.2rem;line-height:1.55;margin-bottom:.9rem">
+    <strong>📱 Postern is live on mobile.</strong> The full app in your phone's browser — wallet (real post-quantum keygen &amp; signing in WASM), node status, vault, encrypted backup and more. Add it to your home screen, no store. Unaudited beta, software keystore, zero-value.
+    &nbsp;→&nbsp; <a href="/apps/postern/"><strong>Open Postern →</strong></a>
+  </div>
+  <div role="note" style="border:1px solid var(--brass);border-left:5px solid var(--brass);background:rgba(180,140,60,.11);border-radius:8px;padding:1rem 1.2rem;line-height:1.55">
+    <strong style="color:var(--brass-hi)">🛰️ Run a node — new step-by-step setup guide.</strong>
+    Six copy-paste steps — install prerequisites, <code>cargo build --release</code>, verify the <strong>signed snapshot</strong> (fresh nodes bootstrap from the snapshot, never genesis on the pruned network), first run, confirm you're converging over RPC, and optionally mine — plus honest troubleshooting (sync deadlocks, the classification/stall fix, gossip saturation).
+    &nbsp;→&nbsp; <a href="/Bloch-Node-Setup-Guide.pdf"><strong>Node Setup Guide (PDF) →</strong></a> &nbsp;·&nbsp; <a href="run-a-node.html">Run a node →</a>
+    <div class="small dim" style="margin-top:.55rem;border-top:1px solid var(--border);padding-top:.5rem">
+      <strong>Node stuck around blue_score 395,897?</strong> That is a known depth-bounded-classification bug (not your setup). The fix — an exact interval-reachability index — is written and on the public branch <code>feat/reachability-durable</code>, <strong>UNAUDITED</strong>, with its live gate <strong>OFF</strong>: upgrading the binary alone changes nothing until the project publishes a coordinated activation height. Step-by-step for operators: <a href="/Bloch-Reachability-Upgrade-Steps.pdf"><strong>Reachability Upgrade Steps (PDF) →</strong></a>
+    </div>
+  </div>
+</div>
+<section class="hero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Postern Labs · public beta</p>
+    <p style="margin:0 0 .9rem"><a href="releases.html" style="display:inline-block;font-size:.82rem;padding:.25rem .75rem;border:1px solid var(--brass);border-radius:999px;color:var(--brass-hi);text-decoration:none">🆕 Release · Bloch node v0.1.0-alpha3 — finality fix + ASERT re-anchor →</a></p>
+    <p style="margin:-.5rem 0 1rem;font-size:.88rem;color:var(--text-dim);max-width:44rem">Running a node? <strong>v0.1.0-alpha3</strong> fixes two consensus bugs the k-ramp exposed once block production un-choked: a finality checkpoint <strong>unit fix</strong> (nodes were freezing on ingest — they converge again) and a height-switched <strong>ASERT re-anchor</strong> so difficulty can track real hashrate instead of being capped at 4× genesis forever. Both are backward-safe (historical blocks validate byte-for-byte — no fork); the Module-SIS gate stays the <strong>difficulty-driven k-ramp</strong> from alpha2. <a href="releases.html" style="color:var(--brass-hi)">See the release →</a></p>
+    <h1>Privacy &amp; security products, sold the honest way.</h1>
+    <p class="lede">Postern Labs builds <strong>owned, rebranded</strong> privacy and security products — a secrets vault, post-quantum file drop, a messenger, passkeys, metadata scrub, a panic lock, a wallet, voice tools, an app store, and a reproducible OS — on top of an <strong>ownerless, post-quantum protocol it does not own</strong>. You pay Postern for protection, support, and provable integrity — never for a coin.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="downloads.html">Get the beta</a>
+      <a class="btn" href="postern-vs-bloch.html">Postern ≠ Bloch — read why</a>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="uphold-h">
+  <div class="wrap">
+    <div style="border:1px solid var(--brass);border-left:5px solid var(--brass);background:rgba(201,162,39,.07);border-radius:12px;padding:1.5rem 1.6rem">
+      <p class="kicker" id="uphold-h" style="color:var(--brass-hi)">Run a node · a Ulysses contract for the digital age</p>
+      <h2 style="margin:.15rem 0 .55rem">Run a node. Uphold the commitment.</h2>
+      <p class="lede" style="margin:0 0 1.1rem">Mine the <strong>ownerless, post-quantum base</strong> from Postern Desktop — <strong>not to profit</strong>, but to uphold a <strong>pre-commitment</strong> to privacy and security as fundamental rights. Like a people binding itself through a <strong>constitution</strong>, the ownerless, permissionless base is a <strong>self-binding commitment device</strong> — a technological <em>Ulysses contract</em> in <a href="acknowledgments.html">Jon Elster's</a> sense — that no future authority, and <strong>not even the founder</strong>, can revoke. <em>From the people, for the people</em> — <strong>We, the People</strong>.</p>
+      <figure style="margin:0 auto;max-width:46rem">
+        <video controls playsinline preload="metadata" poster="/media/postern-run-a-node-and-mine-poster.png" style="width:100%;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#000">
+          <source src="/media/postern-run-a-node-and-mine.mp4" type="video/mp4">
+        </video>
+        <figcaption class="small dim" style="margin-top:.7rem"><strong>Step-by-step, narrated</strong> — open Run&nbsp;a&nbsp;node, point at the <code>bloch</code> binary, tick <strong>Mine (Module-SIS PoW)</strong>, Start, watch blocks seal, Stop. <strong>Participation, not a purchase:</strong> this is a <strong>zero-value, pre-mainnet testnet</strong>; mining yields <strong>no sellable reward</strong>. <strong>BLCH is worthless by design and is not a security.</strong> Honest limit: the desktop node mines Module-SIS PoW and serves RPC locally, but <strong>cannot yet fully sync or produce blocks on the live mainnet</strong> — local / testnet / reference mining. <strong>Reference prototype, unaudited.</strong> The walkthrough is captured in the labeled browser preview (simulated node). Read <a href="acknowledgments.html">“We, the People” →</a></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="nodevid-h">
+  <div class="wrap">
+    <p class="kicker" id="nodevid-h">Run a node · snapshot sync</p>
+    <h2>Set up a Bloch node in about three minutes.</h2>
+    <figure style="margin:1.2rem auto 0;max-width:46rem">
+      <video controls playsinline preload="metadata" poster="/media/bloch-node-setup-v3-poster.png" style="width:100%;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#000">
+        <source src="/media/bloch-node-setup-v3.mp4" type="video/mp4">
+        <track kind="subtitles" srclang="en" label="English" default src="/media/bloch-node-setup-v3.vtt">
+      </video>
+      <figcaption class="small dim" style="margin-top:.6rem"><strong>Snapshot sync — set up a Bloch node in ~3 min</strong> · narrated · English captions. The written steps on <a href="snapshot.html">Snapshot sync</a> and <a href="run-a-node.html">Run a node</a> are authoritative. Unaudited research chain; the coin has no value.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section aria-label="Motto" style="text-align:center;padding:2.6rem 0 0.6rem">
+  <div class="wrap">
+    <p style="font-size:1.18rem;line-height:1.5;letter-spacing:.005em;color:var(--text-dim);max-width:40rem;margin:0 auto">When mathematics and language communicate to foster privacy.</p>
+    <p aria-hidden="true" style="font-size:2.1rem;color:var(--brass);margin:.55rem 0 0;line-height:1">&pi;</p>
+  </div>
+</section>
+
+<section aria-labelledby="film-h">
+  <div class="wrap">
+    <p class="kicker" id="film-h">Why Postern</p>
+    <h2>A protocol tied to the mast.</h2>
+    <figure class="film">
+      <video src="/media/why-postern-v3.mp4" controls muted autoplay loop playsinline preload="metadata">
+        <track kind="captions" src="/media/why-postern-v3.vtt" srclang="en" label="English" default>
+      </video>
+    </figure>
+    <p class="prose small dim">Freedom, property, privacy — why Postern was built, drawn from the founder's essay on pre-commitment (Ulysses at the mast), Locke on property, and privacy as a constitutional penumbra. English narration (unmute) + captions. <strong>*</strong> The <strong>Bloch protocol</strong> is ownerless — no owner, no board. <strong>Postern Labs</strong> is a company, and <strong>has an owner</strong>. It is a vision piece, not a claim — everything remains pre-mainnet and unaudited.</p>
+  </div>
+</section>
+
+<section aria-labelledby="honest-h">
+  <div class="wrap">
+    <p class="kicker" id="honest-h">The part most launch pages hide</p>
+    <h2>This is a beta launch, and we say exactly what that means.</h2>
+    <div class="warnpanel" role="note">
+  <h3>Honest status — read before anything else</h3>
+  <ul>
+    <li><strong>Everything here is pre-production.</strong> The Rust product <strong>cores</strong> are built and test-verified. The <strong>OS images have started to exist</strong>: the x86_64 node and desktop ISOs are <strong>built, hosted, and release-signed</strong> — the <strong>node ISO now QEMU/TCG-boots to a login prompt (boot log recorded, grader rc=0)</strong>; the <strong>desktop ISO's QEMU boot is still pending, and a physical-hardware boot is further out</strong>; the mobile image (aarch64, PinePhone / Mobile NixOS) is now <strong>built, hosted, and release-signed, but not yet boot-tested on any platform</strong> — it has not been booted on QEMU aarch64 or on hardware, so it is the least-proven of the three. The UIs and cloud/enterprise editions remain designs and reference prototypes. <strong>Hosting a signed image is not attestation, and built is not booted — we don't claim otherwise.</strong> Each item is labelled with its exact status wherever it appears.</li>
+    <li>The underlying protocol now runs a <strong>mainnet beta — a designation, not a security claim</strong>. As of node v0.1.0-alpha2 the fixed k=8 Module-SIS gate is <strong>retired</strong>: the gate is a <strong>difficulty-driven k-ramp</strong> — k=4 today, rising 5→6→7→8 as the network's own ASERT difficulty (the on-chain hashrate proxy) sustains above spaced thresholds, and easing back if hashrate falls (the Bitcoin model). Raising k adds <strong>no cryptographic hardness</strong> at β=q/16 — the ramp is a structural/throughput filter, <strong>not a security claim</strong>, and no security is claimed. Real security is <strong>cumulative SHAKE-256 hashcash work — hashrate × time</strong>. A brand-new node can <strong>sync from genesis again</strong> under the ramp, or use the <strong>signed snapshot</strong> as an optional one-command fast-sync. The network is <strong>nascent: very few nodes, low hashrate → 51%-attackable</strong>. It is <strong>unaudited</strong> — a third-party audit is contracted but <strong>not done yet</strong>, and the concrete-security analysis and IACR ePrint are still outstanding.</li>
+    <li><strong>The coin is not a security and not an asset.</strong> No token sale, no listing effort, no market-making, no price. Disclosed in full: a <strong>17% founder premine</strong> (10-year cliff, 40-year vest), structurally passive.</li>
+    <li><strong>Do not use any of this to protect real secrets yet.</strong> It is a public beta for evaluation, feedback, and reproduction of our claims.</li>
+  </ul>
+</div>
+    <p class="prose small">Every claim on this site is audit-gated: if a thing isn't true yet, we phrase it as the plan. The full text lives on the <a href="disclaimer.html">disclaimer page</a>.</p>
+  </div>
+</section>
+
+<section aria-labelledby="model-h">
+  <div class="wrap">
+    <p class="kicker" id="model-h">The model</p>
+    <h2>Owned products ⟂ ownerless protocol.</h2>
+    <div class="prose">
+      <p>Think Bitcoin and the businesses built around it. The base protocol — <strong>Bloch-SIS-PoW</strong>, a post-quantum, pure-PoW BlockDAG — is a neutral commons: <strong>no owner, no foundation, no official site, no token sale</strong>. It is software plus a documented RPC/API surface, and nothing more. Anyone runs it; anyone builds on it.</p>
+      <p><strong>Postern Labs is one builder among many</strong> on that neutral base — a company, with products it owns and a name deliberately rebranded away from “Bloch”. It sells the BlackBerry thing: protection, support, and integrity you can verify, on permissive Linux.</p>
+    </div>
+    <div class="stack" aria-label="Architecture: Postern products on top of the ownerless protocol">
+      <div class="layer">
+        <span class="t">Postern Labs — owned products, rebranded</span>
+        <p>Vault · Courier · Messenger · Keys · Hygiene · Panic Lock · Seal Companion · Wallet · Postern OS · the apps — permissively licensed, sold for the protection.</p>
+      </div>
+      <div class="join">│ consumes the protocol via its public RPC / API — nothing privileged │</div>
+      <div class="layer base">
+        <span class="t">Bloch-SIS-PoW — ownerless protocol</span>
+        <p>SHAKE-256 hashcash PoW (Module-SIS gate) · Falcon‖ML-DSA · GhostDAG-Q · the coin. No owner, no curator, no official site or explorer. Just the protocol.</p>
+      </div>
+    </div>
+    <p class="prose small" style="margin-top:1.2rem">This distinction matters enough that it has <a href="postern-vs-bloch.html">its own page</a>.</p>
+  </div>
+</section>
+
+<section aria-labelledby="suite-h">
+  <div class="wrap">
+    <p class="kicker" id="suite-h">The suite</p>
+    <h2>A tour of what's in the workshop.</h2>
+    <p class="prose">The Rust cores below are <strong>built and test-verified</strong>; the front-ends are <strong>reference prototypes</strong>; everything is <strong>unaudited</strong>. Honest labels on every card — the full catalog is on the <a href="products.html">products page</a>.</p>
+    <div class="grid">
+      <article class="card">
+  <h3>Postern Vault</h3>
+  <p>A secrets / password vault, sealed at rest with the one canonical seal (XChaCha20-Poly1305 + Argon2id).</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Courier</h3>
+  <p>Serverless person-to-person file drop: ML-KEM-1024 payload seal over an ephemeral Tor onion service.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Vestnik</h3>
+  <p>The messenger — Slavic <em>вестник</em>, ‘herald’ (renamed from ‘Messenger’ to steer clear of Meta's mark). The Megolm E2EE core (via vodozemac, Apache-2.0) now drives a real, offline-testable Matrix client — login/sync/room-tier/tier-gated send with PQ-sealable saved-session custody — behind a desktop pane. Live homeserver contact is user-action-only, never in CI; Megolm is classical (not PQ) and the homeserver sees the social graph.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Panic Lock</h3>
+  <p>A panic button that instantly re-locks and destroys nothing.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Keys</h3>
+  <p>A passkey / FIDO2 credential core for the permissive-license world.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Hygiene</h3>
+  <p>Scrubs the document metadata nobody fixes — OOXML, ODF, JPEG.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Svitok — encrypted office suite (in design)</h3>
+  <p>An <strong>encrypted office suite</strong> (свиток, ‘scroll’) — deliberately <strong>not</strong> named after the Word/Excel/PowerPoint/Office marks; ‘office’ is used only as a plain descriptor. It gives <strong>.docx / .pptx / .xlsx-compatible</strong> editing by <strong>aggregating unmodified LibreOffice</strong> (MPL — never forked) under a Postern shell: documents are <strong>sealed at rest by default</strong> with the one canonical seal (postern-core), scrubbed on export (Hygiene) and sanitized on import (Quarantine). <strong>In design / scaffold</strong>: the seal-at-rest + panic-evict session core is started and tested; the LibreOffice-aggregate editor is planned. Honest limit — an inherent, <strong>non-zero plaintext-while-editing window</strong> (minimized via secured scratch / no-swap / secure-delete / Panic-Lock eviction; never claimed zero). Name pending trademark clearance.</p>
+  <div class="badges"><span class="badge design">design / spec</span> <span class="badge design">name proposed · pending trademark clearance</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Seal Companion</h3>
+  <p>The attestation verifier: self-audit and peer-verify, so you check our claims instead of trusting them. It now validates a <strong>genuine AWS SEV-SNP attestation report</strong> end-to-end (VLEK→ASVK→ARK chain to AMD's pinned root, nonce-bound) against <strong>real AMD Milan silicon</strong> — an unaudited reference verifier; verified-against-real-hardware is not audited/production.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Wallet</h3>
+  <p>Post-quantum hybrid wallet (Falcon‖ML-DSA), diversified addresses, on-device key vault — on the unaudited, 51%-attackable mainnet beta; the coins carry no value claim.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Porog — Android container</h3>
+  <p>The <em>door</em> between two worlds (a proposed name, pending trademark clearance; the <em>porog</em> / threshold of the Izbushka tale): a hardened, self-enrolled managed-profile workspace on stock Android — StrongBox key-attestation skeleton + the shared managed-profile DPC. A scaffold, not shipping; key-attested device, not measured-boot workspace; hardened, not anonymous; a rooted host defeats it. Never “Postern OS”.</p>
+  <div class="badges"><span class="badge design">design / spec</span> <span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>NoporIS — the bridge</h3>
+  <p>The <em>bridge</em> between two worlds (the Kalinov crossing): a dual-persona layer that joins your personal side and a second, Google-Play-enabled persona on one device. The Google side is honestly the <strong>less-private</strong> side (it phones home to Google) — NoporIS sells <strong>separation, not privacy</strong>, and respects Google/Android licenses (no GMS redistribution, no Play-Integrity circumvention). A concept scaffold; name pending trademark clearance.</p>
+  <div class="badges"><span class="badge design">design / spec</span> <span class="badge unaud">unaudited</span></div>
+</article>
+    </div>
+    <p class="prose small" style="margin-top:1.2rem">For the deep read, engineers and auditors can pull the <a href="/Postern-Technical-Whitepaper.pdf">Technical Whitepaper (PDF)&nbsp;↓</a> and the <a href="/Postern-Audit-Readiness-Dossier.pdf">Audit-Readiness Dossier (PDF)&nbsp;↓</a> — code-derived, every UNAUDITED / not-booted marker intact. Neither is an audit.</p>
+    <div class="cta-row">
+      <a class="btn" href="products.html">See the full catalog</a>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="roadmap-h">
+  <div class="wrap">
+    <p class="kicker" id="roadmap-h">Roadmap · designed, not shipping</p>
+    <h2>Next: Kalinov Bridge — private, post-quantum backups for your Postern OS files.</h2>
+    <article class="card" style="max-width:52rem">
+      <h3>Kalinov Bridge <span class="small dim">— Postern backups on Filecoin</span> <span class="badge design">design / spec</span> <span class="badge unaud">unaudited</span></h3>
+      <p><strong>Bloch-SIS-PoW + Postern Labs + Filecoin — privacy and post-quantum security for your Postern OS files.</strong> The plan: private <strong>user backups</strong> stored on <strong>Filecoin</strong>, but sealed client-side with the <strong>Postern seal</strong> (XChaCha20-Poly1305) <em>before</em> anything leaves the sealed base — <strong>Filecoin only ever sees ciphertext</strong>, and the keys never leave your device. <strong>Post-quantum integrity and authenticity</strong> come from Bloch cryptography: a <strong>SHAKE-256</strong> manifest signed with <strong>ML-DSA-65&nbsp;‖&nbsp;Falcon</strong>, anchored to the ownerless Bloch base as an ordinary <strong>zero-value on-chain commitment</strong> (“DATA0”).</p>
+      <p class="small dim">Honest status: the <strong>full Kalinov Bridge</strong> — the ML-DSA-65&nbsp;‖&nbsp;Falcon-signed SHAKE-256 manifest anchored to the base — is still <strong>roadmap / planned</strong>. What exists <em>today</em> is a first slice of the path as an <strong>unaudited reference prototype</strong>: the <a href="downloads.html#desk-h">Encrypted Backup pane in Postern Desktop</a> seals a file locally, writes the SHAKE-256 “DATA0” integrity anchor, and does a <strong>real upload of the sealed ciphertext to Filecoin</strong> (real CID; only ciphertext leaves the device). That is a prototype, <strong>not audited and not production</strong> — don't entrust a real backup to it yet. Newer: the <strong>ML-DSA-65&nbsp;‖&nbsp;Falcon-1024 signer over the SHAKE-256 manifest is now implemented and tested at the crate level</strong> (<code>postern-backup-net</code> — an end-to-end test seals, hashes, packages, <strong>signs</strong>, spools and restores a backup, independently verifies <em>both</em> signature halves, and rejects a single tampered byte), still <strong>unaudited</strong>; the on-chain <strong>DATA0 broadcast</strong> and the desktop-pane wiring on top of that signer are <strong>not shipped</strong> yet. Designed ≠ built ≠ booted. It touches the ownerless base only as an ordinary zero-value transaction; BLCH is <strong>not a security</strong> and Postern's revenue never touches the token. Tracked on the <a href="/Postern-Roadmap.md">Postern products roadmap&nbsp;↓</a>.</p>
+    </article>
+  </div>
+</section>
+
+<section aria-labelledby="founder-h">
+  <div class="wrap">
+    <p class="kicker" id="founder-h">About · the founder</p>
+    <h2>Tiago Tenório (“TT”) — Founder &amp; CEO.</h2>
+    <div class="prose">
+      <p>Tiago Tenório (TT) is the founder and CEO of Postern Labs. He comes from Brazil's payments and fintech sector — a Visa prepaid/third-party ISO agent (2018–2020); founder of the AG47 office and a member of C6 Bank's Conexão C6 program, operating across São Paulo, Goiás, the Federal District, Alagoas and Paraná (2020–2021); a national distribution partner in First Data Corporation's Ignite program for acquiring products and services (2020–2021); PMO lead on a cards project at Havan (2021–2022); and Commercial Director at Avalon Capital, an asset manager (2022). In 2026 he founded Postern Labs to build privacy-first, post-quantum software — and the ownerless Bloch-SIS-PoW protocol its products build on, in which he holds no privileged role beyond a fully disclosed, structurally passive 17% founder premine.</p>
+      <p class="small">The companies named above state his prior roles only — none of them endorses, backs, funds, or is affiliated with Postern Labs or Bloch-SIS-PoW.</p>
+      <p class="small"><a href="https://www.linkedin.com/in/tiago-tenorio-a028733bb" rel="noopener">Tiago B. de A. Tenório on LinkedIn</a> — an outbound link; this site still loads nothing external and makes no network requests of its own.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="never-h">
+  <div class="wrap">
+    <p class="kicker" id="never-h">Standing commitments</p>
+    <h2>What we will never do.</h2>
+    <div class="prose">
+      <ul>
+        <li><strong>Never sell you the coin.</strong> No token sale, no listing effort, no “ecosystem fund”, no yield marketing. Postern's revenue story never touches the token.</li>
+        <li><strong>Never overclaim to the people who'd pay for it with their safety.</strong> No product here says “100% private”; every app carries an honest privacy panel.</li>
+        <li><strong>Never embed copyleft, never close the source.</strong> MIT / Apache-2.0; the free build is always buildable from source.</li>
+        <li><strong>Never ship a security claim before its audit.</strong> Claims for the protocol and for the products are separate, and each is audit-gated.</li>
+        <li><strong>No covert surveillance, no tracking</strong> — including this website, which makes zero network calls.</li>
+      </ul>
+    </div>
+    <div class="cta-row">
+      <a class="btn primary" href="downloads.html">Try the beta</a>
+      <a class="btn" href="disclaimer.html">Read the disclaimer</a>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Postern Labs</h4>
+        <p>Privacy &amp; security products, sold the honest way — the BlackBerry model, on permissive Linux, built on an ownerless post-quantum commons.</p>
+        <p>No tracking. No analytics. This site makes zero network requests beyond its own pages.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="products.html">Products</a>
+          <a href="downloads.html">Downloads</a>
+          <a href="run-a-node.html">Run a node</a>
+          <a href="/explorer/">Explorer</a>
+          <a href="disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="acknowledgments.html">Acknowledgments &amp; homage</a>
+          <a href="blochprotocol.html">The blochprotocol.com domain</a>
+          <a href="https://t.me/posternlabs" rel="noopener">Community · Telegram</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>The underlying protocol runs a <strong>mainnet beta</strong> — <strong>unaudited</strong> (audit contracted, not done), nascent, <strong>low-hashrate and 51%-attackable</strong>. The Module-SIS gate is now a <strong>difficulty-driven k-ramp</strong> (v0.1.0-alpha2): k=4 today, rising 5→6→7→8 as the network's own difficulty grows, easing back if hashrate falls — the Bitcoin model. The ramp is a <em>structural</em> filter, <strong>not a security claim</strong>: real security is cumulative SHAKE-256 hashcash work — hashrate × time. Nothing here is a certified security product yet.</p>
+        <p>The coin is <strong>not a security and not an asset</strong>. No token sale, no listing effort, no price. Disclosed in full: a 17% founder premine (10-year cliff, 40-year vest), structurally passive.</p>
+      </div>
+    </div>
+    <p class="legal">MIT / Apache-2.0, per crate — no copyleft embedded in the products. The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; it lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to). <strong>Postern Labs holds no ownership of, representation of, or prerogative over the protocol</strong>, and for that reason maintains <strong>no website for Bloch-SIS-PoW</strong> (including <code>blochprotocol.com</code>) — <a href="blochprotocol.html">read the full statement</a>.</p>
+  </div>
+</footer>
+
+</body>
+</html>

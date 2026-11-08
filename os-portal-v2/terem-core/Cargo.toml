@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# DESIGN PREVIEW — written ≠ built ≠ booted. UNAUDITED. This crate is the
+# host-testable type/validation skeleton of Terem v2
+# (docs/os-portal-v2/POC-SCOPE.md) plus dry-run launch planning (argv as
+# data), a mock-tested QMP client (never pointed at a live QEMU), and ONE
+# real spawn path (src/spawn.rs) that is gated OFF by default — the
+# license-safe default config is refused at both plan time and spawn time.
+# Hermetic tests spawn only a fake sleeper script with the pinned QEMU name;
+# the real-QEMU test is #[ignore]-gated and a real guest has never been
+# booted in CI. Product name "Terem" is proposed only, pending trademark
+# clearance.
+#
+# Standalone crate: it carries its OWN `[workspace]` table (empty) so it is
+# intentionally NOT a member of the ancestor bloch-protocol workspace — the
+# same pattern as integration/pairing. It builds and tests in isolation on any
+# host; no QEMU, no KVM, no network needed for `cargo test`.
+#
+# LICENSE POSTURE (docs/os-portal-v2/LICENSE-DECISION.md §2): this crate is
+# permissive-only (MIT OR Apache-2.0) and depends only on serde/serde_json
+# (both MIT OR Apache-2.0). QEMU (GPL-2.0) and Wine (LGPL-2.1) are NEVER
+# linked, bundled, or vendored — they are external, operator-supplied,
+# opt-in processes, and every GPL-adjacent feature toggle in this crate
+# defaults to OFF.
+[workspace]
+
+[package]
+name = "terem-core"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+description = "DESIGN PREVIEW ONLY — unaudited, host-testable Terem v2 guest-lifecycle plumbing (binary pinning, license-safe opt-in config, QMP framing types, dry-run launch plans, mock-tested QMP client, and an opt-in spawn path that is OFF by default). Links no GPL/LGPL code; QEMU stays an external operator-supplied process, and a real guest has never been booted in CI. Not a product, not deployed. Name 'Terem' pending trademark clearance."
+publish = false
+
+[lib]
+name = "terem_core"
+path = "src/lib.rs"
+
+[dependencies]
+# The ONLY dependencies, both MIT OR Apache-2.0 — nothing GPL/LGPL anywhere
+# in this crate's tree.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

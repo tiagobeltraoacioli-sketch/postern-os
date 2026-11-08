@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://posternlabs.com/schemas/bloch/shield/dlp/sharing-policy/1",
+  "title": "Bloch Shield DLP third-party sharing policy",
+  "description": "Org-authored, fail-closed description of which CORPORATE data classes may be shared with which third-party destinations. Evaluated by classification.mjs mayShareWithThirdParty(). Not legal advice; adherence-by-design, not certified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "grants"],
+  "properties": {
+    "schema": { "const": "bloch.shield.dlp.sharing-policy/1" },
+    "org": { "type": ["string", "null"] },
+    "grants": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/grant" }
+    }
+  },
+  "definitions": {
+    "grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "destination", "verdict", "expires"],
+      "properties": {
+        "class": {
+          "description": "The corporate class this grant unblocks. 'restricted' is un-grantable and ignored.",
+          "enum": ["public", "internal", "confidential", "restricted"]
+        },
+        "destination": { "type": "string", "description": "Third-party destination id." },
+        "verdict": {
+          "description": "The verdict this grant asserts. A grant may only make a flow MORE permissive; it can never assert 'block'.",
+          "enum": ["allow", "warn"]
+        },
+        "expires": {
+          "type": "string",
+          "format": "date-time",
+          "description": "REQUIRED future RFC-3339 instant. An expired, absent, or unparseable expiry is fail-closed (treated as never given)."
+        },
+        "revoked": { "type": "boolean", "description": "A revoked grant is treated as never given." },
+        "dpa": { "type": "boolean", "description": "Is a data-processing agreement on file? Required on file for any 'confidential' grant." },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

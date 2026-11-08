@@ -1,0 +1,50 @@
+{
+  "schema": "postern.noporis-gate.state",
+  "version": 1,
+  "tier": "non-attestable",
+  "lang": "en",
+  "consent": {
+    "accepted": true,
+    "scope": "persistent",
+    "acceptedAtIso": "2026-07-17T09:00:00Z"
+  },
+  "crossings": {
+    "clipboard": {
+      "open": false,
+      "scope": "session",
+      "direction": "near-to-far",
+      "openedAtIso": null
+    },
+    "files": {
+      "open": false,
+      "scope": "session",
+      "direction": "near-to-far",
+      "openedAtIso": null
+    },
+    "mic": {
+      "open": true,
+      "scope": "persistent",
+      "direction": "far-to-near",
+      "openedAtIso": "2026-07-17T09:01:00Z"
+    },
+    "camera": {
+      "open": false,
+      "scope": "session",
+      "direction": "near-to-far",
+      "openedAtIso": null
+    },
+    "location": {
+      "open": false,
+      "scope": "session",
+      "direction": "near-to-far",
+      "openedAtIso": null
+    }
+  },
+  "killSwitch": {
+    "engaged": true,
+    "engagedAtIso": "2026-07-17T09:30:00Z"
+  },
+  "sealedWallet": {
+    "preserved": true
+  }
+}

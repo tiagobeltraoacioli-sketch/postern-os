@@ -1,0 +1,26 @@
+# Postern node configuration for Postern for postmarketOS.
+# Community, NON-attestable tier. UNBOOTED and provisional: the exact schema is
+# owned by the node implementation, which is not built by this scaffold yet
+# (see /etc/init.d/postern-node). Treat every key here as a documented intent,
+# not a validated contract.
+
+[network]
+# Route ALL node traffic through the on-device Arti SOCKS proxy. Must match
+# proxy.socks_listen in /etc/postern/arti.toml.
+socks_proxy = "127.0.0.1:9150"
+# Never fall back to a direct (non-Tor) connection silently.
+require_proxy = true
+
+[storage]
+# Node state/keys. Created 0700, owned by `postern`, by the service.
+data_dir = "/var/lib/postern/node"
+
+[wallet]
+# HONESTY: software keystore only. There is NO TEE/StrongBox on this platform.
+# Never present these keys as hardware-backed. (../HONESTY.md)
+keystore = "software"
+
+[telemetry]
+# No covert telemetry. Off by default; any future analytics must be opt-in and
+# disclosed in the about-tier screen before a single byte leaves the device.
+enabled = false

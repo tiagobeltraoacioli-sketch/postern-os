@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- connect-src is https: + localhost (not pinned to one node) so users can point
+     the explorer at any node they run or trust; scripts stay inline-only, so no
+     external code can load. See explorer/build.js for the full tradeoff note. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https: http://127.0.0.1:* http://localhost:*; base-uri 'none'; form-action 'none'">
+<meta name="description" content="Blocks, transactions and addresses on the Bloch-SIS-PoW mainnet beta, read live from a node's JSON-RPC. Unaudited, low-hashrate, 51%-attackable mainnet beta; the coin carries no value claim.">
+<meta name="color-scheme" content="dark light">
+<title>Bloch Explorer — Postern Labs (mainnet beta, unaudited)</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+
+/* ---------- explorer widgets (Postern identity additions) ---------- */
+.toolhero { padding: 2.8rem 0 2.2rem; }
+.toolhero .rule { width: 3.5rem; height: 3px; background: var(--brass); margin-bottom: 1.6rem; border-radius: 2px; }
+
+.cfgbar {
+  display: flex; gap: .7rem 1rem; flex-wrap: wrap; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: .85rem 1rem; margin-top: 1.2rem;
+}
+.cfgbar .grow { flex: 1 1 18rem; min-width: 14rem; }
+.cfgbar label { font-size: .8rem; color: var(--text-dim); display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; }
+input[type="text"], input[type="url"], input[type="number"] {
+  background: var(--surface-2); border: 1px solid var(--border-hi); color: var(--text);
+  font-family: var(--font-mono); font-size: .86rem; padding: .55rem .7rem; border-radius: 6px;
+  width: 100%;
+}
+input[type="number"] { width: 4.2rem; }
+input[type="checkbox"] { accent-color: var(--brass); width: .95rem; height: .95rem; }
+input:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+button.btn { cursor: pointer; font-family: var(--font-ui); font-size: .9rem; background: var(--surface); }
+button.btn.primary { background: var(--brass); }
+button.btn.small { padding: .35rem .7rem; font-size: .8rem; }
+
+.conn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: .2rem .7rem; border-radius: 99px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.conn::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+.conn.ok   { color: var(--ok); border-color: var(--ok); }
+.conn.warn { color: var(--brass-hi); border-color: var(--brass-dim); }
+.conn.err  { color: var(--danger); border-color: var(--danger); }
+
+.statgrid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); margin-top: 1.4rem; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .95rem 1.05rem; }
+.stat .k { font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.stat .v { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 650; color: var(--text); margin-top: .35rem; overflow-wrap: anywhere; line-height: 1.3; }
+.stat .v small { font-size: .74rem; color: var(--muted); font-weight: 500; font-family: var(--font-ui); }
+.stat .sub { font-size: .78rem; color: var(--text-dim); margin-top: .3rem; }
+.stat.hero-num .v { font-size: 2.5rem; }
+
+.badge.ok   { color: var(--ok); border-color: var(--ok); }
+.badge.warn { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.err  { color: var(--danger); border-color: var(--danger); }
+
+.updated { font-size: .8rem; color: var(--muted); font-family: var(--font-mono); margin-top: .8rem; }
+
+.errpanel {
+  background: var(--surface); border: 1px solid var(--danger); border-left: 4px solid var(--danger);
+  border-radius: 8px; padding: 1.15rem 1.35rem; margin: 1.2rem 0; max-width: 52rem;
+}
+.errpanel h3 { color: var(--danger); font-size: .95rem; letter-spacing: .04em; text-transform: uppercase; margin-bottom: .5rem; }
+.errpanel p, .errpanel li { color: var(--text-dim); font-size: .92rem; }
+.errpanel ul { margin: .55rem 0 0 1.2rem; }
+.errpanel li + li { margin-top: .35rem; }
+.errpanel .cause { color: var(--text); font-weight: 650; }
+.errpanel .raw { margin-top: .7rem; font-size: .78rem; color: var(--muted); font-family: var(--font-mono); overflow-wrap: anywhere; }
+
+.detailpanel {
+  background: var(--surface); border: 1px solid var(--border-hi); border-left: 4px solid var(--brass);
+  border-radius: 10px; padding: 1.25rem 1.4rem; margin: 1.2rem 0;
+}
+.detailpanel h3 { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .9rem; }
+.detailpanel .close { margin-left: auto; }
+.kvlist { display: grid; grid-template-columns: minmax(8rem, 11rem) 1fr; gap: .5rem 1.2rem; font-size: .88rem; align-items: start; }
+.kvlist .k { color: var(--muted); }
+.kvlist .v { font-family: var(--font-mono); color: var(--text-dim); overflow-wrap: anywhere; }
+@media (max-width: 40rem) { .kvlist { grid-template-columns: 1fr; } .kvlist .k { margin-top: .5rem; } }
+.txbox {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: .7rem .9rem; margin-top: .6rem; font-size: .84rem; font-family: var(--font-mono); overflow-wrap: anywhere;
+}
+.txbox .meta { color: var(--muted); font-family: var(--font-ui); margin-top: .25rem; }
+
+.searchrow { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1rem; }
+.searchrow .grow { flex: 1 1 20rem; min-width: 15rem; }
+
+tbody tr.rowlink { cursor: pointer; }
+tbody tr.rowlink:hover td { background: var(--surface-2); }
+td.mono, th.mono { font-family: var(--font-mono); }
+.empty { color: var(--muted); font-size: .88rem; padding: 1.1rem; text-align: center; }
+
+.peerlist { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1rem; }
+.peer { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .6rem .8rem; font-family: var(--font-mono); font-size: .8rem; overflow-wrap: anywhere; }
+.peer .pid { color: var(--text); }
+.peer .paddr { color: var(--muted); }
+
+.copyable { cursor: copy; }
+.copyable.copied { color: var(--ok); }
+.hashlink { color: var(--brass-hi); }
+
+/* ---------- hashrate chart ---------- */
+.chartwrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1rem .55rem; margin-top: 1.4rem; }
+.chartwrap .cap { font-size: .78rem; color: var(--muted); font-family: var(--font-mono); margin-top: .4rem; }
+canvas.hashchart { display: block; width: 100%; height: 320px; }
+@media (max-width: 40rem) { canvas.hashchart { height: 240px; } input[type="number"].winbox { width: 3.6rem; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="/index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="/index.html">Home</a>
+      <a href="/postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="/products.html">Products</a>
+      <a href="/downloads.html">Downloads</a>
+      <a href="/run-a-node.html">Run a node</a>
+      <a href="/disclaimer.html">Disclaimer</a>
+      <a href="index.html" aria-current="page">Explorer</a>
+      <a href="hashrate.html">Hashrate</a>
+      <a href="network.html">Network</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) ·
+  very few nodes, low hashrate — 51%-attackable · the coin carries <strong>no value claim</strong> and is not a security.
+  <a href="/disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<div class="beta-ribbon" role="note" aria-label="Node update notice">
+  <strong>🛰 Running a node?</strong> Node <strong>v0.1.0-alpha2</strong> retires the fixed k=8 gate for a <strong>difficulty-driven k-ramp</strong> — genesis sync works again, and the <strong>signed snapshot</strong> is an optional one-command fast-sync. <a href="/snapshot.html">Snapshot fast-sync — how&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="toolhero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Postern Labs · tools · mainnet beta</p>
+    <h1>Bloch Explorer</h1>
+    <p class="lede">Blocks, transactions and addresses on the <strong>Bloch-SIS-PoW</strong> mainnet beta, read live from a node's JSON-RPC. The protocol is <strong>ownerless</strong> — this is one independent tool on it, by Postern Labs, not "the official explorer" (there is none). <strong>Mainnet beta — unaudited, low-hashrate, 51%-attackable · the coin carries no value claim.</strong></p>
+    <div class="cfgbar">
+      <div class="grow">
+        <label for="rpc" style="display:block;margin-bottom:.3rem">Node RPC endpoint (JSON-RPC 2.0, POST)</label>
+        <input type="url" id="rpc" spellcheck="false" placeholder="https://your-node.example  or  http://127.0.0.1:8645">
+      </div>
+      <button class="btn primary" id="connect" type="button">Connect</button>
+      <label><input type="checkbox" id="auto" checked> auto-refresh</label>
+      <label>every <input type="number" id="interval" value="12" min="5" max="600" aria-label="refresh interval in seconds"> s</label>
+      <span class="conn" id="conn" role="status" aria-live="polite">idle</span>
+    </div>
+    <p class="small dim" style="margin-top:.6rem">Point this at any Bloch node you run or trust. The pre-filled default is Postern's <strong>disposable demo node</strong> — a convenience, not official infrastructure. Requests go only to the endpoint you set.</p>
+  </div>
+</section>
+
+<section aria-labelledby="ov-h">
+  <div class="wrap">
+    <p class="kicker" id="ov-h">Network overview</p>
+    <h2>What the configured node reports.</h2>
+    <p class="prose small">Self-reported by one node's RPC — a single vantage point, not a global view. The <a href="network.html">network page</a> says more about that limit. Whatever network string the node reports (<code>getnetworkinfo.network</code> — the live demo node currently reports <code>mainnet</code>; other builds may report a different string), this chain is an <strong>unaudited, 51%-attackable mainnet beta whose coin carries no value claim</strong>.</p>
+    <div class="errpanel" id="err" style="display:none" role="alert"></div>
+    <div class="statgrid" id="stats" aria-live="polite"></div>
+    <p class="updated" id="updated"></p>
+  </div>
+</section>
+
+<section aria-labelledby="blk-h">
+  <div class="wrap">
+    <p class="kicker" id="blk-h">Block lookup</p>
+    <h2>Open a block by height or hash.</h2>
+    <div class="searchrow">
+      <div class="grow"><input type="text" id="q" spellcheck="false" placeholder="block height (e.g. 1234) or 64-hex block hash" aria-label="block height or hash"></div>
+      <button class="btn" id="go" type="button">Open block</button>
+    </div>
+    <div id="detail"></div>
+  </div>
+</section>
+
+<section aria-labelledby="addr-h">
+  <div class="wrap">
+    <p class="kicker" id="addr-h">Address lookup</p>
+    <h2>Balance and UTXOs for a bloch1… address.</h2>
+    <p class="prose small">Balances are units on the unaudited mainnet beta. They carry <strong>no value claim</strong> — no price, no market, not a security, not for investment.</p>
+    <div class="searchrow">
+      <div class="grow"><input type="text" id="qaddr" spellcheck="false" placeholder="bloch1q… / bloch1t… address" aria-label="bloch address"></div>
+      <button class="btn" id="goaddr" type="button">Check balance</button>
+    </div>
+    <div id="addrinfo" aria-live="polite"></div>
+  </div>
+</section>
+
+<section aria-labelledby="rec-h">
+  <div class="wrap">
+    <p class="kicker" id="rec-h">Recent blocks</p>
+    <h2>The latest blocks the node knows about.</h2>
+    <p class="prose small">Click a row for full detail. The list RPC returns height, hash, time, tx count, size and bits; nonce and the SIS witness are only in the per-block view where the node exposes them.</p>
+    <div class="tablewrap"><table id="blocks">
+      <thead><tr><th>Height</th><th>Hash</th><th>Age</th><th>Txs</th><th>Size</th><th>Bits</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<noscript><div class="wrap"><div class="warnpanel" role="note"><h3>JavaScript required</h3><p>This explorer queries a node's JSON-RPC from your browser; with JavaScript disabled it cannot fetch anything. It still makes zero requests to anyone but the node you configure.</p></div></div></noscript>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Bloch Explorer — a Postern Labs tool</h4>
+        <p>Reads the ownerless <strong>Bloch-SIS-PoW</strong> protocol through a node's public JSON-RPC: <code>getnetworkinfo</code>, <code>getblockcount</code>, <code>getdaginfo</code>, <code>getrecentblocks</code>, <code>getblock</code>, <code>getblockbyheight</code>, <code>getaddressinfo</code>, <code>getpeers</code>. Nothing privileged — anyone can build the same.</p>
+        <p>No tracking. No analytics. The only network requests these pages make are the JSON-RPC calls to the node endpoint(s) you configure.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="/index.html">Home</a>
+          <a href="/postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="/products.html">Products</a>
+          <a href="/downloads.html">Downloads</a>
+          <a href="/run-a-node.html">Run a node</a>
+          <a href="/disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="index.html">Explorer</a>
+          <a href="network.html">Network</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>This chain is a <strong>mainnet beta</strong> — a designation, not a security claim: <strong>unaudited</strong> (audit contracted, not done), with <strong>very few nodes and low hashrate — 51%-attackable</strong>. The Module-SIS gate is a <strong>difficulty-driven k-ramp</strong> (node v0.1.0-alpha2): k=4 today, rising toward k=8 as the network's own difficulty grows and easing back if hashrate falls. It is <strong>not a security claim by itself</strong> (real security is cumulative SHAKE-256 hashcash work — raising k adds no cryptographic hardness at β=q/16). A brand-new node can <strong>sync from genesis</strong> or fast-sync from the optional <strong>signed snapshot</strong>. Whatever network string a node reports, treat confirmations as reversible.</p>
+        <p>The coin is <strong>not a security and not an asset</strong> — it carries no value claim. No token sale, no listing effort, no market-making, no price. A 17% founder premine is disclosed in full. Do not attach value.</p>
+      </div>
+    </div>
+    <p class="legal">The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; there is no official node, site, or explorer. This explorer is one independent tool on that commons, by Postern Labs. It lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to).</p>
+  </div>
+</footer>
+<script>
+'use strict';
+/* Bloch Explorer — Postern Labs.
+ * Inlined into explorer/index.html by explorer/build.js.
+ * The ONLY network requests this page makes are JSON-RPC 2.0 POSTs to the
+ * node endpoint the user configures. All node-supplied strings are escaped
+ * before rendering. */
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const DASH = '—';
+  /* A short BUNDLED fallback list so a single disposable-node outage does not
+     blank the explorer (E1). The protocol is OWNERLESS — none of these is "the"
+     node: the first is Postern's disposable demo node, the rest are honest
+     fallbacks (a node you run locally on the standard RPC port 16210). A node
+     the user types into the box ALWAYS wins and is never auto-swapped; the
+     failover only ever hops between these bundled defaults, and only when the
+     one currently in use stops answering. */
+  const DEFAULT_RPCS = [
+    '/api/rpc',
+    'http://127.0.0.1:16210/',
+  ];
+  const DEFAULT_RPC = DEFAULT_RPCS[0];
+  const LS_RPC = 'postern_explorer_rpc';
+
+  const rpcInput = $('#rpc'), connEl = $('#conn'), errEl = $('#err');
+  let timer = null, rpcId = 0, lastBlocks = [];
+  let failedOver = null; // the primary endpoint we fell back FROM, for an honest note
+
+  const normEp = (u) => String(u || '').trim().replace(/\/+$/, '');
+  // Migrate visitors off the decommissioned Fly demo node to the same-origin proxy.
+  let _storedRpc = localStorage.getItem(LS_RPC);
+  if (_storedRpc && /blochv-node\.fly\.dev/.test(_storedRpc)) { _storedRpc = null; localStorage.removeItem(LS_RPC); }
+  rpcInput.value = (_storedRpc || DEFAULT_RPC).trim();
+
+  const endpoint = () => normEp(rpcInput.value);
+  const DEFAULT_SET = DEFAULT_RPCS.map(normEp);
+  const isDefaultEndpoint = (ep) => DEFAULT_SET.includes(normEp(ep));
+
+  /* Per-call timeout: some heavier RPCs on public demo nodes hang; a bounded
+     wait keeps auto-refresh from piling up requests. `rpcAt` targets an explicit
+     endpoint (used by the bundled-default failover); `rpc` targets the active one. */
+  async function rpcAt(ep, method, params = [], timeoutMs = 20000) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const r = await fetch(normEp(ep) + '/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
+        referrerPolicy: 'no-referrer',
+        signal: ctl.signal,
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(typeof j.error === 'string' ? j.error : JSON.stringify(j.error));
+      if (j.result && typeof j.result === 'object' && !Array.isArray(j.result) && j.result.error)
+        throw new Error(String(j.result.error));
+      return j.result;
+    } finally { clearTimeout(t); }
+  }
+  const rpc = (method, params = [], timeoutMs = 20000) => rpcAt(endpoint(), method, params, timeoutMs);
+
+  /* First live-contact call, with bundled-default failover. Try the active
+     endpoint; if it fails AND the user is on a bundled default (not a node they
+     typed), try the OTHER bundled defaults in order. The first that answers
+     becomes the active node — visibly (the box updates) and honestly (a note
+     says the primary was unreachable). A user-chosen endpoint is never swapped:
+     its failure goes straight to the honest error UX. */
+  async function connectPrimary() {
+    const primary = endpoint();
+    try {
+      return await rpc('getnetworkinfo');
+    } catch (e) {
+      if (!isDefaultEndpoint(primary)) throw e;
+      for (const cand of DEFAULT_SET) {
+        if (normEp(cand) === normEp(primary)) continue;
+        try {
+          const net = await rpcAt(cand, 'getnetworkinfo');
+          rpcInput.value = cand;
+          localStorage.setItem(LS_RPC, cand);
+          failedOver = primary;
+          return net;
+        } catch (_) { /* try the next bundled default */ }
+      }
+      throw e; // every bundled default is unreachable → the honest error UX
+    }
+  }
+
+  /* ── wake/retry with exponential backoff ──────────────────────────────
+     The default demo node is a Fly machine that AUTO-STOPS when idle and
+     cold-starts (~2-5 s, sometimes more) on the first request after a sleep.
+     The first RPC after idle therefore often times out or fails — that is
+     NOT "node down", it is the machine waking up. So the page never shows a
+     hard "not connected" on a first failure: it retries with exponential
+     backoff (1 s → 2 s → 4 s → 8 s → 8 s → 8 s between attempts, each
+     attempt itself bounded by the ~9 s per-request timeout — roughly
+     30-40 s of patience in total) while showing an honest "waking /
+     reconnecting" state, and only after the whole schedule fails does it
+     fall through to the hard error UX. This promises nothing about uptime:
+     the demo node stays a disposable convenience, not official infra. */
+  const WAKE_DELAYS = [1000, 2000, 4000, 8000, 8000, 8000];
+  const CANCELED = Symbol('canceled');
+  let wakeGen = 0;          // bumping this cancels any in-flight wake loop
+  let refreshing = false;   // prevents overlapping refresh cycles
+  let queuedRefresh = false;
+  let everConnected = false;
+  let skipWait = null;      // resolver for the current backoff pause ("retry now")
+
+  function wakeSleep(ms) {
+    return new Promise((res) => {
+      const t = setTimeout(() => { skipWait = null; res(); }, ms);
+      skipWait = () => { clearTimeout(t); skipWait = null; res(); };
+    });
+  }
+  function cancelWake() { wakeGen++; if (skipWait) skipWait(); }
+  function restartRefresh() {
+    cancelWake();
+    if (refreshing) queuedRefresh = true; else refresh();
+  }
+
+  function showWaking(attempt, nextMs) {
+    const reconnect = everConnected;
+    setConn('warn', reconnect ? 'reconnecting…' : 'waking node…');
+    errEl.className = 'warnpanel';       // amber, not red — this is not an error yet
+    errEl.style.display = 'block';
+    errEl.innerHTML = `<h3>${reconnect ? 'Connection dropped — reconnecting' : 'Waking the node…'}</h3>
+      <p>No reply from <code>${esc(endpoint())}</code> yet. ${isDefaultEndpoint(endpoint())
+        ? 'The demo node runs on a Fly machine that <strong>sleeps when idle</strong> and cold-starts on the first request (a few seconds, sometimes more) — a failed first call usually just means it is still waking up. It remains a <strong>disposable demo node</strong>, not official infrastructure; no uptime is promised.'
+        : 'The node may still be starting up, or briefly unreachable.'}
+      Retrying automatically — attempt ${attempt + 1} of ${WAKE_DELAYS.length + 1}, next try in ${Math.round(nextMs / 1000)}s.</p>
+      <p style="margin-top:.6rem"><button class="btn small" id="retryNow" type="button">Retry now</button>
+        <span class="small dim"> — if every retry fails, the honest error view (down vs CORS vs mixed content) follows.</span></p>`;
+    const b = $('#retryNow');
+    if (b) b.onclick = () => { if (skipWait) skipWait(); };
+  }
+
+  /* First contact with retry: only after the whole backoff schedule fails
+     does the caller see the error (→ hard "not connected"). */
+  async function connectWithRetry() {
+    const gen = wakeGen;
+    for (let i = 0; ; i++) {
+      try {
+        return await connectPrimary();
+      } catch (e) {
+        if (gen !== wakeGen) throw CANCELED;
+        if (i >= WAKE_DELAYS.length) throw e;
+        showWaking(i, WAKE_DELAYS[i]);
+        await wakeSleep(WAKE_DELAYS[i]);
+        if (gen !== wakeGen) throw CANCELED;
+      }
+    }
+  }
+
+  /* ── helpers ── */
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const commas = (n) => (n == null || isNaN(Number(n))) ? DASH : Number(n).toLocaleString('en-US');
+  const short = (h, n = 10) => (h && typeof h === 'string') ? esc(h.slice(0, n)) + '…' + esc(h.slice(-4)) : DASH;
+  const val = (v) => (v == null) ? DASH : esc(v);
+  function ago(ts) {
+    if (ts == null) return DASH;
+    const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+    if (s < 60) return s + 's'; if (s < 3600) return Math.floor(s / 60) + 'm';
+    if (s < 86400) return Math.floor(s / 3600) + 'h'; return Math.floor(s / 86400) + 'd';
+  }
+  function bytes(b) {
+    if (b == null) return DASH;
+    if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+  function fmtBits(b) { // getblock returns "0x…" string; getrecentblocks returns a number
+    if (b == null) return DASH;
+    if (typeof b === 'string') return esc(b);
+    return '0x' + (b >>> 0).toString(16).padStart(8, '0');
+  }
+  const fmtTs = (ts) => ts == null ? DASH : new Date(ts * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z/, ' UTC');
+  const isHttpUrl = (u) => /^http:\/\//i.test(u || '');
+
+  function setConn(state, txt) { connEl.className = 'conn' + (state ? ' ' + state : ''); connEl.textContent = txt; }
+  const stat = (k, v, sub) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+
+  /* copy-on-click for hashes */
+  function copyText(text, el) {
+    const done = () => { el.classList.add('copied'); setTimeout(() => el.classList.remove('copied'), 900); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => {});
+  }
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-copy]');
+    if (c) { e.stopPropagation(); copyText(c.getAttribute('data-copy'), c); }
+  });
+  const copyHash = (full, disp) => full
+    ? `<span class="copyable hashlink" data-copy="${esc(full)}" title="click to copy · ${esc(full)}">${disp}</span>`
+    : DASH;
+
+  /* ── rendering ── */
+  function renderStats(net, dag, count, blocks) {
+    // Derive the tip height from getrecentblocks (the lightest, most reliable
+    // RPC) so the headline still tracks the chain when getnetworkinfo /
+    // getblockcount time out under a node's sync load, instead of freezing at
+    // the last value.
+    const tipFromBlocks = Array.isArray(blocks) && blocks.length
+      ? Math.max(...blocks.map((b) => (b && b.height) || 0)) : null;
+    const syncBadge = net.syncing
+      ? '<span class="badge warn">syncing</span>'
+      : '<span class="badge ok">synced</span>';
+    $('#stats').innerHTML = [
+      stat('Height', commas(net.blocks != null ? net.blocks : (count != null ? count : tipFromBlocks))),
+      stat('Blue score', commas(net.blue_score)),
+      stat('Peers', commas(net.peers), '<a href="network.html">single-vantage — network view →</a>'),
+      stat('Mempool', commas(net.mempool) + ' <small>txs</small>'),
+      stat('Sync', syncBadge),
+      stat('DAG tips', dag ? commas(dag.tip_count) : DASH, dag && dag.k != null ? 'GhostDAG k=' + esc(dag.k) : ''),
+      stat('Node reports network', val(net.network || net.chain),
+        '<strong>unaudited mainnet beta · 51%-attackable · no value claim</strong> — whatever the node calls it'),
+      stat('Protocol', val(net.net_protocol != null ? net.net_protocol : net.protocol),
+        net.version ? 'node v' + esc(net.version) : ''),
+    ].join('');
+  }
+
+  function renderBlocks(blocks) {
+    lastBlocks = Array.isArray(blocks) ? blocks : [];
+    const tb = $('#blocks tbody');
+    tb.innerHTML = lastBlocks.map((b, i) => `<tr class="rowlink" data-i="${i}" title="open block detail">
+      <td class="mono"><strong>${commas(b.height)}</strong></td>
+      <td class="mono">${copyHash(b.hash, short(b.hash, 14))}</td>
+      <td class="mono">${ago(b.timestamp)}</td>
+      <td class="mono">${val(b.tx_count)}</td>
+      <td class="mono">${bytes(b.size)}</td>
+      <td class="mono">${fmtBits(b.bits)}</td>
+    </tr>`).join('') || `<tr><td colspan="6"><div class="empty">no blocks returned by the node</div></td></tr>`;
+    tb.querySelectorAll('tr[data-i]').forEach((tr) => {
+      tr.onclick = () => { const b = lastBlocks[+tr.dataset.i]; if (b && b.hash) openBlockByHash(b.hash); };
+    });
+  }
+
+  function renderSkeleton() {
+    $('#stats').innerHTML = Array.from({ length: 8 }, () => stat('…', DASH)).join('');
+    $('#blocks tbody').innerHTML = `<tr><td colspan="6"><div class="empty">waiting for a node connection…</div></td></tr>`;
+  }
+
+  /* ── error UX: honest about down vs CORS vs mixed content ── */
+  function resetButton() {
+    if (endpoint() === DEFAULT_RPC.replace(/\/+$/, '')) return '';
+    return `<p style="margin-top:.8rem"><button class="btn small" id="useDefault" type="button">Use the Postern demo node (${esc(DEFAULT_RPC)})</button>
+      <span class="small dim"> — disposable convenience, not official infrastructure.</span></p>`;
+  }
+  function wireResetButton() {
+    const b = $('#useDefault');
+    if (b) b.onclick = () => { rpcInput.value = DEFAULT_RPC; localStorage.setItem(LS_RPC, DEFAULT_RPC); everConnected = false; restartRefresh(); schedule(); };
+  }
+  const retryButton = () => `<p style="margin-top:.8rem"><button class="btn small" id="retryErr" type="button">Retry now</button>
+      <span class="small dim"> — retries the same backoff schedule (the demo node may just need to wake again).</span></p>`;
+  function wireRetryButton() {
+    const b = $('#retryErr');
+    if (b) b.onclick = restartRefresh;
+  }
+  function showError(e) {
+    const msg = e && e.message ? e.message : String(e);
+    const aborted = e && e.name === 'AbortError';
+    const networkLike = aborted || (e && e.name === 'TypeError') || /failed to fetch|networkerror|load failed|network request failed/i.test(msg);
+    const httpsPage = location.protocol === 'https:';
+    const mixed = httpsPage && isHttpUrl(endpoint());
+    errEl.className = 'errpanel';
+    errEl.style.display = 'block';
+    if (networkLike) {
+      errEl.innerHTML = `<h3>Could not reach the node</h3>
+        <p>The request to <code>${esc(endpoint() || '(empty)')}</code> ${aborted ? 'timed out' : 'failed before a reply arrived'}, and automatic retries with backoff (~30-40 s, enough to cover the demo node's cold start from sleep) failed too. A browser cannot see which of these it was, so all three are listed honestly:</p>
+        <ul>
+          <li><span class="cause">Node down or unreachable.</span> Confirm the node is running and its JSON-RPC is listening at that address.</li>
+          <li><span class="cause">CORS blocked.</span> If the node does not send <code>Access-Control-Allow-Origin</code>, the browser silently blocks this page from reading the reply even when the node is up. Fixes: run the node behind a CORS-enabled reverse proxy, enable the node's CORS flag, or use the desktop (Tauri) build, which is not subject to browser CORS.</li>
+          ${mixed ? '<li><span class="cause">Mixed content.</span> This page is served over HTTPS but the endpoint is <code>http://</code> — browsers block that. Use an HTTPS endpoint, or open the explorer over file:// or plain HTTP.</li>' : ''}
+          <li><span class="cause">CSP.</span> This page's Content-Security-Policy allows HTTPS endpoints plus <code>http://127.0.0.1</code> / <code>localhost</code>; other plain-http hosts are blocked by design.</li>
+        </ul>
+        ${retryButton()}
+        ${resetButton()}
+        <p class="raw">raw error: ${esc(msg)}</p>`;
+      wireRetryButton();
+      wireResetButton();
+    } else {
+      errEl.innerHTML = `<h3>The node replied with an error</h3>
+        <p>The endpoint is reachable but returned: <strong>${esc(msg)}</strong></p>
+        ${retryButton()}
+        <p class="raw">method support varies by node version — this explorer degrades to “${DASH}” for anything a node does not serve.</p>`;
+      wireRetryButton();
+    }
+  }
+
+  /* ── main refresh ──
+     Doubles as the heartbeat: the auto-refresh interval re-runs this, and a
+     failure mid-session goes back through the wake/backoff loop (an honest
+     "reconnecting…" state) instead of jumping straight to a hard error.
+     While reconnecting the last-seen data stays on screen; only a hard
+     failure (whole backoff schedule exhausted) blanks it to the skeleton. */
+  async function refresh() {
+    if (refreshing) return; // a wake/backoff cycle is already running
+    refreshing = true;
+    try {
+      if (!endpoint()) {
+        setConn('err', 'no node set');
+        renderSkeleton();
+        errEl.className = 'errpanel';
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<h3>No node configured</h3>
+          <p>Enter a node's JSON-RPC endpoint above and press <strong>Connect</strong>. The protocol is ownerless — any node works.</p>${resetButton()}`;
+        wireResetButton();
+        return;
+      }
+      setConn('warn', everConnected ? 'reconnecting…' : 'connecting…');
+      failedOver = null;
+      let net;
+      try {
+        net = await connectWithRetry();
+      } catch (e) {
+        if (e === CANCELED) return; // superseded by a newer connect/retry
+        setConn('err', 'not connected');
+        renderSkeleton();
+        showError(e);
+        return;
+      }
+      errEl.style.display = 'none';
+      errEl.className = 'errpanel';
+      setConn('ok', 'connected');
+      everConnected = true;
+      const [dag, blocks, count] = await Promise.all([
+        rpc('getdaginfo').catch(() => null),
+        rpc('getrecentblocks', [20]).catch(() => []),
+        net.blocks == null ? rpc('getblockcount').catch(() => null) : Promise.resolve(null),
+      ]);
+      try { renderStats(net, dag, count, blocks); } catch (e) { console.error('renderStats', e); }
+      try { renderBlocks(blocks); } catch (e) { console.error('renderBlocks', e); }
+      $('#updated').textContent = 'last updated ' + new Date().toLocaleTimeString()
+        + (failedOver ? ' · primary node ' + failedOver + ' was unreachable — showing ' + endpoint() + ' instead' : '');
+    } finally {
+      refreshing = false;
+      if (queuedRefresh) { queuedRefresh = false; refresh(); }
+    }
+  }
+
+  /* ── block detail ── */
+  const openBlockByHash = (hash) => openBlock(() => rpc('getblock', [hash, true]));
+  const openBlockByHeight = (h) => openBlock(() => rpc('getblockbyheight', [h, true]));
+
+  function closeDetail() { $('#detail').innerHTML = ''; }
+
+  async function openBlock(fetcher) {
+    const d = $('#detail');
+    d.innerHTML = `<div class="detailpanel"><h3>Block <span class="badge warn">loading…</span></h3></div>`;
+    d.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+    let b;
+    try { b = await fetcher(); }
+    catch (e) {
+      d.innerHTML = `<div class="detailpanel"><h3>Block detail <button class="btn small close" id="dclose" type="button">close</button></h3>
+        <p style="color:var(--danger)">RPC error: ${esc(e.message || e)}</p></div>`;
+      $('#dclose').onclick = closeDetail;
+      return;
+    }
+    const parents = (b.parents || []).map((p) => copyHash(p, short(p, 18))).join('<br>') || DASH;
+    const txs = Array.isArray(b.transactions) ? b.transactions : null;
+    const txids = Array.isArray(b.txids) ? b.txids : null;
+    let txHtml = '';
+    if (txs) {
+      txHtml = txs.map((tx) => {
+        const out = (tx.outputs || []).reduce((a, o) => a + (Number(o.value) || 0), 0);
+        return `<div class="txbox">${copyHash(tx.txid, esc(tx.txid || DASH))}${tx.coinbase ? ' <span class="badge ok">coinbase</span>' : ''}
+          <div class="meta">${(tx.inputs || []).length} in · ${(tx.outputs || []).length} out · ${(out / 1e8).toLocaleString('en-US', { maximumFractionDigits: 8 })} BLOCH out <span class="dim">(mainnet-beta units — no value claim, not a security)</span></div></div>`;
+      }).join('');
+    } else if (txids) {
+      txHtml = txids.map((t) => `<div class="txbox">${copyHash(t, esc(t))}</div>`).join('');
+    } else {
+      txHtml = `<div class="txbox">${DASH}</div>`;
+    }
+    d.innerHTML = `<div class="detailpanel">
+      <h3>Block ${commas(b.height)} <span class="badge warn">mainnet beta</span> <button class="btn small close" id="dclose" type="button">close</button></h3>
+      <div class="kvlist">
+        <div class="k">hash</div><div class="v">${copyHash(b.hash, esc(b.hash || DASH))}</div>
+        <div class="k">height</div><div class="v">${commas(b.height)}</div>
+        <div class="k">blue_score</div><div class="v">${commas(b.blue_score)}</div>
+        <div class="k">timestamp</div><div class="v">${fmtTs(b.timestamp)} <span class="dim">(${ago(b.timestamp)} ago)</span></div>
+        <div class="k">bits</div><div class="v">${fmtBits(b.bits)}</div>
+        <div class="k">nonce</div><div class="v">${val(b.nonce)}</div>
+        <div class="k">merkle_root</div><div class="v">${copyHash(b.merkle_root, esc(b.merkle_root || DASH))}</div>
+        <div class="k">size</div><div class="v">${bytes(b.size)}</div>
+        <div class="k">tx_count</div><div class="v">${val(b.tx_count)}</div>
+        <div class="k">parents</div><div class="v">${parents}</div>
+        <div class="k">SIS witness</div><div class="v">${Array.isArray(b.pow_solution) ? commas(b.pow_solution.length) + ' coefficients' : DASH + ' <span class="dim">(not exposed by the node RPC — shown honestly, not faked)</span>'}</div>
+      </div>
+      <h3 style="margin-top:1.1rem">Transactions <span class="badge">${txs ? txs.length : (txids ? txids.length : 0)}</span></h3>
+      ${txHtml}</div>`;
+    $('#dclose').onclick = closeDetail;
+  }
+
+  $('#go').onclick = () => {
+    const q = $('#q').value.trim().replace(/^0x/, '');
+    if (!q) return;
+    if (/^\d+$/.test(q)) openBlockByHeight(parseInt(q, 10));
+    else if (/^[0-9a-fA-F]{64}$/.test(q)) openBlockByHash(q.toLowerCase());
+    else {
+      $('#detail').innerHTML = `<div class="detailpanel"><h3>Block lookup <button class="btn small close" id="dclose" type="button">close</button></h3>
+        <p style="color:var(--danger)">Enter a decimal height or a 64-character hex block hash.</p></div>`;
+      $('#dclose').onclick = closeDetail;
+    }
+  };
+  $('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#go').click(); });
+
+  /* ── address lookup ── */
+  async function checkAddress() {
+    const addr = $('#qaddr').value.trim();
+    const box = $('#addrinfo');
+    if (!addr) { box.innerHTML = ''; return; }
+    if (!/^bloch1[a-z0-9]+$/i.test(addr)) {
+      box.innerHTML = `<div class="errpanel" style="margin-top:1rem"><h3>Not a bloch address</h3><p>Enter a bloch1q… / bloch1t… address.</p></div>`;
+      return;
+    }
+    box.innerHTML = `<div class="statgrid">${stat('Address', short(addr, 14), 'looking up… — pool/founder addresses with many UTXOs can take ~20s')}</div>`;
+    try {
+      // getaddressinfo is O(UTXOs) on the node: the founder/pool address has
+      // ~390k UTXOs and takes ~16s to sum, so give address lookups a 30s budget.
+      // The default 9s was aborting mid-request and surfacing "Lookup failed".
+      const r = await rpc('getaddressinfo', [addr], 30000);
+      box.innerHTML = `<div class="statgrid">
+        ${stat('Balance', commas(r.balance_bloch) + ' <small>BLOCH</small>', 'mainnet-beta units — no value claim, not a security')}
+        ${stat('Base units', commas(r.balance_sats), 'approximate for very large balances — base units exceed JavaScript\'s 2^53 exact-integer range')}
+        ${stat('UTXOs', commas(r.utxo_count))}
+        ${stat('Pool role', val(r.pool_role))}
+        ${stat('Pending in / out', commas(r.pending_incoming || 0) + ' / ' + commas(r.pending_outgoing || 0))}
+      </div>`;
+    } catch (e) {
+      box.innerHTML = `<div class="errpanel" style="margin-top:1rem"><h3>Lookup failed</h3><p>${esc(short(addr, 16))}: ${esc(e.message || String(e))}</p></div>`;
+    }
+  }
+  $('#goaddr').onclick = checkAddress;
+  $('#qaddr').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#goaddr').click(); });
+
+  /* ── scheduling ── */
+  function schedule() {
+    if (timer) clearInterval(timer);
+    if ($('#auto').checked && endpoint()) {
+      const s = Math.max(5, parseInt($('#interval').value, 10) || 12);
+      timer = setInterval(() => { if (!document.hidden) refresh(); }, s * 1000);
+    }
+  }
+  $('#connect').onclick = () => {
+    localStorage.setItem(LS_RPC, rpcInput.value.trim());
+    everConnected = false; // fresh endpoint → "connecting"/"waking", not "reconnecting"
+    restartRefresh();
+    schedule();
+  };
+  $('#auto').onchange = schedule;
+  $('#interval').onchange = schedule;
+  rpcInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#connect').click(); });
+
+  renderSkeleton();
+  refresh();
+  schedule();
+})();
+
+</script></body>
+</html>

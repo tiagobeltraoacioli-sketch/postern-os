@@ -1,0 +1,20 @@
+[package]
+name = "postern-panic"
+version = "0.1.0"
+edition = "2021"
+description = "Postern Labs Panic Lock — an instant denial-of-access re-lock (keys evicted, vault sealed). Data becomes at-rest ciphertext — unreadable but NOT destroyed; the locked state is observable, so the re-lock alone is NOT coercion-resistant or deniable. Real plausible deniability (decoy vault, hidden-volume style) lives in the `deniable` module."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_panic"
+
+[dependencies]
+# The panic lock IS the vault's seal + key eviction — reuse it directly.
+postern-vault = { path = "../postern-vault" }
+# The deniable (decoy-vault) container seals fixed-size slots with the one
+# canonical Postern seal (context-bound, key-committing).
+postern-core = { path = "../postern-core" }
+zeroize = "1"
+thiserror = "2"
+# Filler slots and slot-order shuffling need OS randomness.
+getrandom = "0.2"

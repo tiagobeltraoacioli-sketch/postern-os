@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# compose.yaml — stack manifest for the Postern Cloud (hosted) edition image.
+#
+# REPRODUCIBLE-BY-DESIGN, NOT REPRODUCED. Hosted deployment is LESS PRIVATE than
+# self-hosting (disclosed — see BUILD-AND-DEPLOY.md). Defaults here: no telemetry,
+# egress-controlled (deny-by-default), non-root, read-only root FS, secrets
+# injected at runtime and NEVER baked into the image or committed. SKELETON —
+# not hardened beyond what is shown, not audited, not production-ready.
+#
+# Deploy (operator-run):  podman compose up -d   (or docker compose up -d)
+# Build is separate and explicit — use ./build-image.sh; this file references the
+# already-built, pushed-or-local image tag.
+name: postern-cloud
+
+services:
+  postern-cloud:
+    # Prefer deploying an image you built with ./build-image.sh and verified,
+    # pinned by digest for determinism:
+    #   image: registry.example.com/postern-cloud@sha256:<digest>
+    # The build: block is for local iteration only; production deploys pull a
+    # pinned, verified image rather than building on the host.
+    image: postern-cloud:local
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        SOURCE_DATE_EPOCH: "0"
+        POSTERN_EDITION: "cloud"
+    restart: unless-stopped
+
+    # ── Least privilege ──────────────────────────────────────────────────────
+    # No new privileges; drop every capability; read-only root FS. Writable state
+    # lives only in the named volume and an explicit tmpfs.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    pids_limit: 256
+
+    user: "10001:10001"
+
+    environment:
+      # Privacy-preserving default posture. No analytics, no phone-home.
+      POSTERN_TELEMETRY: "off"
+      POSTERN_EDITION: "cloud"
+      # Egress is controlled/denied by default (see the egress network below).
+      POSTERN_EGRESS: "controlled"
+      TZ: "UTC"
+      # Which hosted service to run (default: the license verification service).
+      POSTERN_SERVICE: "${POSTERN_SERVICE:-license}"
+      # MANDATORY, runtime-injected, NEVER baked/committed: the base64 raw Ed25519
+      # vendor PUBLIC key. The service is fail-closed — with this unset it refuses
+      # to start. Compose errors here if it is not present in the environment.
+      VENDOR_PUBLIC_KEY: "${VENDOR_PUBLIC_KEY:?VENDOR_PUBLIC_KEY must be injected at runtime (never baked or committed)}"
+
+    # ── Config + secrets: operator-owned, runtime-injected ──────────────────
+    # Config is mounted READ-ONLY. Keep real secrets OUT of this file — use
+    # `secrets:` (below) or a secrets manager the operator controls.
+    volumes:
+      - ./config:/etc/postern:ro
+      - postern-data:/var/lib/postern
+    # secrets:
+    #   - postern_env          # runtime-injected; never committed
+    # env_file:
+    #   - ./cloud.env          # operator-provided; gitignored; never committed
+
+    # ── Egress control ──────────────────────────────────────────────────────
+    # `internal` network => no route to the outside world. Attach an egress
+    # proxy / explicit allow-list network ONLY if the service genuinely needs
+    # outbound access, and document exactly what it reaches and why.
+    networks:
+      - edge      # ingress from your reverse proxy only
+      # - egress  # uncomment + define below to allow *declared* outbound only
+
+    ports:
+      # Bound to loopback: terminate TLS and enforce authn/z at your own reverse
+      # proxy in front of this. Never expose the container port raw to 0.0.0.0.
+      - "127.0.0.1:8080:8080"
+
+    healthcheck:
+      # Real check: the license service answers GET /healthz with {"ok":true}.
+      # node ships in the image (no curl needed); exit non-zero on any failure.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  edge:
+    driver: bridge
+  # egress:
+  #   driver: bridge
+  #   internal: false   # only if outbound is explicitly required + documented
+
+volumes:
+  postern-data:
+
+# ── Runtime secrets (operator-provided; never committed) ────────────────────
+# Uncomment and point at operator-managed sources. Compose reads these at deploy
+# time; they are not part of the image and must never be checked in.
+# secrets:
+#   postern_env:
+#     file: ./secrets/cloud.env        # gitignored, operator-owned

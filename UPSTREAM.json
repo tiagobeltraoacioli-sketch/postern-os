@@ -1,0 +1,15 @@
+{
+  "source_url": "https://gitlab.com/bloch-sis-group/bloch-sis-project",
+  "source_project_id": 84219798,
+  "source_ref": "main",
+  "source_commit": "257ab0703ffc63a7faddb5bf646791e52b3dee3f",
+  "archive_sha256": "598ccfbe5069e18ada812eb1d62161ddb2820b8f0db8e0887cbd6772ef0bbbd0",
+  "imported_at": "2026-11-08T23:40:02.185897+00:00",
+  "upstream_file_count": 1654,
+  "history": "Single reviewed source snapshot; upstream history was not imported.",
+  "import_changes": [
+    "Upstream README preserved as UPSTREAM-README.md; root README describes this dedicated repository.",
+    "Added UPSTREAM.json and SOURCE-MANIFEST.json for provenance."
+  ],
+  "deployment": "No runtime integration, OS installation or validator rollout performed."
+}

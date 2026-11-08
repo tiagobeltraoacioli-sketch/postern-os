@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# signer-cli — a tiny stdio JSON bridge that DRIVES `postern-mobile-signer`.
+#
+# This binary does NOT reimplement any crypto. It holds a real `MobileSigner`
+# (the phone side) plus a `DesktopRequester` (a local stand-in for the terminal
+# that holds no key) over the protocol's in-process loopback, and speaks a
+# line-delimited JSON protocol over stdin/stdout so the reference web UI's Node
+# bridge can drive the ACTUAL signer:
+#
+#   receive_frame -> WYSIWYS Prompt   |   approve(PresenceProof) -> Approval frame
+#
+# Every consequence tier, the replay guard, the WYSIWYS sentence, and the hybrid
+# Falcon‖ML-DSA signature come from the frozen crates via `postern-mobile-signer`.
+#
+# HONEST: this is a REFERENCE DRIVER, not a shipped phone app. The mobile OS
+# image is UNBOOTED. The wallet is a SOFTWARE keystore here (the PQ secret is in
+# RAM at sign time) — NOT a hardware wallet. Unaudited scaffold.
+#
+# STANDALONE WORKSPACE: the empty `[workspace]` table below detaches this crate
+# from the root virtual workspace (whose `members` list is frozen / off-limits),
+# so it builds in-place without touching any root manifest. The
+# `[patch.crates-io]` mirrors the repo root so bloch-crypto's seeded PQ keygen
+# (the pqcrypto-internals fork) resolves.
+[package]
+name = "signer-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Reference stdio JSON driver for postern-mobile-signer: drives the phone-as-signer WYSIWYS approval flow (receive frame -> prompt -> per-sign presence -> approval frame). Reference driver, not a shipped app; mobile image UNBOOTED; software keystore, not hardware; unaudited scaffold."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[[bin]]
+name = "signer-cli"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+
+# The crate under test: the MOBILE (phone) side. Default features (NO `ffi`) —
+# the pure-Rust engine (MobileSigner etc.) compiles and runs standalone; we call
+# it, we do not reimplement it.
+postern-mobile-signer = { path = "../../signer" }
+
+# Detach from the root virtual workspace (its `members` list is frozen/off-limits).
+[workspace]
+
+# Mirror the repo root: bloch-crypto's PQ keygen needs the seeded-RNG fork of
+# pqcrypto-internals; a [patch] only applies from a workspace root, so replicate it.
+[patch.crates-io]
+pqcrypto-internals = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+# Keep Argon2id (pulled transitively by bloch-crypto) optimized in dev/test so the
+# build is not unusably slow, matching the repo-root profile intent.
+[profile.dev.package.argon2]
+opt-level = 3

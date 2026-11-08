@@ -1,0 +1,37 @@
+{
+  "name": "@postern/enterprise-integration",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Reference integration that wires the Postern enterprise prototypes (licensing, features, comms, shield) together end-to-end via adapters — without editing any of them. SCAFFOLD, pre-production, UNAUDITED. Consumes each module's public exports only.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./siblings": "./src/siblings.mjs"
+  },
+  "files": [
+    "src",
+    "self-check.mjs",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "self-check": "node self-check.mjs",
+    "check": "for f in src/*.mjs self-check.mjs; do node --check \"$f\" || exit 1; done && node self-check.mjs"
+  },
+  "keywords": [
+    "postern",
+    "enterprise",
+    "integration",
+    "licensing",
+    "byod",
+    "offline",
+    "fail-closed",
+    "reference-prototype"
+  ]
+}

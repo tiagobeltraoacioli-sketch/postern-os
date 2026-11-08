@@ -1,0 +1,56 @@
+[package]
+name    = "bloch-wallet-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Postern Wallet — mobile: WebAssembly build of the REAL Bloch wallet crypto surface (BIP39 → keys, byte-identical Bloch addresses, hybrid Falcon‖ML-DSA signing, real tx construction, encrypted keystore, bloch-cli wallet-JSON import). Wraps crates/bloch-crypto unchanged."
+
+# Stand-alone workspace: ships self-contained under apps/mobile-wallet and must
+# not be pulled into any parent Cargo workspace.
+[workspace]
+
+[lib]
+# Plain cdylib with a hand-written C-ABI dispatch layer (bw_alloc / bw_free /
+# bw_call). We target wasm32-wasip1 — the only target on which the REAL pqcrypto
+# PQClean C (ML-DSA-65 + Falcon-1024) compiles — and wasm-bindgen does NOT
+# support wasip1, so we marshal strings ourselves and load the module in the
+# browser with a ~40-line WASI shim (see wallet-wasm.js).
+crate-type = ["cdylib"]
+
+[dependencies]
+# THE wallet crypto — the same crate the node/CLI use. default-features off keeps
+# the terminal CLI (clap/rpassword) and the networked WalletClient (reqwest) out.
+bloch-crypto = { path = "../../../../BlochSISPoW-project/crates/bloch-crypto", default-features = false }
+
+# On wasm32-wasip1 getrandom uses the wasi `random_get` backend automatically —
+# no feature flags or cfg needed (unlike wasm32-unknown-unknown).
+getrandom = "0.3"
+
+# Import interop: replicate bloch-crypto's on-disk crypto (Argon2id + AES-256-GCM)
+# so a bloch-cli wallet.json / founder.json / hd-wallet.json decrypts byte-for-byte.
+# AES-256-GCM is used ONLY on the CLI-interop path (non-negotiable format match).
+argon2  = "0.5"
+aes-gcm = "0.10"
+# The wallet's OWN at-rest keystore (IndexedDB) uses XChaCha20-Poly1305, not
+# AES-GCM: a 192-bit random nonce removes the GCM nonce-reuse failure mode, and
+# ChaCha is constant-time in pure software/WASM (no AES-NI in wasm). Argon2id KDF
+# for both. Matches the postern-vault / desktop keystore shape.
+chacha20poly1305 = "0.10"
+sha3    = "0.10"
+hex     = "0.4"
+base64  = "0.22"
+bip39   = "2"
+zeroize = { version = "1", features = ["derive"] }
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+
+# Match the node's vendored, wasm-aware pqcrypto-internals fork.
+[patch.crates-io]
+pqcrypto-internals = { path = "../../../../BlochSISPoW-project/crates/pqcrypto-internals" }
+
+# Small module. opt-level "s" + lto trims the pqcrypto dead paths.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

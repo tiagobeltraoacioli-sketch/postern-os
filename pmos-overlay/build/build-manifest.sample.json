@@ -1,0 +1,50 @@
+{
+  "_comment": "SAMPLE / SCHEMA for build/build.sh output (build-manifest.json). This template ships status=UNBUILT on purpose: publish-to-r2.sh MUST refuse to upload it. A real manifest is produced only by build.sh after pmbootstrap emits a .img on a Linux aarch64/cross host, which flips status to BUILT and fills in the real sha256/pins. The Postern packages are INSTALLED from the live signed R2 repo (../PUBLISHED.md), not rebuilt. Never hand-edit status to BUILT.",
+  "schema": "postern-pmos-build-manifest/v1",
+  "product": "Postern for postmarketOS — community edition",
+  "not_product": "Postern OS",
+  "status": "UNBUILT",
+  "boot_tested": "UNBOOTED",
+  "install_source": "published apk repo — packages installed, NOT rebuilt",
+  "attestation": "none — signed & publisher-authenticated only; NOT reproducible, NOT attested",
+  "reproducible": false,
+  "attestable": false,
+  "keystore": "software (never hardware-backed on pmOS)",
+  "image": {
+    "file": "",
+    "sha256": "",
+    "bytes": 0
+  },
+  "target": {
+    "device": "pine64-pinephone",
+    "ui": "phosh",
+    "arch": "aarch64",
+    "pmos_release": "v26.06",
+    "image_version": "v0.1",
+    "filesystem": "ext4"
+  },
+  "published_repo": {
+    "base": "https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/pmos/postern",
+    "signing_key": "builder-6a52d247.rsa.pub",
+    "signing_key_sha256": "",
+    "key_note": "alpha BUILD key, not a stable release key (../PUBLISHED.md)"
+  },
+  "pins": {
+    "pmbootstrap_version": "",
+    "pmbootstrap_channel": "",
+    "pmaports_commit": "",
+    "pmaports_remote": "",
+    "apk_world_sha256": "",
+    "installed_packages_file": "installed-packages.txt",
+    "postern_packages": {
+      "postern": "0.1.0-r0",
+      "postern-wallet": "0.1.0_alpha1-r0",
+      "postern-apps": "0.1.0_alpha1-r0"
+    }
+  },
+  "build": {
+    "built_at": "",
+    "built_by_host": "",
+    "build_script": "build/build.sh"
+  }
+}

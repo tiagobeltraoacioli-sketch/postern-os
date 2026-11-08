@@ -1,0 +1,27 @@
+# postern-trail — the ONE shared append-only, SHAKE-256 hash-chained audit
+# trail. Extracted from yagabona ("glowing skull") and ezekiel1 ("rims full of
+# eyes"), which were byte-for-byte the same mechanism with different content
+# fields and had begun to drift (two canonical-JSON specs; both had dropped the
+# schema-version tag). This crate owns the ONE authoritative canonical form so
+# the two chains can never diverge again.
+#
+# Honesty: this is tamper-EVIDENT, not tamper-proof — the machine owner can
+# always rewrite the whole file and recompute every hash. It only guarantees
+# that a *partial* edit is detectable by re-verification. UNAUDITED draft.
+[package]
+name = "postern-trail"
+version = "0.1.0"
+edition = "2021"
+description = "The one shared append-only, SHAKE-256 hash-chained audit trail for the Postern products (yagabona, ezekiel1). Deterministic RFC 8785/JCS-style canonical JSON, generic over an app-specific content payload. Tamper-evident, not tamper-proof. UNAUDITED draft."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_trail"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] } # content (de)serialization + flatten
+serde_json = "1"                                 # canonical JSON of the preimage + JSONL lines
+sha3 = "0.10"                                     # SHAKE-256 XOF for the hash chain
+
+[dev-dependencies]
+tempfile = "3"                                    # isolated trails in tests

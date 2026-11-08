@@ -1,0 +1,40 @@
+Postern CLOUD — control plane (multi-tenant managed-node orchestration)
+Copyright 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+This product is dual-licensed under MIT OR Apache-2.0. See LICENSE-MIT and
+LICENSE-APACHE. SPDX-License-Identifier: MIT OR Apache-2.0
+
+HONEST STATUS
+-------------
+Design / reference prototype. Unaudited. Pre-production. Not a certified
+security product. NO real infrastructure is provisioned by this code — it is the
+orchestration logic and the interfaces an operator's real provisioner plugs into.
+The actual managed hosts are OPERATOR-RUN.
+
+WHAT THIS IS / IS NOT
+---------------------
+- BUSINESS / ENTERPRISE ONLY. A managed node is provisioned only for a corporate
+  TENANT holding a DUNS-backed master license (enterprise/licensing/). Personal
+  Postern apps and personal data NEVER touch this control plane — there is no
+  code path for it.
+- HOSTED IS LESS PRIVATE THAN SELF-HOSTING. A managed node runs on infrastructure
+  the org does not own, under a control plane the org does not run. We disclose
+  this in the README and every user-facing surface; we never pitch it as "just as
+  private" as running your own node. Self-hosting stays free.
+- TENANT ISOLATION IS BY CONSTRUCTION — in-process namespacing, not a kernel or
+  hypervisor boundary. A COMPROMISED CONTROL PLANE DEFEATS IT: whoever controls
+  the orchestrator can read any tenant. We say so plainly.
+- KEYED TO THE MASTER LICENSE. A tenant's nodes exist only while its master token
+  verifies OFFLINE. Revoke or expiry ⇒ the tenant's nodes are deprovisioned and
+  its namespace wiped. revoke ⇒ deprovision, fail-closed.
+- NO TELEMETRY beyond the disclosed operational metrics (node counts, lifecycle
+  state, provision/deprovision events, control-process uptime). No phone-home.
+- This module implements NO cryptography and does NOT depend on the licensing
+  library's code. The real offline verify() plugs in through a documented
+  interface. The token generator lives on posternlabs.com.
+- Payment (after evaluation) is FIAT; pricing is still being structured. Never a
+  coin. The Bloch-SIS-PoW coin is not a security, not an asset, and buys no
+  software.
+
+The community/free personal suite is never "Postern OS"; Postern OS is the
+separate reproducible operating system product.

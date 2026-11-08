@@ -1,0 +1,23 @@
+# Phosh UI defaults for "Postern for postmarketOS -- community edition".
+# GLib gsettings schema override. Installed to
+#   /usr/share/glib-2.0/schemas/20_postern-flavor.gschema.override
+# and applied by `glib-compile-schemas` (Alpine's glib ships a trigger on that
+# dir; the postern-flavor post-install also runs it as a belt-and-suspenders).
+#
+# HONESTY / UNBOOTED: community, NON-attestable tier. This override has NOT been
+# loaded by a real phosh/dconf on a device -- key names are from phosh's
+# sm.puri.phosh schema (favorites: type 'as', the app-grid / dock pins). Verify
+# on-device that the schema id + key exist for the phosh version shipped
+# (see ../README.md, section 4). This is NOT "Postern OS".
+#
+# The override only sets DEFAULTS; a user can still re-pin freely. It never
+# rewrites os-release or any surface that would imply this is a distribution.
+
+[sm.puri.phosh]
+# Wallet-first app grid (flavor/README.md 3, "wallet-first landing"). The
+# wallet leads; then the store, onboarding, login, and the privacy/messaging
+# apps. Names are the .desktop basenames shipped by postern-apps + this flavor:
+#   postern-wallet.desktop            -> flavor (terminal launcher for the CLI)
+#   postern-postern-*.desktop         -> postern-apps (store/login/onboard/enterprise)
+#   postern-sotto/tolmach/vedetta     -> postern-apps
+favorites=['postern-wallet.desktop', 'postern-postern-store.desktop', 'postern-postern-onboard.desktop', 'postern-postern-login.desktop', 'postern-sotto.desktop', 'postern-tolmach.desktop', 'postern-vedetta.desktop']

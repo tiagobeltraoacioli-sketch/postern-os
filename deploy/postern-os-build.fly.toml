@@ -1,0 +1,52 @@
+# STATUS: NOT LAUNCHED — SCAFFOLD ONLY. See deploy/README.md for the full
+# honest caveats (Fly-gated, reproducible-by-design != reproduced,
+# permissive-license-only base). Nothing in this repo has run `fly deploy`
+# or `fly machine run` against this app name.
+#
+# Nix ISO builder host on Fly (Firecracker microVM). This is builder-B — the
+# INDEPENDENT SECOND builder for the Postern OS L1 image two-builder
+# reproducibility proof (backlog #19, docs/plan/FLAKE-REPRO.md §4,
+# os/repro/README.md, driven by scripts/repro-two-builder.sh which defaults
+# --fly-app to this app name and --remote-path-b to /root/bloch-protocol).
+# It must check out the EXACT same <LOCK_COMMIT> as builder-A — see
+# os/repro/repro-verify-iso.sh's header for why an unpinned or independently
+# re-locked flake.lock makes the comparison meaningless.
+#
+# A persistent volume is mounted at /nix so the Nix store (tens of GiB once
+# real builds happen) survives machine restarts instead of re-fetching every
+# input on every run. Nix ISO builds are heavy, so the [[vm]] here is
+# deliberately bigger than postern-apk-build.fly.toml's (2 cpu/2gb) — 4
+# cpus/8gb is a starting guess, not a measured requirement (no build has run
+# here to measure against). Idles on `tail -f /dev/null` so
+# scripts/repro-two-builder.sh can `fly ssh console -a postern-os-build -C
+# '<cmd>'` in, exactly like the apk host.
+#
+# Base image: nixos/nix (official Nix Docker image, ships Nix preinstalled so
+# this host doesn't need the Determinate-installer bootstrap that
+# os/repro/repro-verify-iso-builder-userdata.sh uses for the EC2 path).
+# LICENSE CAVEAT: Nix itself (the package manager binary/daemon in this
+# image) is LGPL-2.1 — weak copyleft, NOT GPL/AGPL, so it clears this repo's
+# "permissive base only, no GPL/AGPL" bar, but LGPL is not permissive
+# (MIT/BSD/Apache) either. Before any real launch, audit the FULL image
+# (base OS layer + whatever else nixos/nix bundles) for any GPL/AGPL
+# component — this scaffold has not done that audit. If it fails, swap to a
+# minimal Debian/Alpine base + `install.determinate.systems/nix` (same
+# installer os/repro/repro-verify-iso-builder-userdata.sh already uses) and
+# re-check.
+app = "postern-os-build"
+primary_region = "gru"
+
+[build]
+  image = "nixos/nix:latest"
+
+[processes]
+  app = "tail -f /dev/null"
+
+[mounts]
+  source = "osnix"
+  destination = "/nix"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 4
+  memory = "8gb"

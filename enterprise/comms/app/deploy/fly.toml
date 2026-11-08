@@ -1,0 +1,43 @@
+# Fly config — Bloch (Postern comms-app), reference-prototype UNAUDITED staging
+# demo. Serves the static org-messenger UI; the license gate stays fail-closed
+# without a real window.PosternLicense injection (there is none here — this is
+# a demo shell, not a licensed deployment). Hosted = LESS private than
+# self-hosting (see the app's own src/transparency.mjs); no crypto keys or
+# license secrets ship in this image. Not production. Mirrors the shape of
+# ../../../cloud/image/fly.toml.
+#
+# Build context MUST be the repo root (the image needs enterprise/features/ and
+# enterprise/comms/compliance/, which live outside this deploy/ directory).
+# Run from the repo root:
+#   fly deploy . --config enterprise/comms/app/deploy/fly.toml \
+#                 --dockerfile enterprise/comms/app/deploy/Dockerfile
+# (BUILD ONLY has been exercised for this authoring pass — see deploy/README.md.
+# No `fly deploy`/`fly launch` has been run; no app was registered with Fly.)
+app = "postern-comms-app-demo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "enterprise/comms/app/deploy/Dockerfile"
+
+[env]
+  PORT = "8080"
+  POSTERN_EDITION = "comms-app"
+  POSTERN_TELEMETRY = "off"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

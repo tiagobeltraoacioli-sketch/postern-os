@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  ============================================================================
+  POSTERN MOBILE WALLET — PWA (React + TypeScript) · reference prototype, UNAUDITED
+  ============================================================================
+  Framework UI that WRAPS the existing hybrid-PQ WASM core (bloch_wallet_wasm.wasm),
+  wallet-live.js and the same-origin /rpc client — the crypto and node access are
+  REUSED, not reinvented. No mining. No native shell. Installable, offline-capable.
+
+  Same-origin + CSP-strict: the app loads ONLY its own bundled, same-origin assets
+  (framework JS/CSS is script-src 'self', not a CDN). The only network it makes is
+  to the same-origin '/rpc' proxy (connect-src 'self'). No third-party fonts,
+  scripts, analytics, or remote images.
+
+  Honest by design (see the per-screen banners and the About screen): the keystore
+  is browser SOFTWARE (not the phone's Secure Enclave / StrongBox); the coin BLCH
+  is worthless by design and not a security; balances read via the hosted /rpc so
+  no live node is required on the phone; and it moves no real funds unless the real
+  send path is genuinely wired.
+  ============================================================================
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'none'; font-src 'none'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0b0e13">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Postern Wallet">
+<title>Postern Wallet — mobile PWA (reference prototype · UNAUDITED) · Postern Labs</title>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="./src/main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "_note": "Shared fixture set for the WASM<->native parity harness. The native binary (src/bin/ezekiel1-parity.rs) and the WASM module (via parity.mjs) both run EVERY case below and their outputs must be byte-identical. Policies are referenced by key from `policies` to avoid duplication. `expect` is a human-readable assertion the native test also checks; parity itself is wasm-output == native-output.",
+  "policies": {
+    "biz": "edition = \"business\"\n\n[[tenants]]\nname = \"acme\"\n\n[[layers]]\nname  = \"root\"\nlevel = 3\n\n[[layers]]\nname   = \"internal\"\nparent = \"root\"\nlevel  = 2\n\n[[subjects]]\nname = \"alice\"\ntenant = \"acme\"\nassignments = [{ context = \"default\", layer = \"root\" }]\n\n[[resources]]\nid     = \"acme/ledger\"\nlayer  = \"internal\"\ntenant = \"acme\"\n\n[[grants]]\nsubject  = \"alice\"\nresource = \"acme/ledger\"\naction   = \"read\"\nexpires  = \"2027-01-01T00:00:00Z\"\n",
+    "biz2": "edition = \"business\"\n\n[[tenants]]\nname = \"acme\"\n\n[[tenants]]\nname = \"globex\"\n\n[[layers]]\nname  = \"root\"\nlevel = 3\n\n[[subjects]]\nname = \"alice\"\ntenant = \"acme\"\nassignments = [{ context = \"default\", layer = \"root\" }]\n\n[[resources]]\nid     = \"globex/logs\"\nlayer  = \"root\"\ntenant = \"globex\"\n\n[[grants]]\nsubject  = \"alice\"\nresource = \"globex/logs\"\naction   = \"read\"\nexpires  = \"2027-01-01T00:00:00Z\"\n",
+    "widen": "edition = \"business\"\n\n[[tenants]]\nname = \"acme\"\n\n[[layers]]\nname  = \"root\"\nlevel = 3\n\n[[layers]]\nname   = \"internal\"\nparent = \"root\"\nlevel  = 9\n\n[[subjects]]\nname = \"alice\"\ntenant = \"acme\"\nassignments = [{ context = \"default\", layer = \"root\" }]\n\n[[resources]]\nid     = \"acme/ledger\"\nlayer  = \"internal\"\ntenant = \"acme\"\n\n[[grants]]\nsubject  = \"alice\"\nresource = \"acme/ledger\"\naction   = \"read\"\nexpires  = \"2027-01-01T00:00:00Z\"\n",
+    "personal": "edition = \"personal\"\n\n[[layers]]\nname  = \"guardian\"\nlevel = 3\n\n[[layers]]\nname   = \"child\"\nparent = \"guardian\"\nlevel  = 1\n\n[[subjects]]\nname = \"guardian-alice\"\nassignments = [{ context = \"home\", layer = \"guardian\" }]\n\n[[subjects]]\nname = \"kid-bob\"\nassignments = [{ context = \"home\", layer = \"child\" }]\n\n[[resources]]\nid    = \"kid-bob/screen-time\"\nlayer = \"child\"\n\n[[grants]]\nsubject  = \"guardian-alice\"\nresource = \"kid-bob/screen-time\"\naction   = \"read\"\nexpires  = \"2027-01-01T00:00:00Z\"\n"
+  },
+  "evaluate": [
+    { "name": "grant-allows-read",          "policy": "biz",      "subject": "alice",         "resource": "acme/ledger",        "context": "default", "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "allow" },
+    { "name": "no-write-grant-denies",       "policy": "biz",      "subject": "alice",         "resource": "acme/ledger",        "context": "default", "action": "write", "now": "2026-07-11T00:00:00Z", "expect": "deny" },
+    { "name": "expired-grant-denies",        "policy": "biz",      "subject": "alice",         "resource": "acme/ledger",        "context": "default", "action": "read",  "now": "2030-01-01T00:00:00Z", "expect": "deny" },
+    { "name": "unknown-subject-denies",      "policy": "biz",      "subject": "mallory",       "resource": "acme/ledger",        "context": "default", "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "deny" },
+    { "name": "unknown-resource-denies",     "policy": "biz",      "subject": "alice",         "resource": "acme/ghost",         "context": "default", "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "deny" },
+    { "name": "cross-firmament-denies",      "policy": "biz2",     "subject": "alice",         "resource": "globex/logs",        "context": "default", "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "deny" },
+    { "name": "widening-policy-rejected",    "policy": "widen",    "subject": "alice",         "resource": "acme/ledger",        "context": "default", "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "error" },
+    { "name": "personal-guardian-allows",    "policy": "personal", "subject": "guardian-alice","resource": "kid-bob/screen-time","context": "home",    "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "allow" },
+    { "name": "personal-child-no-grant-deny","policy": "personal", "subject": "kid-bob",       "resource": "kid-bob/screen-time","context": "home",    "action": "read",  "now": "2026-07-11T00:00:00Z", "expect": "deny" }
+  ],
+  "blp": [
+    { "name": "read-down-ok",    "fn": "read",  "subject_level": 3, "resource_level": 1, "expect": true },
+    { "name": "read-up-denied",  "fn": "read",  "subject_level": 1, "resource_level": 3, "expect": false },
+    { "name": "write-up-ok",     "fn": "write", "subject_level": 1, "resource_level": 3, "expect": true },
+    { "name": "write-down-denied","fn": "write", "subject_level": 3, "resource_level": 1, "expect": false }
+  ],
+  "wall": [
+    { "name": "first-touch-allowed",    "classes": [{ "name": "banks", "members": ["bank-a", "bank-b"] }], "history": [],          "target": "bank-a", "expect": false },
+    { "name": "same-member-allowed",    "classes": [{ "name": "banks", "members": ["bank-a", "bank-b"] }], "history": ["bank-a"],  "target": "bank-a", "expect": false },
+    { "name": "competitor-barred",      "classes": [{ "name": "banks", "members": ["bank-a", "bank-b"] }], "history": ["bank-a"],  "target": "bank-b", "expect": true },
+    { "name": "unrelated-not-barred",   "classes": [{ "name": "banks", "members": ["bank-a", "bank-b"] }], "history": ["bank-a"],  "target": "gold",   "expect": false }
+  ]
+}

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Generated build outputs for the shared android-common managed-profile module.
+# The committed source runs the pure-JVM unit suite via
+#   ./gradlew :android-common:testDebugUnitTest
+# but none of the generated artifacts below belong in the repo.
+
+# Gradle / AGP build outputs
+/build/
+.gradle/

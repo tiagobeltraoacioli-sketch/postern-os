@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Postern Desktop",
+  "version": "0.1.0",
+  "identifier": "org.bloch.desktop",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "title": "Postern Desktop", "width": 1040, "height": 720, "minWidth": 820, "minHeight": 560 }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'none'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; media-src 'none'; worker-src 'none'; child-src 'none'; frame-src 'none'; manifest-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm", "appimage", "app", "dmg", "msi", "nsis"],
+    "createUpdaterArtifacts": false,
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.ico"],
+    "category": "Utility",
+    "publisher": "Postern Labs",
+    "homepage": "https://gitlab.com/blochsispow-group/BlochSISPoW-project",
+    "copyright": "Postern Labs — MIT OR Apache-2.0",
+    "license": "MIT OR Apache-2.0",
+    "licenseFile": "../../LICENSE-APACHE",
+    "shortDescription": "Bloch-SIS-PoW full-node companion (unaudited testnet build).",
+    "longDescription": "Postern Desktop is a companion app for the ownerless Bloch-SIS-PoW protocol: it starts, stops, and monitors a separately-built `bloch` node process (never bundled), and hosts the wallet, pairing, and vault previews. Source-only distribution; the crates are unaudited and the testnet is zero-security by design.",
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0", "libayatana-appindicator3-1"]
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3", "libappindicator-gtk3"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": null,
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

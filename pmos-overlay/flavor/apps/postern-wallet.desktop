@@ -1,0 +1,14 @@
+[Desktop Entry]
+# Wallet launcher for "Postern for postmarketOS -- community edition".
+# HONESTY: the wallet is a CLI (`postern-wallet`, bloch-crypto's wallet::cli).
+# It opens in a terminal -- this is not a graphical wallet, and the keys are in
+# a SOFTWARE keystore (no TEE/StrongBox on this platform; ../../HONESTY.md).
+# UNBOOTED: never launched under phosh on a device.
+Type=Application
+Name=Postern Wallet
+Comment=Offline post-quantum wallet CLI (software keystore) -- opens in a terminal
+Exec=postern-wallet
+Terminal=true
+Categories=Network;Utility;Finance;
+Keywords=postern;wallet;crypto;
+X-Postern-Edition=postmarketOS-community

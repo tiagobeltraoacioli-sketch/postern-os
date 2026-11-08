@@ -1,0 +1,20 @@
+# sloboda-gate-boot.service — re-derive the consent projection on boot.
+# NON-ATTESTABLE tier; UNAUDITED. Ordering is VM-UNTESTED (design §5.2 #8).
+# Install: Dev C's os/sloboda-compat.nix (systemd.services), NOT this daemon.
+[Unit]
+Description=Sloboda consent-gate: re-derive /run projection on boot (non-attestable)
+DefaultDependencies=no
+After=local-fs.target
+# The projection MUST exist before anything can enter the container:
+Before=waydroid-container.service graphical-session.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Re-derives the projection from persistent canonical + applies the session re-ask.
+ExecStart=@sloboda-gated@ boot
+
+[Install]
+# Order this ahead of every consumer of the projection.
+RequiredBy=waydroid-container.service
+WantedBy=multi-user.target

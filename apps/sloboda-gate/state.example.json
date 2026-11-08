@@ -1,0 +1,26 @@
+{
+  "schema": "postern.sloboda-gate.state",
+  "version": 1,
+  "tier": "non-attestable",
+  "lang": "en",
+  "consent": {
+    "accepted": false,
+    "scope": "session",
+    "acceptedAtIso": null
+  },
+  "bridges": {
+    "clipboard": false,
+    "files": false,
+    "mic": false,
+    "camera": false,
+    "location": false
+  },
+  "egress": {
+    "torOnly": true,
+    "torBootstrapped": false
+  },
+  "killSwitch": {
+    "engaged": false,
+    "engagedAtIso": null
+  }
+}

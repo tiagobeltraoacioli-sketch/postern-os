@@ -1,0 +1,54 @@
+#!/sbin/openrc-run
+# Postern for postmarketOS -- Postern node daemon service.
+#
+# HONESTY / UNBOOTED: community, NON-attestable tier. Syntax-checked (sh -n)
+# only; never started on a device. See overlay/README.md.
+#
+# Runs the Postern node as the dedicated, unprivileged `postern` user. The node
+# routes its network traffic through the on-device Arti SOCKS proxy
+# (postern-tor). Keys/state live under /var/lib/postern with 0700 perms.
+#
+# NOTE(packaging): the node binary (/usr/bin/postern-node) is NOT produced by
+# the current postern-wallet APKBUILD, which builds only the offline wallet
+# island (--features wallet-cli, node feature OFF). This service is the correct
+# OpenRC wiring for when a node package ships; until then `rc-service
+# postern-node start` will fail fast on the missing binary. Flagged, not
+# changed -- the APKBUILDs are owned by other devs.
+
+name="Postern node"
+description="Postern node daemon (unprivileged, Tor-routed)"
+
+: "${postern_config:=/etc/postern/node.toml}"
+: "${postern_datadir:=/var/lib/postern/node}"
+: "${postern_socks:=127.0.0.1:9150}"
+
+supervisor="supervise-daemon"
+command="/usr/bin/postern-node"
+command_args="--config ${postern_config} --data-dir ${postern_datadir}"
+command_user="postern:postern"
+pidfile="/run/postern-node.pid"
+output_log="/var/log/postern/node.log"
+error_log="/var/log/postern/node.log"
+
+# Route the node's outbound traffic through the Arti SOCKS proxy. Exact env var
+# name is node-implementation-specific; documented here and in node.toml.
+export ALL_PROXY="socks5://${postern_socks}"
+
+depend() {
+	need net
+	use postern-tor
+	after firewall postern-firewall postern-tor
+}
+
+start_pre() {
+	. /usr/libexec/postern/postern-common.sh
+	postern_ensure_user
+	postern_ensure_dir "$postern_datadir"
+	checkpath -d -m 0750 -o postern:postern /var/log/postern
+	if [ ! -x "$command" ]; then
+		eerror "Postern node binary not found at $command."
+		eerror "The current overlay ships the OFFLINE wallet only; a node"
+		eerror "package is not part of this scaffold yet. See overlay/README.md."
+		return 1
+	fi
+}

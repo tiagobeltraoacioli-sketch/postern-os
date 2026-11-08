@@ -1,0 +1,69 @@
+NoporIS — Nopor Internet Systems (the dual-persona bridge app)
+Copyright 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+
+This product is licensed under MIT OR Apache-2.0.
+See the repository-root LICENSE-MIT and LICENSE-APACHE.
+SPDX-License-Identifier: MIT OR Apache-2.0
+
+HONEST STATUS
+-------------
+DESIGN CONCEPT. Not yet staffed. UNAUDITED / reference-prototype. Nothing here
+has been built, provisioned, or run on a device. Not a certified security
+product. This NOTICE is scaffolding for a future build; it must be made accurate
+against the actually-shipped artifact before any release (see licenses/README.md
+and COMPLIANCE.md §11). This is not legal advice.
+
+WHAT NoporIS IS / IS NOT (for attribution purposes)
+---------------------------------------------------
+- NoporIS is an UNPRIVILEGED APP on stock, user-supplied Android. It is NEVER
+  "Postern OS" and is not an Android distribution.
+- NoporIS ships NO operating system, NO AOSP source, and NO Google Mobile
+  Services (GMS). It compiles AGAINST the Android SDK; it does not incorporate
+  AOSP source into its binary. The user brings their own device, OS, and Google
+  account. GMS, where present, is the user's own — obtained from their device
+  manufacturer under Google's terms, not redistributed by NoporIS.
+- "Android", "Google", "Google Play", the Android robot, and the Google Play
+  logo are trademarks of Google LLC, used here ONLY NOMINATIVELY to identify the
+  Google products NoporIS interoperates with. NoporIS is independent and is not
+  endorsed by, certified by, or affiliated with Google or the AOSP project.
+
+=============================================================================
+THIRD-PARTY COMPONENTS
+=============================================================================
+NoporIS bundles / links the following third-party components. Their licenses
+govern their respective code. Full license texts are in ./licenses/.
+
+--- Android Open Source Project (AOSP) — platform APIs / SDK ---------------
+  Copyright The Android Open Source Project
+  License: Apache License, Version 2.0  ->  ./licenses/Apache-2.0.txt
+  Use: NoporIS compiles against AOSP framework APIs (DevicePolicyManager,
+       DeviceAdminReceiver, managed-profile provisioning intents, Private Space
+       surfaces where applicable). No AOSP source is modified or redistributed.
+       (Some AOSP components carry other permissive licenses; NoporIS's use is
+       confined to the Apache-2.0 framework API surface. Re-verify before any
+       source is vendored — see licenses/README.md.)
+
+--- AndroidX (Jetpack) libraries ------------------------------------------
+  Copyright The Android Open Source Project / Google LLC and contributors
+  License: Apache License, Version 2.0  ->  ./licenses/Apache-2.0.txt
+  Components (as scoped by the sibling android-container profile app; NoporIS's
+  own build MUST replace this list with its actual dependency set before ship):
+    - androidx.compose:compose-bom
+    - androidx.compose.ui:ui
+    - androidx.compose.material3:material3
+    - androidx.activity:activity-compose
+    - androidx.lifecycle:lifecycle-runtime-ktx
+
+--- Kotlin standard library & coroutines ----------------------------------
+  Copyright JetBrains s.r.o. and Kotlin Programming Language contributors
+  License: Apache License, Version 2.0  ->  ./licenses/Apache-2.0.txt
+  Components:
+    - org.jetbrains.kotlin:* (Kotlin stdlib / Android)
+    - org.jetbrains.kotlinx:kotlinx-coroutines-android
+
+=============================================================================
+This file must be regenerated from the real, resolved dependency graph of the
+shipped build. The list above is inherited from the design scaffold and is a
+STARTING POINT, not a verified manifest. See ./licenses/README.md for how to
+keep this current, and ../android-bridge/COMPLIANCE.md for the release
+checklist. NOT LEGAL ADVICE — counsel review is a hard release gate.

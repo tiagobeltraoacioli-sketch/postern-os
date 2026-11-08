@@ -1,0 +1,856 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Content-Security-Policy — locked down on purpose:
+    default-src 'none'                      nothing loads unless named below
+    script-src 'sha256-...' x3              ONLY the three inline script blocks
+                                             below, pinned by hash — no
+                                             'unsafe-inline', so an injected
+                                             script tag never executes even if
+                                             markup escaping were bypassed.
+                                             (Defense-in-depth: server/D&B
+                                             strings are ALSO entity-escaped at
+                                             every innerHTML sink via
+                                             GRM.escapeHtml.) If you edit ANY
+                                             inline script you MUST recompute
+                                             its hash (sha256, base64, of the
+                                             exact bytes between the tags) —
+                                             xss-escape.test.mjs pins this.
+    style-src 'unsafe-inline'               inline <style> + style="" attributes
+                                             (hash sources do not cover style
+                                             attributes without 'unsafe-hashes')
+    img-src 'self' blob: data:              document previews are LOCAL blobs only
+    connect-src 'self'                       the ONLY network calls are the minimal
+                                             verdict to /license/review on our origin
+  No document image or OCR text is ever in a network request — enforced by design
+  (see submitVerdict) and by the server tripwire (/license/review scanForPII).
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HiU5KMe4tGT9ho5NvgtT+VLNyrxY0M/V5DPMIa3UgJQ=' 'sha256-cSxbUoqryEznvs2mgeQT9oVQpnIZdRgND5iU7Tag5pg=' 'sha256-Hedz91W1x9De3bftXXL2Apscp34rlw38fxoUArMme2Y='; style-src 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Gramota — owner/manager identity KYC · Postern Labs</title>
+<style>
+:root{
+  --bg:#0d1014; --surface:#14181f; --surface-2:#1a2029; --border:#29323e; --border-hi:#3a4552;
+  --text:#ece7e9; --text-dim:#a8adb5; --muted:#79818c;
+  --acc:#d8b26a; --acc-hi:#efc97e; --acc-ink:#1c1608;   /* gramota = charter/deed: parchment gold */
+  --ok:#63ab7c; --warn:#d08c2e; --err:#d96a63;
+  --radius:13px; --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme]){
+  --bg:#f2efe8; --surface:#fbfaf6; --surface-2:#f1ece0; --border:#ddd5c4; --border-hi:#c9bfa8;
+  --text:#20242b; --text-dim:#5a616b; --muted:#8a8577;
+  --acc:#8a6a24; --acc-hi:#6f5418; --acc-ink:#fdfaf2;
+  --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+}}
+:root[data-theme="light"]{
+  --bg:#f2efe8; --surface:#fbfaf6; --surface-2:#f1ece0; --border:#ddd5c4; --border-hi:#c9bfa8;
+  --text:#20242b; --text-dim:#5a616b; --muted:#8a8577;
+  --acc:#8a6a24; --acc-hi:#6f5418; --acc-ink:#fdfaf2;
+  --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+}
+*{box-sizing:border-box}
+body{font-family:var(--font-ui);background:var(--bg);color:var(--text);max-width:48rem;margin:0 auto;padding:2rem 1.25rem 5rem;line-height:1.6}
+h1{font-size:1.5rem;margin:0 0 .2rem} h2{font-size:1.02rem;margin:2rem 0 .6rem;letter-spacing:.01em}
+.sub{color:var(--text-dim);font-size:.9rem;margin:.1rem 0 1rem}
+a{color:var(--acc-hi)}
+label{display:block;margin:1rem 0 .3rem;font-weight:600;font-size:.92rem}
+input,select,button{font:inherit;padding:.6rem .7rem;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);width:100%}
+input[type=file]{padding:.5rem}
+button{background:var(--acc);color:var(--acc-ink);font-weight:700;border:none;cursor:pointer;margin-top:1rem}
+button.secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border-hi)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.2rem;margin:1rem 0}
+.check{display:flex;gap:.6rem;align-items:flex-start;margin:1rem 0 .2rem}
+.check input{width:auto;margin-top:.4rem;flex:0 0 auto} .check label{margin:0;font-weight:400}
+.dim{color:var(--text-dim);font-size:.85rem}
+.row{display:flex;gap:1rem;flex-wrap:wrap} .row>div{flex:1;min-width:12rem}
+.preview{max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);margin-top:.5rem;display:none}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:.9rem;font-size:.78rem;font-family:var(--font-mono);overflow:auto}
+.pill{display:inline-block;padding:.12rem .55rem;border-radius:999px;font-size:.76rem;font-weight:700;border:1px solid var(--border-hi)}
+.pill.ok{background:rgba(99,171,124,.15);color:var(--ok);border-color:var(--ok)}
+.pill.no{background:rgba(217,106,99,.15);color:var(--err);border-color:var(--err)}
+.pill.prov{background:rgba(208,140,46,.15);color:var(--warn);border-color:var(--warn)}
+.loa{font-size:2rem;font-weight:800;color:var(--acc-hi)}
+.step{opacity:.45;pointer-events:none;transition:opacity .2s}
+.step.active{opacity:1;pointer-events:auto}
+code{font-family:var(--font-mono);background:var(--surface-2);padding:.05rem .35rem;border-radius:4px;font-size:.85em}
+hr{border:none;border-top:1px solid var(--border);margin:1.5rem 0}
+</style>
+</head>
+<body>
+<h1>Gramota <span class="dim" style="font-size:.9rem;font-weight:400">· owner / manager identity KYC</span></h1>
+<p class="sub">The person&#8594;entity binder for Postern Enterprise onboarding. It ties <em>you</em> to the company that holds a DUNS number — so nobody registers a corporate license against <em>your</em> company's public DUNS.</p>
+
+<details class="privacy" open style="margin:1rem 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-dim); padding:0 16px; font-size:.86rem;">
+  <summary style="cursor:pointer; padding:14px 2px; color:var(--text); font-weight:600;">Privacy — what leaves this device</summary>
+  <div style="padding:2px 0 16px; line-height:1.55;">
+    <p style="margin:0 0 10px;"><strong style="color:var(--text)">On-device by construction.</strong> Your document images and the text read from them (OCR, names, numbers — any PII) <strong style="color:var(--text)">never leave this device</strong> and never reach a Postern server. The only network call is the minimal verdict — booleans, matched field <em>names</em> (never their values), and an assurance level — POSTed to <code>/license/review</code> on this origin (<code>connect-src 'self'</code>; the server tripwire rejects anything more).</p>
+    <p style="margin:0 0 10px;"><strong style="color:var(--text)">A document read is not proof of authority.</strong> OCR proves text was extracted, not that a document is authentic, current, or genuinely grants authority. <strong style="color:var(--text)">UNAUDITED reference prototype; not legal advice.</strong> Any future billing is fiat — the coin is never billed.</p>
+    <p style="margin:0;"><strong style="color:var(--text)">The honest caveat:</strong> this is defense-in-depth, <em>not</em> "100% private" and <em>not</em> "100% secure." Your images and typed fields live in this page while it is open, so anyone who can use this unlocked device — or a compromised browser or OS — can read them, and the minimal verdict is a real request to this origin. No web page can promise otherwise.</p>
+  </div>
+</details>
+
+<!-- STEP 1 -->
+<div class="card step active" id="s1">
+<h2>1 · The company (DUNS)</h2>
+<div class="row">
+  <div><label for="duns">DUNS number (9 digits)</label>
+  <input id="duns" inputmode="numeric" placeholder="e.g. 150483782" autocomplete="off"></div>
+  <div><label for="role">Your role at that company</label>
+  <select id="role"><option value="owner">Owner</option><option value="manager">Authorized manager</option></select></div>
+</div>
+<button id="resolveBtn" class="secondary">Resolve entity at Dun &amp; Bradstreet</button>
+<div id="entityOut" class="dim" style="margin-top:.8rem"></div>
+</div>
+
+<!-- STEP 2 -->
+<div class="card step" id="s2">
+<h2>2 · Read your documents — on this device</h2>
+<p class="dim">Authority document (articles / certificate of incorporation, board resolution, power of attorney) and a government photo ID. Images are held in this page as local blobs and discarded when you leave. <strong>They are never uploaded.</strong></p>
+<div class="row">
+  <div><label for="authImg">Authority document</label><input type="file" id="authImg" accept="image/*"><img class="preview" id="authPrev" alt=""></div>
+  <div><label for="idImg">Government photo ID</label><input type="file" id="idImg" accept="image/*"><img class="preview" id="idPrev" alt=""></div>
+</div>
+<button id="ocrBtn" class="secondary">Read documents on-device</button>
+<p class="dim" id="ocrEngineNote" style="margin-top:.6rem"></p>
+<div id="fields" style="display:none">
+  <hr>
+  <p class="dim">Fields read on-device (stay on this device — shown to you only). Correct any OCR slip before validating.</p>
+  <div class="row">
+    <div><label for="fLegal">Legal entity name (from authority doc)</label><input id="fLegal" autocomplete="off"></div>
+    <div><label for="fCountry">Country (from authority doc)</label><input id="fCountry" autocomplete="off"></div>
+  </div>
+  <label for="fOfficer">Officer / your name (from ID &amp; authority doc)</label><input id="fOfficer" autocomplete="off">
+  <div class="check"><input type="checkbox" id="liveness"><label for="liveness">A liveness / authenticity check was performed on-device (optional; raises assurance when combined with a validated read).</label></div>
+</div>
+</div>
+
+<!-- STEP 3 -->
+<div class="card step" id="s3">
+<h2>3 · Validate against the entity — on this device</h2>
+<p class="dim">Your on-device fields are compared to the D&amp;B entity <em>in this browser</em>. Only the boolean result leaves the device. Any field that cannot be confidently matched earns <strong>no assurance credit</strong> (fail-closed).</p>
+<button id="validateBtn">Validate on-device</button>
+<div id="valOut" style="margin-top:.9rem"></div>
+</div>
+
+<!-- STEP 4 -->
+<div class="card step" id="s4">
+<h2>4 · Submit the minimal verdict</h2>
+<p class="dim">This POST contains <strong>only</strong> <code>{ duns, role, attestation, kyc:{ ocr:{ onDevice, match, fieldsMatched, liveness } } }</code>. No image, no names, no numbers. Inspect it below before sending.</p>
+<pre id="payloadPre">—</pre>
+<div class="check"><input type="checkbox" id="consent"><label for="consent">I attest I am the owner or an authorized manager of the DUNS holder, and I consent to this anti-impersonation KYC. I understand a document read is not proof of authority and this is validated again at renewal.</label></div>
+<button id="submitBtn" disabled>Submit verdict &#8594; get reference</button>
+<div id="verdictOut" style="margin-top:1rem"></div>
+</div>
+
+<p class="dim" style="margin-top:2rem">Gramota (proposed name, trademark pending) · Postern Labs · Reference prototype, UNAUDITED, pre-production. Not legal advice. <a href="./README.md">Design &amp; privacy notes</a>.</p>
+
+<!-- ===================================================================== -->
+<!-- DOM-FREE CORE — the fail-closed validators. Mirrors the AUTHORITATIVE   -->
+<!-- server copy in functions/license/review.js so device and server agree.  -->
+<!-- Exercised headless by test-core.mjs.                                    -->
+<!-- ===================================================================== -->
+<script id="grm-core">
+(function(root){
+  "use strict";
+  var LEGAL_SUFFIXES = ["incorporated","corporation","company","limited","llc","llp","inc","corp","co","ltd","ltda","gmbh","ag","sa","sas","sarl","srl","spa","plc","bv","nv","oy","ab","pty","kg","kgaa","sl","lp","pllc","pc","ug","aps","kft"];
+  var SUF = {}; LEGAL_SUFFIXES.forEach(function(s){ SUF[s.replace(/[^a-z0-9]/g,"")] = 1; });
+  var COUNTRY = {"united states":"US","united states of america":"US","usa":"US","u s a":"US","brazil":"BR","brasil":"BR","united kingdom":"GB","uk":"GB","great britain":"GB","germany":"DE","deutschland":"DE","france":"FR","canada":"CA","spain":"ES","espana":"ES","portugal":"PT","netherlands":"NL","nederland":"NL","italy":"IT","italia":"IT","ireland":"IE","australia":"AU","india":"IN","japan":"JP","china":"CN","mexico":"MX","mexico ":"MX","switzerland":"CH","austria":"AT","belgium":"BE","sweden":"SE","norway":"NO","denmark":"DK","finland":"FI","poland":"PL"};
+  var ALLOWED_FIELDS = {legalName:1,country:1,officer:1};
+
+  function stripDiacritics(s){ return String(s).normalize("NFD").replace(/[̀-ͯ]/g,""); }
+
+  // Escape a string for safe interpolation into innerHTML. Server- and
+  // D&B-derived strings (legalName, country, error, decision, assurance,
+  // methods, ref, engine names) are UNTRUSTED display data: a hostile value
+  // like '<img src=x onerror=...>' must render as text, never as markup.
+  // Escapes all five HTML metacharacters (& < > " ') so the result is also
+  // safe inside attribute values. null/undefined -> "" (fail-closed).
+  var ESC_MAP = {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};
+  function escapeHtml(s){ if(s==null) return ""; return String(s).replace(/[&<>"']/g,function(c){ return ESC_MAP[c]; }); }
+
+  function normalizeLegalName(s){
+    if(s==null) return "";
+    var t = stripDiacritics(s).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+    var toks = t.split(" ").filter(Boolean);
+    while(toks.length>1 && SUF[toks[toks.length-1]]) toks.pop();
+    return toks.join(" ");
+  }
+  function normalizeName(s){
+    if(s==null) return "";
+    return stripDiacritics(s).toLowerCase().replace(/[^a-z\s]/g," ").replace(/\s+/g," ").trim();
+  }
+  function normalizeCountry(s){
+    if(s==null) return "";
+    var raw = stripDiacritics(s).toLowerCase().replace(/[^a-z\s]/g," ").replace(/\s+/g," ").trim();
+    if(/^[a-z]{2}$/.test(raw)) return raw.toUpperCase();      // already an alpha-2 code
+    if(COUNTRY[raw]) return COUNTRY[raw];                     // known country name
+    return "";                                               // unknown -> fail-closed
+  }
+  function levenshtein(a,b){
+    var m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+    var prev=new Array(n+1),cur=new Array(n+1),i,j;
+    for(j=0;j<=n;j++) prev[j]=j;
+    for(i=1;i<=m;i++){ cur[0]=i;
+      for(j=1;j<=n;j++){ var c=a.charCodeAt(i-1)===b.charCodeAt(j-1)?0:1; cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+c); }
+      var tmp=prev; prev=cur; cur=tmp;
+    }
+    return prev[n];
+  }
+  function ratio(a,b){ if(!a&&!b) return 1; var L=Math.max(a.length,b.length); if(!L) return 1; return 1-levenshtein(a,b)/L; }
+  function tokenSetScore(a,b){
+    var A=a.split(" ").filter(Boolean), B=b.split(" ").filter(Boolean);
+    if(!A.length||!B.length) return 0;
+    var setB={}; B.forEach(function(x){setB[x]=1;}); var inter=0;
+    A.forEach(function(x){ if(setB[x]) inter++; });
+    return inter/Math.min(A.length,B.length);
+  }
+  // Conservative floors. Missing either side => matched:false (fail-closed).
+  function matchField(kind,a,b){
+    if(kind==="country"){ var na=normalizeCountry(a),nb=normalizeCountry(b); if(!na||!nb) return {matched:false,score:0}; return {matched:na===nb,score:na===nb?1:0}; }
+    if(kind==="legalName"){ var la=normalizeLegalName(a),lb=normalizeLegalName(b); if(!la||!lb) return {matched:false,score:0}; var s=ratio(la,lb); return {matched:s>=0.90,score:s}; }
+    if(kind==="officer"||kind==="name"){ var pa=normalizeName(a),pb=normalizeName(b); if(!pa||!pb) return {matched:false,score:0}; var best=Math.max(ratio(pa,pb),tokenSetScore(pa,pb)); return {matched:best>=0.85,score:best}; }
+    return {matched:false,score:0};
+  }
+  // Validate on-device OCR fields against the D&B entity. Fail-closed everywhere.
+  function validateOcrAgainstEntity(ocr,entity){
+    ocr=ocr||{}; entity=entity||{};
+    var fieldsMatched=[], details={};
+    var ln=matchField("legalName",ocr.legalName,entity.legalName); details.legalName=ln; if(ln.matched) fieldsMatched.push("legalName");
+    var cc=matchField("country",ocr.country,entity.country); details.country=cc; if(cc.matched) fieldsMatched.push("country");
+    if(ocr.officerName && Array.isArray(entity.principals) && entity.principals.length){
+      var best={matched:false,score:0};
+      entity.principals.forEach(function(p){ var r=matchField("officer",ocr.officerName,p); if(r.score>best.score) best=r; });
+      details.officer=best; if(best.matched) fieldsMatched.push("officer");
+    }
+    var requiredMatched = fieldsMatched.indexOf("legalName")>=0 && fieldsMatched.indexOf("country")>=0;
+    return {fieldsMatched:fieldsMatched,requiredMatched:requiredMatched,details:details};
+  }
+  // The MINIMAL verdict that leaves the device — booleans + field NAMES only.
+  function buildOcrVerdict(validation,opts){
+    validation=validation||{}; opts=opts||{};
+    var fm=(validation.fieldsMatched||[]).filter(function(f){return ALLOWED_FIELDS[f];});
+    return {onDevice:true, match:!!validation.requiredMatched, fieldsMatched:fm, liveness:!!opts.liveness};
+  }
+  function ocrValidated(ocr){
+    return !!(ocr && ocr.onDevice===true && ocr.match===true && ocr.fieldsMatched &&
+      ocr.fieldsMatched.indexOf("legalName")>=0 && ocr.fieldsMatched.indexOf("country")>=0);
+  }
+  // Faithful, fail-closed LoA table (design §3). Same math as the server.
+  function computeLoa(x){
+    x=x||{}; var methods=[];
+    if(x.selfDeclared!==false) methods.push("self-declared");
+    if(x.dnbVerified) methods.push("dnb-entity");
+    var ov=ocrValidated(x.ocr);
+    if(x.corpDomain) methods.push("corp-domain");
+    if(x.principalMatch) methods.push("dnb-principal");
+    if(x.ocr && x.ocr.onDevice) methods.push("ocr-ondevice");
+    if(x.idvPass) methods.push("idv");
+    var loa=0;
+    if(x.corpDomain) loa=1;
+    if(loa>=1 && (x.principalMatch||ov)) loa=2;
+    if((ov && x.liveness)||x.idvPass) loa=3;
+    return {loa:loa,methods:methods,ocrValidated:ov};
+  }
+  root.GRM={ escapeHtml:escapeHtml,
+    normalizeLegalName:normalizeLegalName, normalizeName:normalizeName, normalizeCountry:normalizeCountry,
+    ratio:ratio, tokenSetScore:tokenSetScore, matchField:matchField,
+    validateOcrAgainstEntity:validateOcrAgainstEntity, buildOcrVerdict:buildOcrVerdict,
+    ocrValidated:ocrValidated, computeLoa:computeLoa };
+})(typeof globalThis!=="undefined"?globalThis:window);
+</script>
+
+<!-- ===================================================================== -->
+<!-- ON-DEVICE OCR ENGINE SEAM (DOM-free, pure). The document READER is a     -->
+<!-- pluggable adapter; NO reader is bundled, so the honest default is MANUAL  -->
+<!-- on-device entry. This block is the single source of the engine contract  -->
+<!-- and is exercised headless by ocr-engine.test.mjs. Load-bearing honesty:  -->
+<!--   • It NEVER fabricates text. No engine, no file, an empty read, a       -->
+<!--     malformed adapter, or an adapter that throws all fail-closed to       -->
+<!--     manual (text:null) — never a guessed or partial "read".              -->
+<!--   • read() returns ONLY { engine, manual, text } — never a match, LoA,   -->
+<!--     or decision. Turning text into a verdict stays in GRM (a document     -->
+<!--     read is not proof of authority) and requires a real field match.     -->
+<!--   • To auto-read, self-host a Tesseract WASM build (or any adapter with  -->
+<!--     recognize(file)->{data:{text}} / read(file)->text) and expose it as   -->
+<!--     window.Tesseract / window.PosternOcr. Images still never leave the    -->
+<!--     device — the adapter runs in-page, on-device.                         -->
+<!-- ===================================================================== -->
+<script id="grm-ocr">
+(function(root){
+  "use strict";
+  // Accept a Tesseract-shaped adapter ({recognize}), a generic {read}, a bare
+  // function, or {name, ...}. Anything else -> no engine (manual). Fail-closed.
+  function normalizeAdapter(a){
+    if(!a) return null;
+    if(typeof a.recognize==="function") return { name:a.name||"tesseract", call:function(f){ return a.recognize(f,"eng"); } };
+    if(typeof a.read==="function")      return { name:a.name||"custom",    call:function(f){ return a.read(f); } };
+    if(typeof a==="function")           return { name:a.name||"engine",    call:function(f){ return a(f,"eng"); } };
+    return null;
+  }
+  // Pull a plain-string transcript out of a recognizer result. Unknown shapes
+  // yield null (fail-closed) rather than a coerced/garbage string.
+  function extractText(res){
+    if(res==null) return null;
+    if(typeof res==="string") return res;
+    if(typeof res.text==="string") return res.text;                       // { text }
+    if(res.data && typeof res.data.text==="string") return res.data.text; // { data:{ text } } (Tesseract)
+    return null;
+  }
+  function makeOcrEngine(adapter){
+    var norm = normalizeAdapter(adapter);
+    function manual(name,reason){ return { engine:name||"none", manual:true, text:null, reason:reason||"no-engine" }; }
+    async function read(file){
+      if(!norm) return manual("none","no-engine");   // honest manual entry
+      if(!file) return manual(norm.name,"no-file");   // nothing to read -> no fabrication
+      var res;
+      try{ res = await norm.call(file); }
+      catch(_e){ return manual(norm.name,"engine-error"); } // fail-closed, never a partial read
+      var text = extractText(res);
+      if(typeof text!=="string" || text.trim()==="") return manual(norm.name,"empty-read");
+      return { engine:norm.name, manual:false, text:text };
+    }
+    return { name: norm ? norm.name : "none", available: !!norm, read: read };
+  }
+  root.GRM_OCR = { makeOcrEngine:makeOcrEngine, normalizeAdapter:normalizeAdapter, extractText:extractText };
+})(typeof globalThis!=="undefined"?globalThis:window);
+
+/* ===================================================================== */
+/* GRM-OCR-ENGINE-INLINE:BEGIN                                            */
+/* Real on-device ICAO 9303 MRZ engine (TD3 parse + check digits +        */
+/* calendar-valid dates + opt-in asOf expiry), fail-closed. This is a     */
+/* byte-parity copy of apps/gramota-kyc/ocr-engine.js so the single-file  */
+/* app carries the tested engine behind the GRM_OCR seam. Parity with the */
+/* .js source of truth is enforced by ocr-inline-parity.test.mjs — do NOT */
+/* edit one side without the other (that drift is the regression this     */
+/* marker + test exist to catch). Reference prototype / UNAUDITED.        */
+/* ===================================================================== */
+(function (root, factory) {
+  var mod = factory();
+  if (typeof module === "object" && module && module.exports) module.exports = mod;
+  if (root) root.GRM_OCR_ENGINE = mod;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  // ==========================================================================
+  // ICAO 9303 check-digit primitive (real algorithm, weights 7/3/1 mod 10)
+  // ==========================================================================
+  var WEIGHTS = [7, 3, 1];
+  function charValue(c) {
+    if (c >= "0" && c <= "9") return c.charCodeAt(0) - 48;
+    if (c >= "A" && c <= "Z") return c.charCodeAt(0) - 55; // A=10 .. Z=35
+    if (c === "<") return 0;
+    return null; // invalid MRZ character -> cannot score, fail closed
+  }
+  function mrzCheckDigit(field) {
+    var sum = 0;
+    for (var i = 0; i < field.length; i++) {
+      var v = charValue(field[i]);
+      if (v === null) return null;
+      sum += v * WEIGHTS[i % 3];
+    }
+    return String(sum % 10);
+  }
+  // A field that is entirely filler ('<') and whose printed check digit is
+  // also '<' is a documented real-world convention for "unused optional
+  // field" (some issuers skip computing a check digit for an empty personal-
+  // number field). Anywhere else, the digit must match exactly.
+  function checkDigitOk(field, digit) {
+    if (field.replace(/</g, "").length === 0 && digit === "<") return true;
+    var expect = mrzCheckDigit(field);
+    return expect !== null && expect === digit;
+  }
+
+  // ==========================================================================
+  // TD3 (passport, 2 lines x 44 chars) parser — the most common cross-border
+  // government photo-ID format the KYC flow's step 2 asks for.
+  // ==========================================================================
+  // --------------------------------------------------------------------------
+  // MRZ date semantics (ICAO 9303 §3 / §4 — the SAME 6-digit YYMMDD field
+  // encoding is used by TD1, TD2 AND TD3, so this primitive is the shared
+  // TD1/TD2/TD3 date validator; the TD1/TD2 structural parsers are not yet
+  // implemented here, but their date fields are byte-for-byte the same YYMMDD
+  // slices this function validates — see ocr-engine.test.mjs for the proof).
+  //
+  // Fail-closed calendar validity. Century is intentionally NOT known from a
+  // bare MRZ date, so the max-day table is the century-agnostic ceiling: Feb
+  // caps at 29 (a real day in leap years — it cannot be disproven without a
+  // century and is therefore NOT rejected here; the century-aware strict check
+  // in `resolveMrzYear` rejects a genuine Feb-29-in-a-non-leap-year once a
+  // concrete year is resolved for expiry). Everything genuinely impossible for
+  // ANY century — mm<1, mm>12, dd<1, dd>31, Feb 30/31, Apr/Jun/Sep/Nov 31 — is
+  // rejected outright (returns null), so no downstream layer ever trusts a
+  // calendar-impossible date.
+  // --------------------------------------------------------------------------
+  var MONTH_MAX_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  var EXPIRY_CENTURY_BASE = 2000; // in-circulation / recently-expired travel docs
+
+  function parseYyMmDd(s) {
+    if (!/^\d{6}$/.test(s)) return null;
+    var yy = s.slice(0, 2);
+    var mm = s.slice(2, 4);
+    var dd = s.slice(4, 6);
+    var m = parseInt(mm, 10);
+    var d = parseInt(dd, 10);
+    if (m < 1 || m > 12) return null; // impossible month (00, 13..99)
+    if (d < 1 || d > MONTH_MAX_DAYS[m - 1]) return null; // impossible day for that month
+    return { yy: yy, mm: mm, dd: dd };
+  }
+
+  // Resolve a validated {yy,mm,dd} to a concrete UTC instant at the END of that
+  // calendar day for a KNOWN century base, and re-check strict calendar
+  // validity now that the century is fixed (this is what catches Feb 29 in a
+  // non-leap year — JS Date would roll it over to Mar 1, which we detect and
+  // reject by returning null). Returns a Date, or null if the date does not
+  // exist in the resolved year (fail-closed).
+  function resolveMrzYear(ymd, centuryBase) {
+    if (!ymd) return null;
+    var year = centuryBase + parseInt(ymd.yy, 10);
+    var m = parseInt(ymd.mm, 10);
+    var d = parseInt(ymd.dd, 10);
+    var dt = new Date(Date.UTC(year, m - 1, d, 23, 59, 59, 999));
+    if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+      return null; // rolled over -> non-existent day in this concrete year
+    }
+    return dt;
+  }
+
+  // Coerce a caller-supplied "as-of" reference (Date | epoch-ms | ISO string)
+  // to epoch-ms, or null if absent/unparseable. No implicit clock is read here:
+  // expiry is only evaluated when the CALLER supplies a reference time, keeping
+  // this module purely deterministic (production callers pass `new Date()`).
+  function asOfToMs(asOf) {
+    if (asOf == null) return null;
+    if (asOf instanceof Date) return isNaN(asOf.getTime()) ? null : asOf.getTime();
+    if (typeof asOf === "number") return isFinite(asOf) ? asOf : null;
+    if (typeof asOf === "string") {
+      var t = Date.parse(asOf);
+      return isNaN(t) ? null : t;
+    }
+    return null;
+  }
+  function parseNameField(raw) {
+    var parts = raw.replace(/<+$/, "").split("<<");
+    var surname = (parts[0] || "").replace(/</g, " ").trim();
+    var given = (parts[1] || "").replace(/</g, " ").trim();
+    return { surname: surname, given: given };
+  }
+  function parseTd3(line1, line2, opts) {
+    opts = opts || {};
+    if (typeof line1 !== "string" || typeof line2 !== "string") return null;
+    if (line1.length !== 44 || line2.length !== 44) return null;
+    if (line1[0] !== "P") return null; // passport document code
+    if (!/^[A-Z<]{44}$/.test(line1) || !/^[A-Z0-9<]{44}$/.test(line2)) return null;
+
+    var issuingCountry = line1.slice(2, 5).replace(/</g, "");
+    var name = parseNameField(line1.slice(5, 44));
+
+    var docNumber = line2.slice(0, 9);
+    var docNumberCheck = line2[9];
+    var nationality = line2.slice(10, 13).replace(/</g, "");
+    var dob = line2.slice(13, 19);
+    var dobCheck = line2[19];
+    var sex = line2[20];
+    var expiry = line2.slice(21, 27);
+    var expiryCheck = line2[27];
+    var personalNumber = line2.slice(28, 42);
+    var personalNumberCheck = line2[42];
+    var compositeCheck = line2[43];
+    var compositeInput =
+      line2.slice(0, 10) + line2.slice(13, 20) + line2.slice(21, 28) + line2.slice(28, 43);
+
+    var checks = {
+      docNumber: checkDigitOk(docNumber, docNumberCheck),
+      dob: checkDigitOk(dob, dobCheck),
+      expiry: checkDigitOk(expiry, expiryCheck),
+      personalNumber: checkDigitOk(personalNumber, personalNumberCheck),
+      composite: checkDigitOk(compositeInput, compositeCheck),
+    };
+    // Calendar semantics: a check digit only proves the DIGITS transmitted
+    // intact — it says NOTHING about whether "749913" is a real date. So we
+    // additionally parse each date field for calendar validity (fail-closed:
+    // an impossible date -> null). `datesValid` folds into the gate below so a
+    // checksum-valid-but-calendar-garbage date can never be trusted.
+    var dobParsed = parseYyMmDd(dob);
+    var expiryParsed = parseYyMmDd(expiry);
+    var datesValid = dobParsed !== null && expiryParsed !== null;
+
+    // Expiry evaluation is opt-in via a caller-supplied `asOf` (keeps this
+    // deterministic — no hidden clock). When supplied, we resolve the expiry
+    // to a concrete year (2000+YY, the practical century for a travel document
+    // in or recently out of circulation), re-check strict calendar validity
+    // for that concrete year, and flag `expired` fail-closed.
+    var expired = null; // null = not evaluated (no reference time supplied)
+    var asOfMs = asOfToMs(opts.asOf);
+    if (asOfMs !== null && expiryParsed !== null) {
+      var expiryInstant = resolveMrzYear(expiryParsed, EXPIRY_CENTURY_BASE);
+      if (expiryInstant === null) {
+        datesValid = false; // e.g. Feb 29 in a non-leap resolved year
+      } else {
+        // Valid THROUGH the whole expiry day; expired strictly after it.
+        expired = asOfMs > expiryInstant.getTime();
+      }
+    }
+
+    // Fail-closed: the document-number, DOB, expiry, and composite check
+    // digits all have to agree, AND every date must be a real calendar date.
+    // (personalNumber's own check digit is reported but not gating on its own —
+    // real-world issuers are inconsistent about computing it for an optional
+    // field; the composite digit already covers the literal bytes of that
+    // field, so tampering there still trips `checks.composite`.)
+    var allValid =
+      checks.docNumber && checks.dob && checks.expiry && checks.composite && datesValid;
+
+    return {
+      format: "TD3",
+      issuingCountry: issuingCountry,
+      nationality: nationality,
+      documentNumber: docNumber.replace(/</g, ""),
+      surname: name.surname,
+      givenNames: name.given,
+      sex: sex === "<" ? null : sex,
+      dateOfBirth: dobParsed,
+      dateOfExpiry: expiryParsed,
+      personalNumber: personalNumber.replace(/</g, "") || null,
+      checks: checks,
+      datesValid: datesValid,
+      expired: expired, // true | false | null(not evaluated)
+      valid: allValid,
+    };
+  }
+
+  // Scan raw transcript text for a TD3 MRZ block (two consecutive 44-char
+  // lines). Returns null if none found — a document simply not containing an
+  // MRZ is not an error, just nothing to extract structurally.
+  function extractMrz(text, opts) {
+    if (typeof text !== "string") return null;
+    var lines = text
+      .split(/\r\n|\r|\n/)
+      .map(function (l) {
+        return l.trim().toUpperCase();
+      })
+      .filter(function (l) {
+        return l.length > 0;
+      });
+    for (var i = 0; i < lines.length - 1; i++) {
+      var td3 = parseTd3(lines[i], lines[i + 1], opts);
+      if (td3) return td3;
+    }
+    return null;
+  }
+
+  // ==========================================================================
+  // Structured-text adapter: plugs directly into the EXISTING grm-ocr seam
+  // contract (`{name, read(file)}` — see GRM_OCR.normalizeAdapter in
+  // index.html). Reads REAL bytes of a text-bearing File/Blob. Refuses images
+  // outright rather than fabricate a "read" of pixels it never inspected.
+  // ==========================================================================
+  function looksLikeImage(file) {
+    var t = (file && file.type) || "";
+    if (t) return /^image\//i.test(t);
+    var n = (file && file.name) || "";
+    return /\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff?)$/i.test(n);
+  }
+  function makeStructuredTextAdapter() {
+    return {
+      name: "structured-text",
+      read: async function (file) {
+        if (!file) throw new Error("no-file");
+        if (looksLikeImage(file)) {
+          // Honest refusal: raster pixel recognition is the pluggable
+          // boundary this module does not implement (see file header).
+          throw new Error(
+            "unsupported-raster-format: structured-text adapter does not perform pixel OCR; " +
+              "wire a real raster engine (Tesseract etc.) as window.Tesseract / window.PosternOcr"
+          );
+        }
+        if (typeof file.text === "function") return await file.text(); // real File/Blob bytes
+        if (typeof file.content === "string") return file.content; // plain test stand-in
+        throw new Error("unreadable-file");
+      },
+    };
+  }
+
+  // ==========================================================================
+  // Field extraction for the KYC flow — layered ABOVE the raw transcript.
+  // Fail-closed on low confidence: below-floor fields come back `null`, never
+  // silently proposed as if read with certainty. This is what should replace
+  // the UI's previous naive `firstLine(text)` guess (index.html step 2).
+  // ==========================================================================
+  var CONFIDENCE_FLOOR = 0.6;
+
+  // ID-document path: only trust fields pulled from a checksum-VALID MRZ
+  // block. A block that parses but fails its checksums is worse than no
+  // block at all (it looks plausible) — so it is reported invalid with EMPTY
+  // fields, never partially trusted.
+  function extractIdFields(text, opts) {
+    var mrz = extractMrz(text, opts);
+    if (!mrz) return { source: "none", valid: false, fields: {} };
+    // Fail-closed on BOTH a broken block (bad checksum / impossible date) and
+    // an EXPIRED document: an expired ID is genuine but no longer confers
+    // assurance, so it earns NO field credit (empty fields -> no LoA lift
+    // downstream, exactly like an invalid block). Expiry is only asserted when
+    // the caller supplied a reference time via opts.asOf; without one, expiry
+    // is not evaluated (mrz.expired === null) and only structural validity
+    // gates — production callers pass the current date to enforce expiry.
+    var expired = mrz.expired === true;
+    if (!mrz.valid || expired) {
+      return {
+        source: "mrz",
+        format: mrz.format,
+        valid: false,
+        expired: expired,
+        fields: {},
+        raw: mrz,
+      };
+    }
+    var officerName = [mrz.givenNames, mrz.surname].filter(Boolean).join(" ").trim();
+    return {
+      source: "mrz",
+      format: mrz.format,
+      valid: true,
+      expired: false,
+      fields: {
+        officerName: officerName ? { value: officerName, confidence: 1 } : null,
+        country: mrz.nationality ? { value: mrz.nationality, confidence: 1 } : null,
+        documentNumber: mrz.documentNumber ? { value: mrz.documentNumber, confidence: 1 } : null,
+      },
+      raw: mrz,
+    };
+  }
+
+  // Free-text authority-document path (articles / board resolution — not a
+  // standardized machine-readable format, so extraction is inherently
+  // probabilistic). Kept deliberately local/independent from the
+  // authoritative validator in <script id="grm-core"> — this is a candidate
+  // GUESS for the UI to pre-fill, always subject to G.validateOcrAgainstEntity
+  // and human review; it is never itself an assurance verdict.
+  var LEGAL_SUFFIX_RE =
+    /\b(inc|incorporated|corp|corporation|llc|ltd|limited|llp|gmbh|sa|sas|sarl|srl|spa|plc|bv|nv|pty|kg|sl|lp|pllc|pc)\b\.?/i;
+  var COUNTRY_CANDIDATES = [
+    "united states",
+    "usa",
+    "brazil",
+    "brasil",
+    "united kingdom",
+    "germany",
+    "france",
+    "canada",
+    "spain",
+    "portugal",
+    "netherlands",
+    "italy",
+    "ireland",
+    "australia",
+    "india",
+    "japan",
+    "china",
+    "mexico",
+    "switzerland",
+  ];
+
+  function scoreLegalNameLine(line) {
+    var t = String(line || "").trim();
+    if (!t || t.length > 120) return 0;
+    if (!LEGAL_SUFFIX_RE.test(t)) return 0;
+    var letters = t.replace(/[^A-Za-z]/g, "");
+    var upperRatio = letters.length ? letters.replace(/[^A-Z]/g, "").length / letters.length : 0;
+    var score = 0.55;
+    if (upperRatio > 0.9) score += 0.2; // ALL CAPS letterhead-style line
+    else if (/^[A-Z]/.test(t)) score += 0.1; // Title-cased
+    if (t.split(/\s+/).length <= 8) score += 0.1; // plausible name length, not a sentence
+    return Math.min(score, 0.95); // a heuristic alone never claims certainty
+  }
+  function scoreCountryLine(line) {
+    var t = String(line || "").trim();
+    var lower = t.toLowerCase();
+    if (!lower) return { value: null, score: 0 };
+    for (var i = 0; i < COUNTRY_CANDIDATES.length; i++) {
+      var c = COUNTRY_CANDIDATES[i];
+      if (lower === c) return { value: t, score: 0.9 }; // the whole line is just the country
+      if (new RegExp("\\b" + c + "\\b").test(lower)) return { value: t, score: 0.65 }; // embedded in a longer line
+    }
+    return { value: null, score: 0 };
+  }
+  function extractAuthorityDocFields(text) {
+    if (typeof text !== "string" || !text.trim()) return { fields: { legalName: null, country: null } };
+    var lines = text.split(/\r\n|\r|\n/);
+    var bestName = { value: null, score: 0 };
+    var bestCountry = { value: null, score: 0 };
+    lines.forEach(function (line) {
+      var s = scoreLegalNameLine(line);
+      if (s > bestName.score) bestName = { value: line.trim(), score: s };
+      var c = scoreCountryLine(line);
+      if (c.score > bestCountry.score) bestCountry = c;
+    });
+    return {
+      fields: {
+        legalName:
+          bestName.score >= CONFIDENCE_FLOOR
+            ? { value: bestName.value, confidence: bestName.score }
+            : null,
+        country:
+          bestCountry.score >= CONFIDENCE_FLOOR
+            ? { value: bestCountry.value, confidence: bestCountry.score }
+            : null,
+      },
+    };
+  }
+
+  // Unified entry point. Tries the ID-document MRZ path first (checksum-
+  // verified, confidence exactly 1 or nothing at all); falls back to the
+  // fail-closed authority-document heuristic. Never throws; never fabricates;
+  // always safe to call with untrusted/garbage text.
+  function extractFields(text, opts) {
+    opts = opts || {};
+    var id = extractIdFields(text, opts);
+    if (id.source === "mrz") return id; // report the ID-document outcome honestly, valid or not
+    if (opts.kind === "id") return id; // caller told us this was an ID read; nothing structural found
+    return { source: "heuristic", valid: null, fields: extractAuthorityDocFields(text).fields };
+  }
+
+  return {
+    mrzCheckDigit: mrzCheckDigit,
+    parseYyMmDd: parseYyMmDd, // shared TD1/TD2/TD3 date primitive (calendar-valid, fail-closed)
+    resolveMrzYear: resolveMrzYear,
+    parseTd3: parseTd3,
+    extractMrz: extractMrz,
+    extractIdFields: extractIdFields,
+    extractAuthorityDocFields: extractAuthorityDocFields,
+    extractFields: extractFields,
+    makeStructuredTextAdapter: makeStructuredTextAdapter,
+    CONFIDENCE_FLOOR: CONFIDENCE_FLOOR,
+  };
+});
+/* GRM-OCR-ENGINE-INLINE:END                                             */
+</script>
+
+<!-- ===================================================================== -->
+<!-- UI LAYER (browser only). Depends on GRM. Never in a network request:   -->
+<!-- images (local blobs) and OCR text. Submits only the minimal verdict.   -->
+<!-- ===================================================================== -->
+<script>
+(function(){
+  var G = window.GRM;
+  var esc = G.escapeHtml;       // ALL server/D&B-derived strings go through this before innerHTML
+  var entity = null;            // { legalName, country } from D&B resolve (entity data)
+  var validation = null;        // last on-device validation result
+  var $ = function(id){ return document.getElementById(id); };
+  function setStep(id,on){ var el=$(id); el.classList[on?"add":"remove"]("active"); }
+  // cls is always one of our own literals; txt may be server-derived -> escape.
+  function pill(cls,txt){ return '<span class="pill '+cls+'">'+esc(txt)+'</span>'; }
+
+  // ---- STEP 1: resolve entity (business data only) ----
+  $("resolveBtn").addEventListener("click", async function(){
+    var duns=($("duns").value||"").replace(/\D/g,"");
+    if(!/^\d{9}$/.test(duns)){ $("entityOut").innerHTML=pill("no","need 9 digits"); return; }
+    $("entityOut").textContent="Resolving…";
+    try{
+      var r=await fetch("/license/review",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({duns:duns,resolve:true})});
+      var j=await r.json();
+      if(!r.ok){ entity=null; $("entityOut").innerHTML=pill("no","refused")+" "+esc(j.error||("HTTP "+r.status)); return; }
+      entity={ legalName:(j.dnb&&j.dnb.legalName)||"", country:(j.dnb&&j.dnb.country)||"" };
+      var verified = j.dnb && j.dnb.verified;
+      // entity stays RAW for on-device matching; it is escaped at the render sink.
+      $("entityOut").innerHTML = (verified?pill("ok","D&B verified"):pill("prov","format-only (D&B unavailable)"))+
+        "<br><strong>"+esc(entity.legalName||"(name unavailable)")+"</strong> · "+esc(entity.country||"country unknown")+
+        "<br><span class='dim'>Compare your documents to this entity below — on this device.</span>";
+      setStep("s2",true);
+    }catch(e){ $("entityOut").innerHTML=pill("no","network error")+" "+esc(String(e)); }
+  });
+
+  // ---- image previews (LOCAL blobs; never uploaded) ----
+  function wirePreview(inputId,imgId){
+    $(inputId).addEventListener("change",function(){
+      var f=this.files&&this.files[0]; var img=$(imgId);
+      if(!f){ img.style.display="none"; return; }
+      img.src=URL.createObjectURL(f); img.style.display="block";
+    });
+  }
+  wirePreview("authImg","authPrev"); wirePreview("idImg","idPrev");
+
+  // ---- on-device OCR ----
+  // The document READER is pluggable and NOT bundled. If a self-hosted engine is
+  // present (window.Tesseract, or any window.PosternOcr adapter) it runs in-page,
+  // on-device; otherwise we fall back to honest MANUAL on-device entry. Either way
+  // the fail-closed validator + minimal-verdict flow is what earns assurance — a
+  // read is never fabricated and never lifts LoA on its own. See <script id="grm-ocr">.
+  var engine = window.GRM_OCR.makeOcrEngine(window.Tesseract || window.PosternOcr || null);
+  var NOTES = {
+    "no-engine":   "No on-device OCR engine detected — using <strong>manual on-device entry</strong>. Type what your documents show (this stays on your device). To auto-read, self-host a Tesseract WASM build and expose <code>window.Tesseract</code>.",
+    "no-file":     "Add your authority document image, then read — nothing was fabricated.",
+    "empty-read":  "The on-device engine returned no legible text — falling back to <strong>manual entry</strong>. Type what your documents show; nothing was guessed.",
+    "engine-error":"The on-device engine failed to read this image — falling back to <strong>manual entry</strong> (fail-closed). Type what your documents show."
+  };
+  $("ocrBtn").addEventListener("click", async function(){
+    $("fields").style.display="block"; setStep("s3",true);
+    var a=$("authImg").files[0], i=$("idImg").files[0];
+    var ra=await engine.read(a);
+    if(ra.manual){
+      $("ocrEngineNote").innerHTML = NOTES[ra.reason] || NOTES["no-engine"];
+      return; // no field is auto-filled — the user types the real values
+    }
+    $("ocrEngineNote").innerHTML="Read on-device via <code>"+esc(ra.engine)+"</code>. Review &amp; correct every field below — a read is not proof of authority.";
+    // naive field guesses from the real transcript; the user confirms/corrects.
+    $("fLegal").value=$("fLegal").value|| firstLine(ra.text);
+    // ID text (officer) — read separately, on-device
+    if(i){ var ri=await engine.read(i); if(!ri.manual && ri.text){ $("fOfficer").value=$("fOfficer").value|| firstLine(ri.text); } }
+  });
+  function firstLine(t){ return (String(t).split(/\n/).map(function(s){return s.trim();}).filter(Boolean)[0]||"").slice(0,120); }
+
+  // ---- STEP 3: validate ON-DEVICE ----
+  $("validateBtn").addEventListener("click", function(){
+    if(!entity){ $("valOut").innerHTML=pill("no","resolve the entity first"); return; }
+    var ocr={ legalName:$("fLegal").value, country:$("fCountry").value, officerName:$("fOfficer").value };
+    validation=G.validateOcrAgainstEntity(ocr,{ legalName:entity.legalName, country:entity.country });
+    var rows=["legalName","country"].map(function(k){
+      var d=validation.details[k]; var m=d&&d.matched;
+      return (m?pill("ok","match"):pill("no","no match"))+" "+k+(d?" <span class='dim'>("+d.score.toFixed(2)+")</span>":"");
+    }).join("<br>");
+    var pass=validation.requiredMatched;
+    $("valOut").innerHTML=rows+"<br><br>"+(pass?pill("ok","validated on-device"):pill("prov","not validated — no assurance credit"))+
+      "<br><span class='dim'>Unmatched fields earn no LoA credit (fail-closed). A document read is not proof of authority.</span>";
+    updatePayload();
+    setStep("s4",true);
+  });
+
+  // ---- STEP 4: build + submit MINIMAL verdict ----
+  function buildVerdict(){
+    var v=G.buildOcrVerdict(validation||{fieldsMatched:[],requiredMatched:false},{ liveness:$("liveness").checked });
+    return { duns:($("duns").value||"").replace(/\D/g,""), role:$("role").value, attestation:$("consent").checked, kyc:{ ocr:v } };
+  }
+  function updatePayload(){
+    var p=buildVerdict();
+    // show the EXACT bytes that will be sent — proof that no PII is in it
+    $("payloadPre").textContent=JSON.stringify(p,null,2);
+    $("submitBtn").disabled = !($("consent").checked && /^\d{9}$/.test(p.duns));
+  }
+  $("consent").addEventListener("change",updatePayload);
+  $("liveness").addEventListener("change",updatePayload);
+
+  $("submitBtn").addEventListener("click", async function(){
+    var payload=buildVerdict();
+    // client-side guard: NEVER include an image/text field, whatever the UI state.
+    // (the server tripwire enforces this too.)
+    $("verdictOut").textContent="Submitting minimal verdict…";
+    try{
+      var r=await fetch("/license/review",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+      var j=await r.json();
+      if(!r.ok){ $("verdictOut").innerHTML=pill("no","refused")+" "+esc(j.error||("HTTP "+r.status)); return; }
+      // decision/loa/assurance/methods/ref are server-derived -> escape at the sink.
+      var dec=j.decision, cls=dec==="pass"?"ok":dec==="provisional"?"prov":"no";
+      $("verdictOut").innerHTML=
+        '<div class="loa">LoA '+esc(j.loa)+'</div>'+pill(cls,dec)+' · '+esc(j.assurance)+
+        '<br><span class="dim">methods: '+esc((j.methods||[]).join(", "))+'</span>'+
+        '<br><br>Reference to hand to onboarding / <code>/license/master</code>:<pre>'+
+        esc(JSON.stringify({ kyc_ref:j.ref, duns:payload.duns },null,2))+'</pre>'+
+        '<span class="dim">Pass <code>{ kyc_ref }</code> when generating the master license; the server binds this verdict into the signed token by reference. A document read is not proof of authority.</span>';
+    }catch(e){ $("verdictOut").innerHTML=pill("no","network error")+" "+esc(String(e)); }
+  });
+})();
+</script>
+</body>
+</html>

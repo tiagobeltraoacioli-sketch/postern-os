@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-release — SHA256SUMS manifest + a detached HYBRID Falcon-1024‖ML-DSA-87
+# signature over it, for Postern release artifacts.
+#
+# STANDALONE WORKSPACE: its own (empty) [workspace] detaches it from the root
+# virtual workspace (whose `members` list is frozen/off-limits) — same pattern as
+# integration/interop-test, integration/pairing, integration/signer-protocol, and
+# mobile/signer. Cargo resolves this directory as a separate workspace root; the
+# root's `exclude` list does not need to (and does not) name this crate because it
+# is never path-depended-on by a root member.
+#
+# WHY A SEPARATE PQ SIGNATURE, NOT A REPLACEMENT: the repo's existing release
+# convention (enterprise/deployment/signing/{sign,verify}-build.sh, pmos-overlay's
+# publish flow) signs SHA256SUMS with minisign (Ed25519). This crate adds a SECOND,
+# post-quantum, detached signature over the SAME manifest bytes — it COMPLEMENTS
+# minisign, it does not replace it. Ship both; verify both.
+[package]
+name = "postern-release"
+version = "0.1.0"
+edition = "2021"
+description = "SHA256SUMS manifest builder + a detached HYBRID Falcon-1024 + ML-DSA-87 (AND-of-both) post-quantum signature over it, complementing (not replacing) the repo's existing minisign(Ed25519) release signature. UNAUDITED: pqcrypto-falcon wraps unaudited PQClean C, ml-dsa is pre-1.0. Proves origin+integrity only — not attestation, not reproducibility, not audit."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "postern_release"
+
+[[bin]]
+name = "postern-release"
+path = "src/bin/postern-release.rs"
+
+[dependencies]
+# Pure-Rust FIPS 204 ML-DSA (RustCrypto, Apache-2.0/MIT). Pre-1.0, UNAUDITED (see
+# crate-level docs). Default features (alloc + getrandom + pkcs8) give us ambient
+# keygen (`SigningKey::<MlDsa87>::generate()`); "zeroize" adds ZeroizeOnDrop on the
+# expanded signing key.
+ml-dsa = { version = "0.1", features = ["zeroize"] }
+# FIPS 205-era Falcon over PQClean's `clean` C implementation (Apache-2.0/MIT).
+# UNAUDITED: this wraps unaudited PQClean C, not a from-scratch Rust proof.
+pqcrypto-falcon = "0.4"
+pqcrypto-traits = "0.3"
+sha2 = "0.10"
+thiserror = "2"
+# OPTIONAL, feature-gated (see [features] below): awslabs/tough (MIT OR
+# Apache-2.0), a TUF (The Update Framework) client/metadata crate. Pulled in
+# ONLY behind `tuf-tough` as a reference/link-check import for `src/tuf.rs`'s
+# SCAFFOLD — this crate never drives `tough`'s network client, root rotation,
+# or signing ceremony. Default build does not compile or link it.
+tough = { version = "0.24.0", optional = true, default-features = false }
+# OPTIONAL, `tuf-tough`-gated only: `tough`'s public metadata structs are
+# typed over `jiff::Timestamp` (Unlicense OR MIT); needed to name/construct
+# that type directly (`Timestamp::UNIX_EPOCH`) when link-checking `tough`'s
+# `Root`/`Targets`/`Snapshot`/`Timestamp`. Not used anywhere in the default
+# build.
+jiff = { version = "0.2", optional = true }
+# OPTIONAL, `tuf-tough`-gated only: `tough::RepositoryLoader::new` takes
+# `url::Url` base URLs (MIT OR Apache-2.0). Used ONLY to construct a loader
+# against dummy `file://` URLs — `.load()` is never called, so no I/O of any
+# kind (network or filesystem) happens.
+url = { version = "2", optional = true }
+zeroize = "1"
+
+[dev-dependencies]
+# Only used by tests/roundtrip.rs to build a throwaway artifacts dir under a tmp
+# path — std::env::temp_dir() + manual cleanup would work too, but this keeps the
+# integration test honest about not leaking fixtures into the repo tree.
+tempfile = "3"
+
+# Detach from the root virtual workspace (its `members` list is frozen/off-limits).
+[workspace]
+
+[features]
+# TUF (`tough`) update-channel SCAFFOLD link-check. See `src/tuf.rs` module
+# docs: local role/threshold/expiry types build and test WITHOUT this
+# feature; enabling it additionally links `tough`'s real metadata/loader
+# types to prove they compile against this crate's TUF role shapes, with NO
+# network fetch and NO key ceremony performed anywhere in this crate.
+tuf-tough = ["dep:tough", "dep:jiff", "dep:url"]

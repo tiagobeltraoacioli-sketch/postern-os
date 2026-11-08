@@ -1,0 +1,161 @@
+{
+  "schema": "postern.repo/v1",
+  "repo": {
+    "name": "Example Journalist Kit",
+    "description": "A self-hosted third-party Postern repo — the A-repo-client.md §1.1 worked example.",
+    "address": "https://example.org/postern-repo",
+    "timestamp": 1783968827,
+    "pubkey_b64": "rGMxMlw1IPm1s18WGnkmmPXqa79P5iYdcSRgTDpkd24=",
+    "pq_pubkey_b64": null,
+    "mirrors": []
+  },
+  "honesty": "This is a self-hosted, third-party POC repo, not Postern's own catalog. Its index is signed by the key above; that signature proves authorship of these bytes, never the truth of any claim inside them.",
+  "vocab": {
+    "note": "unchanged from postern.catalog/v1 — omitted in this POC fixture for brevity"
+  },
+  "apps": [
+    {
+      "id": "organic-maps",
+      "name": "Organic Maps",
+      "publisher": "Organic Maps",
+      "category": "assistants",
+      "platform": "mobile",
+      "source": "fdroid",
+      "tier": "sloboda-compat",
+      "license": {
+        "spdx": "Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true
+      },
+      "distribution": {
+        "model": "link",
+        "hosted_by_us": false,
+        "upstream": "https://organicmaps.app/",
+        "checksum": null,
+        "signing": {
+          "state": "upstream"
+        }
+      },
+      "security": []
+    },
+    {
+      "id": "vault-mirror",
+      "name": "Postern Vault (mirror)",
+      "publisher": "Postern Labs",
+      "category": "security",
+      "platform": "both",
+      "source": "postern-apk",
+      "tier": "attestable-nix",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true
+      },
+      "distribution": {
+        "model": "mirror",
+        "hosted_by_us": true,
+        "upstream": "https://posternlabs.com/vault",
+        "checksum": "sha256:b827d98919459c8f995d9d2a584ef38e9ccdd7d1f49d19ec3b713ed4b4ff8599",
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@example.org",
+          "state": "published"
+        }
+      },
+      "security": [
+        "attestable",
+        "on-device-only"
+      ]
+    },
+    {
+      "id": "courier-mirror",
+      "name": "Postern Courier (mirror, bad checksum)",
+      "publisher": "Postern Labs",
+      "category": "files",
+      "platform": "both",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "license": {
+        "spdx": "MIT OR Apache-2.0",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://posternlabs.com/courier",
+        "checksum": "sha256:b827d98919459c8f995d9d2a584ef38e9ccdd7d1f49d19ec3b713ed4b4ff8599",
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "packages@example.org",
+          "state": "published"
+        }
+      },
+      "security": []
+    },
+    {
+      "id": "some-proprietary-app",
+      "name": "Some Proprietary App",
+      "publisher": "Some Vendor Inc.",
+      "category": "media",
+      "platform": "both",
+      "source": "web",
+      "tier": "browser",
+      "license": {
+        "spdx": "LicenseRef-Proprietary",
+        "class": "proprietary",
+        "foss": false,
+        "redistribute": false,
+        "rebrand": false
+      },
+      "distribution": {
+        "model": "mirror",
+        "hosted_by_us": true,
+        "upstream": "https://example.com/proprietary-app",
+        "checksum": "sha256:b827d98919459c8f995d9d2a584ef38e9ccdd7d1f49d19ec3b713ed4b4ff8599",
+        "signing": {
+          "scheme": "none",
+          "state": "unpublished"
+        }
+      },
+      "security": []
+    },
+    {
+      "id": "laundered-attestable-tool",
+      "name": "Definitely Attestable Tool (not really)",
+      "publisher": "Some Self-Hoster",
+      "category": "developer",
+      "platform": "desktop",
+      "source": "postern-apk",
+      "tier": "pmos-overlay",
+      "license": {
+        "spdx": "MIT",
+        "class": "permissive",
+        "foss": true,
+        "redistribute": true,
+        "rebrand": true
+      },
+      "distribution": {
+        "model": "overlay-build",
+        "hosted_by_us": true,
+        "upstream": "https://example.org/tool",
+        "checksum": null,
+        "signing": {
+          "scheme": "abuild-rsa",
+          "key_id": "self-hoster@example.org",
+          "state": "unpublished"
+        }
+      },
+      "security": [
+        "attestable",
+        "post-quantum"
+      ]
+    }
+  ]
+}

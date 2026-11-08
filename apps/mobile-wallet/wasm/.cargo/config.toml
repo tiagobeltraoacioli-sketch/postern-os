@@ -1,0 +1,17 @@
+# Build config for the wasm wallet crate.
+#
+# Target wasm32-wasip1: it is the ONLY wasm target on which the real pqcrypto
+# PQClean C (ML-DSA-65 + Falcon-1024) compiles here — its build scripts branch on
+# `target_os == "wasi"` to pick up the wasi-sysroot headers, and `libc` only
+# defines its C types (c_int/size_t) on wasi, not on wasm32-unknown-unknown.
+#
+# The PQClean C is compiled by the `cc` crate; Apple's system clang has no
+# WebAssembly backend, so build-wasm.sh points CC/AR at the wasi-sdk toolchain
+# and exports WASI_SDK_DIR (consumed by the pqcrypto build scripts' --sysroot).
+#
+# The resulting module imports a handful of wasi_snapshot_preview1 functions
+# (random_get, environ_*, fd_write, proc_exit); wallet-wasm.js provides a minimal
+# browser shim for them.
+
+[build]
+target = "wasm32-wasip1"

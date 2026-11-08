@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# noporis-bridge-glue — the NoporIS "Kalinov crossing" DATA-CROSSING glue.
+#
+# SCAFFOLD / reference-prototype — UNAUDITED. Certifies nothing.
+#
+# This crate is the net-new *glue* that carries an approved crossing's payload
+# between the two NoporIS personas (clean world <-> Google-Play world on ONE
+# handset) over the ALREADY-TESTED pairing channel's consent model. It does not
+# re-implement crypto, pairing, signing, or the gate. It CONSUMES, through their
+# PUBLIC APIs only:
+#
+#   * postern-pairing          — the PQ-hybrid (ML-KEM-1024‖X25519), SAS-anchored,
+#                                mutually-authenticated, replay-guarded `Channel`
+#                                (seal_frame -> transport -> open_frame; monotonic
+#                                counter, session-id + direction in the AAD) and
+#                                the `Transport` bearer seam + `PairingRecord`
+#                                (peer pin / revoke).
+#   * postern-signer-protocol  — the consent-model PRIMITIVES: `SessionId`,
+#                                `fresh_nonce()`, `RequestCounter` (monotonic),
+#                                and `ConsequenceTier` (how loud a crossing is).
+#                                The per-crossing replay guard here MIRRORS that
+#                                crate's `ReplayGuard` (its guard is typed to a
+#                                `SignRequest`, so a crossing needs its own).
+#
+# The N-GATE consent decision (Dev N-gate's `apps/noporis-gate/`, deny-by-default,
+# kill-switch, per-capability bridges) is CONSUMED via the `GateConsent` seam
+# trait — this crate never edits or owns that gate; the reference implementation
+# here is a clearly-labelled test/reference stand-in for it.
+#
+# RAILS (carry on every surface): reference-prototype, UNAUDITED; the Google-Play
+# persona is the LESS-PRIVATE side by construction; a rooted/kernel-compromised
+# host defeats every boundary here; the per-crossing gate is a userland,
+# in-process check, NOT an OS/kernel boundary; this is an app on stock Android,
+# NEVER "Postern OS"; the coin (BLCH) is not a security and buys no software.
+
+[package]
+name = "noporis-bridge-glue"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — unaudited NoporIS dual-persona DATA-CROSSING glue: carries an approved, per-capability crossing payload between two personas over the tested postern-pairing PQ-hybrid channel (fresh nonce + monotonic counter + session/peer binding, replay-guarded), gated by a live near-side grant AND the deny-by-default N-gate consent decision. Nothing crosses without a live grant. Not secure, not deployed."
+publish = false
+
+# Standalone by design (mirrors the sibling scaffolds): this crate owns its own
+# empty `[workspace]` so pointing at the integration crates by path does not fold
+# it into the ancestor bloch-protocol virtual workspace — it builds/tests alone.
+[workspace]
+
+[lib]
+name = "noporis_bridge_glue"
+path = "src/lib.rs"
+
+# The daemon/state-machine CLI entrypoint: what a real device's init/systemd
+# unit would exec. On host it runs entirely over the default `host-stub`
+# feature's in-memory seams (HostStubDpc/HostStubSloboda) — it never touches
+# Android/Waydroid. See `daemon` module + `src/bin/noporis-orchestrator.rs`.
+[[bin]]
+name = "noporis-orchestrator"
+path = "src/bin/noporis-orchestrator.rs"
+
+[features]
+# Default: compile the in-memory HOST substrate stubs (HostStubDpc /
+# HostStubSloboda) + their ergonomic `::new()` constructors + their unit tests so
+# `cargo test` stays offline-clean and green on macOS (Dev A / Dev E). The real
+# device seams (SlobodaCli, the JNI DpcSeam) are always compiled and are selected
+# by injecting them with `with_seam()`; they are not gated by this feature.
+default = ["host-stub"]
+host-stub = []
+
+[dependencies]
+# The two tested crates NoporIS consumes — public APIs only. Each carries its own
+# `[workspace]`, so a path dep does not pull it into this crate's workspace.
+postern-pairing = { path = "../../integration/pairing" }
+postern-signer-protocol = { path = "../../integration/signer-protocol" }
+# The ONE shared append-only, SHAKE-256 hash-chained audit trail (yagabona /
+# ezekiel1's extracted mechanism). The crossing audit ledger is CrossingRecord
+# over this — size + digest, never the bytes.
+postern-trail = { path = "../../crates/postern-trail" }
+
+# Ed25519 signatures for the ConsentRecord — pure-Rust RustCrypto/dalek, no
+# unsafe in our crate. REFERENCE: a classical key standing in for the near side's
+# real on-device PQ-hybrid signer; the near side is where PQ lives on a device.
+ed25519-dalek = "2"
+# OS entropy for minting a near-side signing key (same getrandom the pairing
+# crate uses under the hood).
+getrandom = "0.2"
+
+# Wire (de)serialization of the crossing envelope. Only PUBLIC crossing metadata
+# and the opaque capability payload ever appear here.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Domain-separated derivation of the 16-byte crossing session id FROM the pairing
+# transcript's 32-byte session id (so both personas agree without a new secret).
+sha2 = "0.10"
+# Compact hex encoding of the opaque payload on the wire.
+hex = "0.4"
+# Typed, fail-closed errors (house style).
+thiserror = "2"
+# Wipe crossed sensor/clipboard bytes from RAM on drop.
+zeroize = { version = "1", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+# Isolated audit trails / temp files in the audit + functional-proof tests.
+tempfile = "3"

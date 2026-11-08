@@ -1,0 +1,24 @@
+# tpm2/fixtures/pcr15_swtpm_three_event_replay.txt
+#
+# REAL fixture captured from `swtpm` 0.10.1 (software TPM emulator — NOT
+# hardware evidence; see ../README.md). Same capture session/method as
+# pcr16_swtpm_single_extend.txt (raw TPM2 command bytes, no tpm2-tools), this
+# time three sequential TPM2_PCR_Extend calls on PCR 15 (SHA-256 bank) to
+# exercise a multi-event REPLAY, not just a single extend — this is what a
+# verifier actually does against a measured-boot event log: recompute the
+# expected PCR from the log's claimed events, one extend at a time, and
+# compare against the log's own "final value" claim (never trust the log's
+# claim standalone).
+#
+# This proves: chaining `pcr_extend_sha256` three times over these three
+# event digests, starting from PCR15's all-zero reset value, reproduces
+# EXACTLY what this real (software) TPM computed internally across three
+# real TPM2_PCR_Extend calls.
+
+pcr_index=15
+hash_alg=sha256
+initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
+event_digest_1=19c0fadf920d2a018e0e3199fb2d3e9f50c3ccbd0e9503a71cf5cf23839a7c68
+event_digest_2=078dfc82a0dc078900ea0edcbe65c1e138b10b56a2d8204b62b3dd31c01692d8
+event_digest_3=1971bbe61e4ba6a834d57eac4c9d542fd6ffa503d24a6a0fc258df65d78f0473
+final_pcr=926d43623c8817d5ac4e842687cc86cba36fa3bafa74b056d59aa6deaaf92e7e

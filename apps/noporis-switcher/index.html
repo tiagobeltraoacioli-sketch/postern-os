@@ -1,0 +1,1342 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!-- ============================================================================
+     Strict CSP — defense-in-depth, NOT "security" on its own.
+
+     default-src 'none'   deny by default; every source is named below.
+     script-src 'unsafe-inline'   one hand-written inline <script> (the switcher
+         logic at the foot of this file). Kept inline so the app stays a single,
+         copy-verbatim, dependency-free file — the same shape as apps/postern-
+         sloboda-gate. This is defense-in-depth, not a security claim.
+     style-src 'unsafe-inline'   one hand-maintained <style> block. All dynamic
+         text is written via textContent, never innerHTML with user input.
+     img-src 'self' data:   inline SVG marks only.
+     connect-src 'none'   the switcher opens NO network. Zero telemetry, no
+         phone-home, no account. (The *Google-Play world it describes* phones
+         home to Google — that is the whole honest point of §NoporIS — but THIS
+         page never reaches the network.)
+     base-uri / form-action / frame-ancestors 'none'.
+     ============================================================================ -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'none'; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>NoporIS — the guarded bridge · persona switcher · Postern Labs</title>
+<!-- ============================================================================
+     ⚠  REFERENCE PROTOTYPE · UNAUDITED  ⚠
+     NoporIS — the persona SWITCHER + bridge panel (reference front-end).
+
+     WHAT THIS IS: a design-only, dependency-free, CSP-strict single-file UI for
+     the "guarded crossing" between two worlds that BOTH keep existing:
+       · POROG   — the guarded DOOR into the hardened world (managed profile on
+                   stock Android; key-attested device, not a measured-boot
+                   workspace; Tor-only). A different product.
+       · NOPORIS — the guarded BRIDGE (the Kalinov crossing) to a second persona:
+                   a Google-Play / business side. NON-ATTESTABLE by construction,
+                   badged "less private" everywhere it appears.
+
+     HONESTY RAILS baked into this file (see §rails in the script):
+       · The NoporIS/Google side is ALWAYS tier = non-attestable. No code path
+         gives it a Seal or a padlock it did not earn (mirrors gate-store.mjs).
+       · Every per-capability crossing (clipboard/files/mic/camera/location)
+         DEFAULTS TO DENY and is only ever open by an explicit, disclosed lever.
+       · Attestation is shown ONLY on the Porog side and ONLY where a real
+         Verdict::Genuine is possible — key-attested (device), NOT measured-boot
+         (workspace); the tier obtained is always named.
+       · One keyring, presented at ONE door at a time, each crossing named +
+         consented. There is NO master approval spanning both worlds.
+       · This is an app on STOCK ANDROID — never "Postern OS".
+       · Guardian is YAGABONA (coined mark), never the registered "Baba Yaga".
+       · Kalinov crossing kept NEUTRAL: a passage between two worlds that both
+         persist — NOT a journey to a "world of the dead".
+       · The coin (BLCH) is not a security, buys no software; personal use free.
+       · Google / Android / Google Play / Play Integrity are used nominatively to
+         name the real third-party system; no affiliation or endorsement implied,
+         and no fake attestation is asserted on their behalf.
+
+     UNBUILT: the on-device switcher, the two pairings, and the world-badged
+     signer prompt DO NOT EXIST YET. This page persists a mock state to
+     localStorage as a stand-in. Nothing here is audited or a security claim.
+     ============================================================================ -->
+<style>
+/* ============================================================
+   NOPORIS · Postern Labs — the guarded bridge.
+   Two-world palette, honest by construction:
+     · house base   — graphite / ink (shared with the gate + store)
+     · --porog      — warm ember/amber: the sealed, hardened DOOR side
+                      (echoes apps/izbushka's glowing-window gold)
+     · --river      — cool Smorodina slate-cyan: the app's own accent,
+                      the SPAN of the crossing itself (a bridge, not a door)
+     · --less       — caution ochre: the "less private" fact-badge worn by
+                      the Google-Play side wherever it appears
+   ============================================================ */
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #0c0f13;
+  --bg-glow:   #10161c;
+  --surface:   #13181f;
+  --surface-2: #19202a;
+  --surface-3: #212a35;
+  --border:    #29333f;
+  --border-hi: #3a4653;
+  --text:      #eceaf0;
+  --text-dim:  #aeb2bd;
+  --muted:     #7d8492;
+
+  --river:     #52b5cf;   /* the span — the app's own accent */
+  --river-hi:  #74cfe6;
+  --river-dim: #2f7d92;
+  --river-ink: #05171d;
+
+  --porog:     #f2c14e;   /* the door — sealed, hardened, warm ember */
+  --porog-hi:  #ffd671;
+  --porog-dim: #b98f2f;
+
+  --less:      #d98a3d;   /* the "less private" caution badge */
+  --less-hi:   #e8a45c;
+
+  --live:      #e4574f;   /* mic/cam hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.5);
+  --radius: 14px;
+}
+:root[data-theme="light"] {
+  --bg:        #eef1f4;
+  --bg-glow:   #f6f8fa;
+  --surface:   #fbfcfd;
+  --surface-2: #eef1f5;
+  --surface-3: #e3e8ee;
+  --border:    #d5dce3;
+  --border-hi: #bcc6d0;
+  --text:      #171c22;
+  --text-dim:  #47505b;
+  --muted:     #6f7885;
+
+  --river:     #1f7d95;
+  --river-hi:  #12617a;
+  --river-dim: #6fb3c5;
+  --river-ink: #f2fbfe;
+
+  --porog:     #a9781a;
+  --porog-hi:  #855c0c;
+  --porog-dim: #c19a4b;
+
+  --less:      #a85a1c;
+  --less-hi:   #8a4712;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(40,52,64,.15);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#eef1f4; --bg-glow:#f6f8fa; --surface:#fbfcfd; --surface-2:#eef1f5;
+    --surface-3:#e3e8ee; --border:#d5dce3; --border-hi:#bcc6d0;
+    --text:#171c22; --text-dim:#47505b; --muted:#6f7885;
+    --river:#1f7d95; --river-hi:#12617a; --river-dim:#6fb3c5; --river-ink:#f2fbfe;
+    --porog:#a9781a; --porog-hi:#855c0c; --porog-dim:#c19a4b;
+    --less:#a85a1c; --less-hi:#8a4712;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(40,52,64,.15);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  background: radial-gradient(1100px 520px at 50% -160px, var(--bg-glow), transparent 70%), var(--bg);
+  color: var(--text); min-height: 100vh; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--river); color: var(--river-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 940px; margin: 0 auto; padding: 0 20px; }
+h1,h2,h3 { font-weight: 650; }
+code { font-family: var(--font-mono); font-size: .92em; color: var(--river); }
+
+/* ---------- forced-honesty strip ---------- */
+.unbuilt {
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+}
+.unbuilt .wrap { display: flex; gap: 10px; align-items: center; padding: 7px 20px; flex-wrap: wrap; }
+.unbuilt .tag {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  background: var(--warn); color: #1a1206; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.unbuilt .txt { font-size: 12px; color: var(--text-dim); }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; flex-wrap: wrap; }
+.wordmark {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 700;
+  letter-spacing: .2em; color: var(--text); user-select: none;
+  background: none; border: none; padding: 0; white-space: nowrap;
+}
+.wordmark .tick { color: var(--river); }
+.byline {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+  border-left: 1px solid var(--border); padding-left: 12px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border); border-radius: 9px;
+  padding: 6px 11px; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .06em; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+
+/* ---------- design note ---------- */
+.draft {
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  border-radius: var(--radius); padding: 13px 16px; margin: 18px 0 6px;
+  font-size: 13px; color: var(--text-dim); line-height: 1.6;
+}
+.draft b { color: var(--warn); font-family: var(--font-mono); letter-spacing: .05em;
+  text-transform: uppercase; font-size: 11px; }
+
+/* ---------- hero ---------- */
+.hero { text-align: center; padding: 24px 0 4px; }
+.hero h1 { margin: 0 0 8px; font-size: 25px; letter-spacing: -.01em; }
+.hero h1 .door { color: var(--porog); }
+.hero h1 .span { color: var(--river); }
+.hero p.sub { margin: 0 auto; max-width: 660px; color: var(--text-dim); font-size: 14.5px; }
+.hero .quote { margin: 12px auto 0; color: var(--muted); font-style: italic; font-size: 13px; max-width: 640px; }
+
+/* ---------- section head ---------- */
+.sec-head { display: flex; align-items: baseline; gap: 10px; padding: 26px 0 10px; }
+.sec-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.sec-head .spacer { flex: 1; }
+
+/* ============================================================
+   THE TWO-WORLDS STAGE (the switcher)
+   ============================================================ */
+.stage {
+  display: grid;
+  grid-template-columns: 1fr minmax(120px, 200px) 1fr;
+  gap: 0; align-items: stretch;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow); overflow: hidden;
+}
+@media (max-width: 720px) { .stage { grid-template-columns: 1fr; } }
+
+.world { padding: 20px 20px 18px; display: flex; flex-direction: column; gap: 12px; position: relative; }
+.world.porog {
+  background:
+    radial-gradient(420px 240px at 20% -40px, color-mix(in srgb, var(--porog) 12%, transparent), transparent 70%),
+    var(--surface);
+  border-right: 1px solid var(--border);
+}
+.world.nopor {
+  background:
+    radial-gradient(420px 240px at 80% -40px, color-mix(in srgb, var(--less) 10%, transparent), transparent 70%),
+    var(--surface-2);
+  border-left: 1px solid var(--border);
+}
+.world.dim { opacity: .58; filter: saturate(.7); }
+.world .w-top { display: flex; align-items: center; gap: 9px; }
+.world .w-emblem { width: 30px; height: 30px; flex: none; }
+.world .w-name { font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: .16em; }
+.world.porog .w-name { color: var(--porog); }
+.world.nopor .w-name { color: var(--river-hi); }
+.world .w-kind { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); margin-left: auto; }
+.world .w-tag { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin: 0; }
+
+/* honest badges */
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge {
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: .08em;
+  padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border);
+  color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+}
+.badge.devicekey { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); }
+.badge.tor      { color: var(--porog); border-color: color-mix(in srgb, var(--porog) 50%, var(--border)); }
+.badge.sealed   { color: var(--porog-hi); border-color: color-mix(in srgb, var(--porog) 45%, var(--border)); }
+.badge.less     { color: var(--less-hi); border-color: color-mix(in srgb, var(--less) 55%, var(--border));
+  background: color-mix(in srgb, var(--less) 10%, transparent); }
+.badge.nonattest{ color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.badge.phone    { color: var(--text-dim); }
+
+/* live pill */
+.live-pill {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted);
+}
+.world.live .live-pill { color: var(--river-ink); background: var(--river); border-color: var(--river); }
+.world.porog.live .live-pill { color: var(--river-ink); background: var(--porog); border-color: var(--porog); }
+
+.w-actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+.btn-door {
+  background: color-mix(in srgb, var(--porog) 16%, var(--surface)); border: 1px solid var(--porog);
+  color: var(--porog-hi); border-radius: 10px; padding: 10px 16px; font-size: 13.5px; font-weight: 650; flex: 1;
+}
+.btn-door:hover { background: color-mix(in srgb, var(--porog) 26%, var(--surface)); }
+.btn-span {
+  background: color-mix(in srgb, var(--river) 16%, var(--surface)); border: 1px solid var(--river);
+  color: var(--river-hi); border-radius: 10px; padding: 10px 16px; font-size: 13.5px; font-weight: 650; flex: 1;
+}
+.btn-span:hover { background: color-mix(in srgb, var(--river) 26%, var(--surface)); }
+.btn-back {
+  background: transparent; border: 1px solid var(--border-hi); color: var(--text-dim);
+  border-radius: 10px; padding: 10px 14px; font-size: 13px;
+}
+.btn-back:hover { border-color: var(--river); color: var(--text); }
+
+/* ---------- the crossing (center column) ---------- */
+.crossing {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px 8px; background: var(--surface-3);
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+@media (max-width: 720px) { .crossing { border: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); } }
+.keyring-note {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); text-align: center; line-height: 1.5;
+}
+.span-wrap { width: 100%; height: 92px; position: relative; display: flex; align-items: center; justify-content: center; }
+.span-svg { width: 100%; height: 92px; }
+/* the deck of the bridge extends when a crossing opens */
+.deck { transform-origin: center; transition: transform .5s ease, opacity .4s ease; }
+.span-wrap[data-open="0"] .deck { transform: scaleX(.06); opacity: .35; }
+.span-wrap[data-open="1"] .deck { transform: scaleX(1); opacity: 1; }
+.span-wrap[data-side="porog"] .keytok { transform: translateX(-30px); }
+.span-wrap[data-side="nopor"] .keytok { transform: translateX(30px); }
+.keytok { transition: transform .5s ease; }
+.span-label {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--river-hi); text-align: center;
+}
+.span-wrap[data-open="0"] ~ .span-label { color: var(--muted); }
+
+/* ============================================================
+   status line under the stage
+   ============================================================ */
+.statusline {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 0;
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; background: var(--surface-2);
+  font-size: 12.5px; color: var(--text-dim);
+}
+.statusline .dotk { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.statusline[data-live="porog"] .dotk { background: var(--porog); }
+.statusline[data-live="nopor"] .dotk { background: var(--river); }
+.statusline b { color: var(--text); }
+.statusline .ks { margin-left: auto; }
+
+/* ============================================================
+   shared cards / boxes
+   ============================================================ */
+.card {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px 22px; margin-bottom: 16px;
+}
+.card > h3.card-h {
+  margin: 0 0 6px; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--river-hi); font-weight: 700;
+}
+.card p.lead { margin: 0 0 10px; font-size: 14px; color: var(--text-dim); }
+
+.warnbox, .refusebox, .okbox {
+  border-radius: 10px; padding: 12px 14px; margin: 10px 0; font-size: 13px; line-height: 1.58;
+}
+.warnbox { border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); }
+.warnbox strong, .warnbox b { color: var(--warn); }
+.refusebox { border: 1px solid color-mix(in srgb, var(--err) 48%, var(--border)); background: color-mix(in srgb, var(--err) 8%, var(--surface)); }
+.refusebox strong, .refusebox b { color: var(--err); }
+.okbox { border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--border)); background: color-mix(in srgb, var(--ok) 8%, var(--surface)); }
+.okbox strong, .okbox b { color: var(--ok); }
+.fact-t { display: block; margin-bottom: 3px; font-weight: 600; }
+
+.standin {
+  border: 1px dashed var(--border-hi); border-radius: 10px; padding: 9px 12px; margin: 12px 0 2px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.65; color: var(--muted);
+}
+.standin b { color: var(--river); font-weight: 600; }
+
+/* ============================================================
+   attestation panel (Porog only, honest)
+   ============================================================ */
+.seal {
+  display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); padding: 14px 16px;
+}
+.seal-mark { width: 46px; height: 46px; flex: none; }
+.seal .verdict { font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: .06em; }
+.seal[data-v="genuine"] .verdict { color: var(--ok); }
+.seal[data-v="unverified"] .verdict { color: var(--warn); }
+.seal .vsub { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+.seal .vmeta { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+
+/* ============================================================
+   bridge ledger (guarded crossing) — mirrors the gate
+   ============================================================ */
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 8px 0 4px; }
+.bridge { display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: start;
+  padding: 14px; border-bottom: 1px solid var(--border); }
+.bridge:last-child { border-bottom: 0; }
+.bridge .b-t { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.bridge .b-d { font-size: 12.6px; color: var(--text-dim); line-height: 1.55; }
+.bridge .b-risk { font-size: 12.2px; color: var(--muted); margin-top: 4px; }
+.bridge .b-risk b { color: var(--warn); }
+.bridge .b-sub { margin-top: 8px; display: none; }
+.bridge[data-on="1"] .b-sub { display: block; }
+.bridge .b-sub label { font-size: 12.5px; margin-right: 14px; cursor: pointer; }
+.bridge .b-sub input { accent-color: var(--river); }
+
+.sw { position: relative; width: 46px; height: 26px; flex: none; align-self: center; }
+.sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.sw .track { position: absolute; inset: 0; border-radius: 999px; background: var(--surface-3);
+  border: 1px solid var(--border-hi); transition: background .15s, border-color .15s; }
+.sw .knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--muted); transition: transform .15s, background .15s; }
+.sw input:checked + .track { background: color-mix(in srgb, var(--river) 30%, var(--surface)); border-color: var(--river); }
+.sw input:checked + .track .knob { transform: translateX(20px); background: var(--river); }
+.sw input:disabled + .track { opacity: .4; }
+.sw input:focus-visible + .track { outline: 2px solid var(--river); outline-offset: 2px; }
+
+/* in-bridge indicator */
+.indicator {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--less) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--less) 45%, var(--border));
+  border-radius: 12px; padding: 9px 12px; margin-bottom: 14px;
+}
+.indicator .core { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: .08em; color: var(--less-hi); }
+.dots { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.dot { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em;
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted); background: var(--surface-2); }
+.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--border-hi); }
+.dot[data-on="1"] { color: var(--river-hi); border-color: color-mix(in srgb, var(--river) 50%, var(--border)); }
+.dot[data-on="1"]::before { background: var(--river); }
+.dot[data-live="1"] { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+.dot[data-live="1"]::before { background: var(--live); animation: blink 1s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.indicator .kill { margin-left: auto; }
+
+/* ============================================================
+   signer — two pairings, one keyring
+   ============================================================ */
+.pairgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .pairgrid { grid-template-columns: 1fr; } }
+.pair { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; background: var(--surface-2); }
+.pair.porog { border-color: color-mix(in srgb, var(--porog) 40%, var(--border)); }
+.pair.nopor { border-color: color-mix(in srgb, var(--river) 40%, var(--border)); }
+.pair .p-name { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin-bottom: 2px; }
+.pair.porog .p-name { color: var(--porog); }
+.pair.nopor .p-name { color: var(--river-hi); }
+.pair .p-peer { font-size: 13px; color: var(--text); margin-bottom: 6px; }
+.pair .p-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); line-height: 1.6; word-break: break-all; }
+.pair .p-actions { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+.pair.unpaired { opacity: .6; }
+.pair.unpaired .p-actions { display: none; }
+.btn-mini { background: transparent; border: 1px solid var(--border-hi); color: var(--text-dim);
+  border-radius: 8px; padding: 6px 10px; font-family: var(--font-mono); font-size: 11px; }
+.btn-mini:hover { border-color: var(--river); color: var(--text); }
+.btn-mini.danger { border-color: color-mix(in srgb, var(--err) 55%, var(--border)); color: var(--err); }
+.btn-mini.danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); border-color: var(--err); }
+
+/* signer prompt card (world-badged WYSIWYS) */
+.sim-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 12px; }
+.sim-row .lbl { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.wys {
+  border: 1px solid var(--border-hi); border-radius: 12px; overflow: hidden; background: var(--surface);
+}
+.wys .wys-chrome {
+  display: flex; align-items: center; gap: 9px; padding: 10px 14px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.wys[data-world="porog"] .wys-chrome { background: color-mix(in srgb, var(--porog) 12%, var(--surface)); }
+.wys[data-world="nopor"] .wys-chrome { background: color-mix(in srgb, var(--less) 12%, var(--surface)); }
+.wys .wys-world { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.wys[data-world="porog"] .wys-world { color: var(--porog); }
+.wys[data-world="nopor"] .wys-world { color: var(--less-hi); }
+.wys .wys-body { padding: 14px 16px 16px; }
+.wys .wys-tier { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px; }
+.wys .wys-sentence { font-size: 14.5px; color: var(--text); line-height: 1.5; margin: 0 0 10px; }
+.wys .wys-funds { font-family: var(--font-mono); font-size: 11.5px; padding: 6px 10px; border-radius: 8px;
+  display: inline-block; margin-bottom: 10px; }
+.wys .wys-funds[data-move="0"] { color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.wys .wys-funds[data-move="1"] { color: var(--err); border: 1px solid color-mix(in srgb, var(--err) 45%, var(--border)); }
+.wys .wys-frag { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.wys .wys-frag b { color: var(--river-hi); letter-spacing: .18em; }
+.wys .wys-confirm { display: flex; gap: 9px; margin-top: 12px; }
+.wys .wys-approve { flex: 1; border-radius: 10px; padding: 10px; font-weight: 650; font-size: 13.5px;
+  border: 1px solid var(--river); background: color-mix(in srgb, var(--river) 18%, var(--surface)); color: var(--river-hi); }
+.wys .wys-approve[data-move="1"] { border-color: var(--err); background: color-mix(in srgb, var(--err) 14%, var(--surface)); color: var(--err); }
+.wys .wys-decline { border-radius: 10px; padding: 10px 14px; font-size: 13.5px;
+  border: 1px solid var(--border-hi); background: transparent; color: var(--text-dim); }
+
+/* ---------- checklist ---------- */
+.checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.checklist li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 13.5px; color: var(--text-dim); line-height: 1.55; }
+.checklist .mk { color: var(--warn); font-family: var(--font-mono); font-weight: 700; text-align: center; }
+.checklist b { color: var(--text); }
+
+/* ---------- narrative ---------- */
+.about-body p { font-size: 14px; color: var(--text-dim); margin: 0 0 12px; }
+.about-body b { color: var(--text); }
+.about-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+  border-top: 1px solid var(--border); padding-top: 12px; line-height: 1.7; margin-top: 6px; }
+
+/* ---------- hold-to-cross button ---------- */
+.hold { position: relative; overflow: hidden;
+  border: 1px solid var(--river); background: color-mix(in srgb, var(--river) 16%, var(--surface));
+  color: var(--river-hi); border-radius: 10px; padding: 11px 20px; font-size: 14px; font-weight: 650;
+  touch-action: none; user-select: none; }
+.hold[disabled] { opacity: .4; cursor: not-allowed; }
+.hold .fill { position: absolute; inset: 0; width: 0; background: var(--river); z-index: 0;
+  transition: width 1.1s linear; opacity: .9; }
+.hold.holding .fill { width: 100%; }
+.hold .lbl { position: relative; z-index: 1; }
+.hold.holding .lbl { color: var(--river-ink); }
+
+/* ---------- modal ---------- */
+.modal-back { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(0,0,0,.58); backdrop-filter: blur(3px); }
+.modal-back[data-open="1"] { display: flex; }
+.modal { width: 100%; max-width: 520px; border: 1px solid var(--border-hi); background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; max-height: 88vh; overflow-y: auto; }
+.modal h3 { margin: 0 0 8px; font-size: 17px; }
+.modal .subhead { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-dim); margin: 16px 0 8px; }
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--river); background: color-mix(in srgb, var(--river) 7%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--river); flex: none; }
+.radio-card .rc-t { font-size: 13.8px; font-weight: 600; }
+.radio-card .rc-d { font-size: 12.5px; color: var(--muted); }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.btn-ghost { background: transparent; border: 1px solid var(--border-hi); color: var(--text);
+  border-radius: 10px; padding: 11px 18px; font-size: 14px; font-weight: 550; }
+.btn-ghost:hover { border-color: var(--river); }
+.btn-danger { background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 11px 16px; font-size: 14px; }
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.tiny { font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+
+footer.site { padding: 20px 0 30px; text-align: center; font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; line-height: 1.8; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 620px) { .byline { display: none; } .hero h1 { font-size: 20px; } }
+</style>
+</head>
+
+<body data-live="none">
+
+<!-- forced honesty: reference prototype, unaudited -->
+<div class="unbuilt" role="note">
+  <div class="wrap">
+    <span class="tag">REFERENCE PROTOTYPE · UNAUDITED</span>
+    <span class="txt">Design-only UI. The on-device switcher, the two pairings, and the world-badged signer prompt do not exist yet. Nothing here is audited or a security claim.</span>
+  </div>
+</div>
+
+<header class="site">
+  <div class="wrap site-inner">
+    <button class="wordmark" id="btnHome" aria-label="NoporIS — the guarded bridge">NOPOR<span class="tick">·</span>IS</button>
+    <span class="byline">Postern Labs · the guarded bridge · Kalinov crossing</span>
+    <div class="site-actions">
+      <button class="hbtn" id="btnReset" title="Reset the mock state">Reset</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="draft" role="note">
+    <b>Design note</b> &nbsp; NoporIS is the guarded <b style="text-transform:none;font-size:13px;color:var(--river-hi)">bridge</b> — a
+    <em>controlled</em> crossing between two worlds that <b style="text-transform:none;font-size:13px;color:var(--text)">both keep existing</b>:
+    your personal side and a second persona (business, or a Google-Play-enabled side). It is a different shape from
+    <b style="text-transform:none;font-size:13px;color:var(--porog)">Porog</b>, the guarded <em>door</em> into the hardened world.
+    Door and bridge are two products that share one signer core and never merge their trust boundaries. Every mechanism below is
+    either a shipped scaffold or a design spec — labelled as such — on <b style="text-transform:none;font-size:13px;color:var(--text)">stock Android</b>, never "Postern&nbsp;OS".
+  </div>
+
+  <section class="hero">
+    <h1>One keyring. A <span class="door">door</span> on one side, a <span class="span">bridge</span> on the other.</h1>
+    <p class="sub">Porog is a room you are <em>in</em> or <em>out</em> of — one threshold, sealed, Tor-only. NoporIS is a span you
+    <em>stand on</em> to reach the other side, where both worlds keep running. You choose which side is live, and exactly what crosses.</p>
+    <p class="quote">"The Kalinov crossing is <em>held</em>, not opened. Passage is deliberate — that control is the product."</p>
+  </section>
+
+  <!-- ============================================================
+       THE SWITCHER — two worlds stage
+       ============================================================ -->
+  <div class="sec-head"><h2>The crossing</h2><span class="spacer"></span></div>
+  <div class="stage" id="stage">
+
+    <!-- POROG (door) -->
+    <section class="world porog" id="worldPorog" aria-label="Porog — the guarded door">
+      <div class="w-top">
+        <svg class="w-emblem" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="6" y="4" width="20" height="24" rx="2" fill="none" stroke="var(--porog)" stroke-width="1.6"/>
+          <rect x="9.5" y="10" width="8" height="12" rx="1" fill="color-mix(in srgb, var(--porog) 30%, transparent)" stroke="var(--porog)" stroke-width="1.2"/>
+          <circle cx="15.5" cy="16" r="1.1" fill="var(--porog-hi)"/>
+        </svg>
+        <span class="w-name">POROG</span>
+        <span class="w-kind">the door</span>
+        <span class="live-pill" id="porogLive">at rest</span>
+      </div>
+      <p class="w-tag">The guarded <b style="color:var(--porog)">door</b> into the hardened world — an AOSP managed profile on the phone you already own. Cross the threshold once; inside, comms, keys and wallet are sealed off and Tor-only.</p>
+      <div class="badges">
+        <span class="badge sealed">◆ SEALED PROFILE</span>
+        <span class="badge tor">TOR-ONLY</span>
+        <!-- KEY-ATTESTED = key-attested device, not a measured-boot workspace: it attests the phone's keystore, never the container. -->
+        <span class="badge devicekey" id="porogAttBadge">KEY-ATTESTED</span>
+      </div>
+      <div class="w-actions">
+        <button class="btn-door" id="crossThreshold"><span id="thresholdLbl">Cross the threshold</span></button>
+        <button class="btn-back" id="leavePorog" hidden>Close the door</button>
+      </div>
+    </section>
+
+    <!-- CROSSING (center) -->
+    <div class="crossing">
+      <div class="keyring-note">one keyring<br>presented at one<br>door at a time</div>
+      <div class="span-wrap" id="spanWrap" data-open="0" data-side="mid">
+        <svg class="span-svg" viewBox="0 0 200 92" aria-hidden="true" preserveAspectRatio="none">
+          <!-- far banks -->
+          <line x1="0" y1="58" x2="34" y2="58" stroke="var(--porog)" stroke-width="2.4"/>
+          <line x1="166" y1="58" x2="200" y2="58" stroke="var(--river)" stroke-width="2.4"/>
+          <!-- the deck (extends on crossing) -->
+          <g class="deck">
+            <line x1="34" y1="58" x2="166" y2="58" stroke="var(--river-hi)" stroke-width="2.6"/>
+            <path d="M34 58 Q100 20 166 58" fill="none" stroke="var(--river)" stroke-width="1.6" opacity=".8"/>
+            <line x1="60" y1="58" x2="72" y2="40" stroke="var(--river-dim)" stroke-width="1"/>
+            <line x1="100" y1="58" x2="100" y2="30" stroke="var(--river-dim)" stroke-width="1"/>
+            <line x1="140" y1="58" x2="128" y2="40" stroke="var(--river-dim)" stroke-width="1"/>
+          </g>
+          <!-- the keyring token -->
+          <g class="keytok">
+            <circle cx="100" cy="58" r="6.5" fill="none" stroke="var(--porog-hi)" stroke-width="2"/>
+            <circle cx="100" cy="58" r="2" fill="var(--porog-hi)"/>
+            <line x1="100" y1="64.5" x2="100" y2="70" stroke="var(--porog-hi)" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+      <div class="span-label" id="spanLabel">span retracted</div>
+    </div>
+
+    <!-- NOPORIS (bridge → Google-Play side) -->
+    <section class="world nopor" id="worldNopor" aria-label="NoporIS — the guarded bridge to the Google-Play side">
+      <div class="w-top">
+        <svg class="w-emblem" viewBox="0 0 32 32" aria-hidden="true">
+          <line x1="3" y1="22" x2="10" y2="22" stroke="var(--river)" stroke-width="1.6"/>
+          <line x1="22" y1="22" x2="29" y2="22" stroke="var(--river)" stroke-width="1.6"/>
+          <path d="M10 22 Q16 9 22 22" fill="none" stroke="var(--river-hi)" stroke-width="1.6"/>
+          <line x1="13" y1="17.5" x2="13" y2="22" stroke="var(--river-dim)" stroke-width="1"/>
+          <line x1="19" y1="17.5" x2="19" y2="22" stroke="var(--river-dim)" stroke-width="1"/>
+        </svg>
+        <span class="w-name">NOPORIS</span>
+        <span class="w-kind">the bridge</span>
+        <span class="live-pill" id="noporLive">at rest</span>
+      </div>
+      <p class="w-tag">A guarded <b style="color:var(--river-hi)">bridge</b> to a second persona — a Google-Play / business side. It is a real Google-Android system and the <b style="color:var(--less-hi)">less-private</b> side of your device: it phones home to Google. That convenience is the point, and the cost.</p>
+      <div class="badges">
+        <span class="badge less">LESS PRIVATE</span>
+        <span class="badge nonattest">tier = non-attestable</span>
+        <span class="badge phone">phones home to Google</span>
+      </div>
+      <div class="w-actions">
+        <button class="btn-span" id="crossBridge">Cross the bridge…</button>
+        <button class="btn-back" id="leaveNopor" hidden>Step off the span</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- status line -->
+  <div class="statusline" id="statusline" data-live="none" role="status" aria-live="polite">
+    <span class="dotk" aria-hidden="true"></span>
+    <span id="statusText">At rest. The keyring is presented at neither door. No world is live.</span>
+    <button class="btn-back ks" id="killStatus" hidden>Kill-switch: drop the span</button>
+  </div>
+
+  <p class="standin" style="margin-top:14px">
+    <span>Code-true seam: the switcher never signs. It sets a local posture and lets the phone's <b>postern-sdk</b> serve a terminal in <b>one</b> world at a time. Porog ⇒ managed profile + <b>seal::verify_report</b> (fail-closed). NoporIS ⇒ the guarded bridge on stock Android, gated by <b>apps/noporis-gate/gate-store.mjs</b> (schema <code>postern.noporis-gate.state</code>, tier pinned non-attestable, <code>crossings.*</code> default DENY) and <b>postern-policy</b> (Decision default = Deny). Two apps, two folklore shapes, one shared keyring.</span>
+  </p>
+
+  <!-- ============================================================
+       ATTESTATION — shown ONLY where it is true (Porog)
+       ============================================================ -->
+  <div class="sec-head"><h2>Attestation — shown where it is true</h2><span class="spacer"></span></div>
+  <div class="card">
+    <h3 class="card-h">Porog · the hardened side</h3>
+    <p class="lead">The door side can surface a <b>real</b> verdict from the signer core's attestation surface (<code>seal::verify_report → Verdict::{Genuine, Failed, Unverified}</code>, fail-closed: no trust anchor ⇒ <code>Unverified</code>, never accepted). It is shown here honestly, with the exact tier obtained.</p>
+    <div class="seal" id="porogSeal" data-v="genuine">
+      <svg class="seal-mark" viewBox="0 0 46 46" aria-hidden="true" id="sealMark">
+        <path d="M23 3 L40 10 V22 C40 33 32 41 23 44 C14 41 6 33 6 22 V10 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path class="seal-tick" d="M16 23 l5 5 l9 -11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div class="verdict" id="sealVerdict">Verdict::Genuine</div>
+        <div class="vsub" id="sealSub">Key-attested — the <b>device</b> presented a valid StrongBox/TEE key-attestation chain rooted at a pinned anchor.</div>
+        <div class="vmeta" id="sealMeta">tier obtained: StrongBox (hardware) · <b>key-attested, NOT measured-boot</b> — this attests the phone, not the workspace.</div>
+      </div>
+    </div>
+    <div class="sim-row" style="margin-top:12px">
+      <span class="lbl">Simulate verdict</span>
+      <button class="btn-mini" data-verdict="genuine">Genuine · StrongBox</button>
+      <button class="btn-mini" data-verdict="tee">Genuine · TEE only</button>
+      <button class="btn-mini" data-verdict="unverified">Unverified</button>
+    </div>
+    <div class="warnbox">
+      <b>NoporIS shows no seal.</b> The Google-Play side is <code>tier = non-attestable</code>, always — pulled at setup as mutable
+      state, outside any measured chain (the on-device gate hardcodes the tier so no code path can silently relabel it as attested).
+      Putting a green check or a padlock on that side would be exactly the security theater we reject, so we don't.
+    </div>
+  </div>
+
+  <!-- ============================================================
+       THE BRIDGE PANEL — guarded crossing (appears when span is live)
+       ============================================================ -->
+  <div class="sec-head" id="bridgeHead" hidden><h2>The guarded crossing — what you hand across</h2><span class="spacer"></span></div>
+  <div class="card" id="bridgeCard" hidden>
+    <div class="indicator" id="indicator">
+      <span class="core">◆ NOPORIS · <span style="color:var(--less-hi)">LESS PRIVATE</span> · NON-ATTESTABLE</span>
+      <span class="dots" id="bridgeDots" aria-live="polite"></span>
+      <button class="btn-danger kill" id="killBridge">Kill-switch: drop the span</button>
+    </div>
+
+    <p class="lead">Nothing crosses that you did not hand across. Every capability starts <b>OFF (deny)</b>. Each is a lever you throw —
+    visible, disclosed, individually revocable — mapping to <code>noporis-gate</code>'s <code>crossings.{clipboard,files,mic,camera,location}</code>
+    (each a per-capability <code>{open, scope, openedAtIso}</code> object). That is the guarded crossing, not a metaphor over an open door.</p>
+
+    <div class="ledger">
+      <div class="bridge" data-bridge="clipboard">
+        <div>
+          <div class="b-t">Clipboard (both directions)</div>
+          <div class="b-d">Lets copy-and-paste cross between your personal side and the Google-Play side.</div>
+          <div class="b-risk"><b>Risk:</b> an app on the less-private side can read whatever you last copied — including passwords or wallet addresses. Auto-off when you step off the span.</div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="clipboard" aria-label="Clipboard crossing"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="bridge" data-bridge="files">
+        <div>
+          <div class="b-t">Shared folder (personal → Google side)</div>
+          <div class="b-d">Mounts one folder across. Only what you drop in <code>Shared</code> is visible; nothing else crosses.</div>
+          <div class="b-risk"><b>Risk:</b> every app on the far side can read that folder — not just the one you meant.</div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="files" aria-label="Shared folder crossing"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="bridge" data-bridge="mic">
+        <div>
+          <div class="b-t">Microphone → Google side</div>
+          <div class="b-d">Feeds a live mic across. An app with mic permission on the far side can listen live.</div>
+          <div class="b-risk"><b>Risk:</b> live audio into a non-attestable app that may phone home. Turn it on only while you need it.</div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="mic" data-consent="mic" aria-label="Microphone crossing"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="bridge" data-bridge="camera">
+        <div>
+          <div class="b-t">Camera → Google side</div>
+          <div class="b-d">Feeds a live camera across. An app with camera permission sees and can upload the video.</div>
+          <div class="b-risk"><b>Risk:</b> live video into apps that can upload it. Never leave on across sessions.</div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="camera" data-consent="camera" aria-label="Camera crossing"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="bridge" data-bridge="location">
+        <div>
+          <div class="b-t">Location → Google side</div>
+          <div class="b-d">Gives the far side your position. Choose coarse (city-level, the safer default) or precise.</div>
+          <div class="b-risk"><b>Risk:</b> precise location is a strong tracking signal to every app and its servers.</div>
+          <div class="b-sub">
+            <label><input type="radio" name="locprec" value="coarse" checked> Coarse</label>
+            <label><input type="radio" name="locprec" value="precise"> Precise</label>
+          </div>
+        </div>
+        <label class="sw"><input type="checkbox" data-toggle="location" aria-label="Location crossing"><span class="track"><span class="knob"></span></span></label>
+      </div>
+    </div>
+
+    <div class="standin">
+      <span>Each true value maps to concrete plumbing (clipboard → wl-clipboard; the rest → Waydroid/LXC device passthrough). A false or absent value crosses NOTHING. This page persists a <b>switcher-local mock</b> (flat booleans) to <code>localStorage</code>, all default DENY — it is not the gate-store state file. An on-device wrapper would map these fields onto <b>noporis-gate</b>'s <code>crossings.*</code> per-capability objects (<code>{open, scope, openedAtIso}</code>), treating a missing field as deny. The kill-switch sets <b>killSwitch.engaged</b> — it stops the far side and never touches wallet state on the sealed base (<code>sealedWallet.preserved</code> pinned true).</span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       THE SIGNER — two pairings, one keyring
+       ============================================================ -->
+  <div class="sec-head"><h2>The signer — two pairings, never one that spans the bridge</h2><span class="spacer"></span></div>
+  <div class="card">
+    <p class="lead">Can one paired signer authorize across the bridge? <b>No — and it must not.</b> One physical phone holds <b>two
+    independent pairings</b>, one per world (each its own <code>PairingRecord</code>: peer pins + a forward-secret <code>session_root</code>).
+    A grant issued to the Google-Play peer <b>cannot</b> auto-approve anything for the Porog peer — session binding fails closed.
+    There is no persona field anywhere; a "world" is simply a distinct paired peer.</p>
+
+    <div class="pairgrid">
+      <div class="pair porog" id="pairPorog">
+        <div class="p-name">POROG PEER · hardened</div>
+        <div class="p-peer" id="pairPorogPeer">Tiago's ThinkPad</div>
+        <div class="p-meta" id="pairPorogMeta"></div>
+        <div class="p-actions">
+          <button class="btn-mini" data-grant="porog">Revoke grant</button>
+          <button class="btn-mini danger" data-unpair="porog">Unpair this world</button>
+        </div>
+      </div>
+      <div class="pair nopor" id="pairNopor">
+        <div class="p-name">NOPORIS PEER · <span style="color:var(--less-hi)">less private</span></div>
+        <div class="p-peer" id="pairNoporPeer">Work laptop (Google-Play side)</div>
+        <div class="p-meta" id="pairNoporMeta"></div>
+        <div class="p-actions">
+          <button class="btn-mini" data-grant="nopor">Revoke grant</button>
+          <button class="btn-mini danger" data-unpair="nopor">Unpair this world</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="card-h" style="margin:18px 0 6px">World-badged approval (WYSIWYS)</h3>
+    <p class="lead">The phone recomputes the human sentence from the <b>decoded bytes</b>, never from wire text — and binds the world
+    label to <b>which pairing the frame arrived on</b>, not to any field the requester controls. A compromised desktop can't narrate
+    a lie, and now can't mislabel its world either. Consequence tier stays byte-derived: a transfer is a transfer in either world.</p>
+
+    <div class="sim-row">
+      <span class="lbl">Simulate an incoming request from</span>
+      <button class="btn-mini" data-sim="porog|login">Porog peer · login</button>
+      <button class="btn-mini" data-sim="nopor|login">NoporIS peer · login</button>
+      <button class="btn-mini" data-sim="nopor|transfer">NoporIS peer · transfer</button>
+      <button class="btn-mini" data-sim="porog|read">Porog peer · read-only</button>
+    </div>
+
+    <div class="wys" id="wysCard" data-world="porog">
+      <div class="wys-chrome">
+        <span class="wys-world" id="wysWorld">POROG · hardened</span>
+        <span class="badge less" id="wysLess" style="display:none">LESS PRIVATE</span>
+        <span style="margin-left:auto; font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)" id="wysPeer">for Tiago's ThinkPad</span>
+      </div>
+      <div class="wys-body">
+        <div class="wys-tier" id="wysTier">SingleTap — low-stakes</div>
+        <p class="wys-sentence" id="wysSentence">This signs a login challenge for "tiago" at "porog.local". It proves you hold the wallet key — it can't move funds.</p>
+        <div class="wys-funds" id="wysFunds" data-move="0">✓ this signature cannot move funds</div>
+        <div class="wys-frag">confirmation fragment (also shown on the desktop): <b id="wysFrag">7F2·A9</b></div>
+        <div class="wys-confirm">
+          <button class="wys-approve" id="wysApprove" data-move="0">Approve</button>
+          <button class="wys-decline">Decline</button>
+        </div>
+      </div>
+    </div>
+    <p class="tiny">The world badge is <b>context</b>, not a substitute for the byte-derived tier. Undecodable ⇒ undisplayable ⇒ won't sign — unchanged, both worlds. A grant never covers a value transfer; a transfer always needs a full, explicit review. (This card is a design mock; no bytes are signed here.)</p>
+  </div>
+
+  <!-- ============================================================
+       ANTI-THEATER CHECKLIST
+       ============================================================ -->
+  <div class="sec-head"><h2>Anti-theater — stated on the surface, not only in a doc</h2><span class="spacer"></span></div>
+  <div class="card">
+    <ul class="checklist">
+      <li><span class="mk">!</span><span>The bridge <b>separates and conveniences</b>; on the Google side it does <b>not</b> make you private — that persona phones home to Google.</span></li>
+      <li><span class="mk">!</span><span>A <b>rooted or kernel-compromised host defeats the separation</b>. Both the managed-profile boundary and the Waydroid boundary are only as strong as the Android kernel + SELinux; a rooted/malware endpoint reads keys from RAM and can forge the approval UI.</span></li>
+      <li><span class="mk">!</span><span>Software signing in RAM is <b>not a hardware wallet</b>. The real signer is <code>mobile/core</code>'s <code>WalletCore</code>; the scaffolds' <code>ScaffoldSigner</code> is a deterministic test stand-in, not cryptography.</span></li>
+      <li><span class="mk">!</span><span>Attestation here is <b>key-attested (device), not measured-boot (workspace)</b>. No StrongBox claim on a device that only got TEE — the tier obtained is always named.</span></li>
+      <li><span class="mk">!</span><span>This is an app on <b>stock Android / the OS-desktop surface</b> — it is <b>not "Postern OS"</b> and must not borrow its measured-boot assurances.</span></li>
+    </ul>
+  </div>
+
+  <!-- ============================================================
+       NARRATIVE — Kalinov bridge, neutral and honest
+       ============================================================ -->
+  <div class="sec-head"><h2>The story — kept neutral and honest</h2><span class="spacer"></span></div>
+  <div class="card about-body">
+    <p>In Slavic cosmology two worlds coexist: <b>Yav</b> (the everyday, material world) and <b>Nav</b> (the other side). Between them
+    runs the fire-river <b>Smorodina</b>, and the only way across is the <b>Kalinov Bridge</b> (<i>Kalinov most</i>) — a <b>guarded</b>
+    crossing, held against all comers, never an open border. NoporIS is that bridge for one handset: it lets your two worlds meet and
+    connect <b>without a second phone</b>, and like the Kalinov crossing the passage is controlled. That control is the product.</p>
+    <p><b>"Nopor" is a coined name</b> — not a word or a portal from the tales. What is authentic is the <i>crossing between two worlds</i>;
+    the myth is the narrative, not a claim of provenance. The classically named bridge is the Kalinov most; NoporIS is the chosen mark.</p>
+    <p><b>A neutral crossing, not a "world of the dead."</b> Yav ↔ Nav is a passage between worlds that <b>both keep existing</b> — both of
+    your worlds are alive and in use. That reading never appears in our copy or art.</p>
+    <p><b>The guardian is Yagabona</b> — the coined mark that <i>holds</i> both the crossing and the door. We never use the registered
+    "Baba&nbsp;Yaga" word mark.</p>
+    <p><b>Door + Bridge is the whole picture.</b> Porog is the guarded door into the hardened world; NoporIS is the guarded bridge between
+    two worlds that both persist. Two apps, two folklore shapes, one shared keyring.</p>
+    <div class="about-meta">
+      This UI collects nothing and phones nothing home (<code>connect-src 'none'</code>). The mock state lives only in this browser's
+      <code>localStorage</code>. The coin (BLCH) is not a security, is not involved in licensing, and buys no software; personal use is free.
+      Google, Android, Google Play and Play Integrity name a real third-party system (nominative use); no affiliation or endorsement is implied.
+      SPDX-License-Identifier: MIT OR Apache-2.0.
+    </div>
+  </div>
+
+</main>
+
+<footer class="site wrap">
+  NoporIS · the guarded bridge · one keyring, one door at a time · the Google side is less private, and every surface says so · reference prototype · UNAUDITED · not "Postern OS"
+</footer>
+
+<!-- ================= crossing disclosure modal (entering the bridge) ================= -->
+<div class="modal-back" id="crossBack" role="dialog" aria-modal="true" aria-labelledby="crossTitle">
+  <div class="modal">
+    <h3 id="crossTitle">Crossing to the Google-Play side</h3>
+    <p class="lead">The far side is the <b style="color:var(--less-hi)">less-private</b> side. Here is exactly what that means, once — not a EULA wall.</p>
+    <div class="warnbox">
+      <span class="fact-t">It is non-attestable, by construction.</span>
+      A real Google-Android system in a sandboxed container. Sandboxed is not secure, private, or attested; <code>tier = non-attestable</code>,
+      always. It is <b>not covered by any Seal</b>. Play Integrity fails by design, so banking / Google Wallet / most paid DRM will refuse or degrade.
+    </div>
+    <div class="warnbox">
+      <span class="fact-t">It phones home to Google.</span>
+      This is a full Android userland; its apps reach the network and talk to Google and their own makers. NoporIS can't make an Android app
+      private for you. What it can do: keep the far side off the base unless you hand a capability across (next), and drop the span whenever you want.
+    </div>
+    <div class="subhead">Next time you cross</div>
+    <label class="radio-card">
+      <input type="radio" name="cscope" value="session" checked>
+      <span><span class="rc-t">This session only</span><span class="rc-d"> — show the full disclosure again next time.</span></span>
+    </label>
+    <label class="radio-card">
+      <input type="radio" name="cscope" value="persistent">
+      <span><span class="rc-t">Remember the short reminder</span><span class="rc-d"> — show the compact crossing note each time (never nothing — the crossing is always shown).</span></span>
+    </label>
+    <div class="btnrow">
+      <button class="btn-ghost" id="crossCancel">Not now — stay off the span</button>
+      <button class="hold" id="crossConfirm"><span class="fill" aria-hidden="true"></span><span class="lbl">Extend the span (hold)</span></button>
+    </div>
+    <p class="tiny" id="crossNote" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- ================= micro-consent modal (mic / camera) ================= -->
+<div class="modal-back" id="mcBack" role="dialog" aria-modal="true" aria-labelledby="mcTitle">
+  <div class="modal">
+    <h3 id="mcTitle"></h3>
+    <p class="lead" id="mcBody"></p>
+    <div class="btnrow">
+      <button class="btn-ghost" id="mcHand">Hand it across (this session)</button>
+      <button class="btn-ghost" id="mcCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   NOPORIS — switcher logic. Zero dependencies, no network (connect-src 'none').
+   Persists a MOCK state to localStorage (this switcher's own flat shape, not
+   byte-equal to any gate-store's state file); on device the real posture is
+   read by the postern-sdk host + the apps/noporis-gate gate-store wrapper +
+   postern-policy. This file is a design stand-in and signs nothing.
+
+   §rails — honesty enforced in code (not just copy):
+     · NoporIS tier is ALWAYS "non-attestable"; no path sets it attested.
+     · Every bridge DEFAULTS TO DENY; unknown/missing normalises to deny.
+     · The kill-switch stops the far side and NEVER touches the sealed base/keys.
+     · The signer world label is derived from WHICH PEER a request arrived on,
+       never from requester-supplied text. A grant never covers a transfer.
+     · One world live at a time — the keyring is presented at one door only.
+   ============================================================================ */
+const $  = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const root = document.documentElement;
+const body = document.body;
+const nowIso = () => new Date().toISOString();
+
+/* pure switcher state model — DOM-free, no localStorage at top level;
+   extracted verbatim and evaluated in node by test-switcher.mjs (§pure-model-begin) */
+const BRIDGE_KEYS = ["clipboard", "files", "mic", "camera", "location"];
+const LS = "noporis.switcher.state.v1";
+const LS_THEME = "noporis.switcher.theme";
+
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+const asBool = (v) => v === true;
+const oneOf = (v, allowed, fb) => (allowed.includes(v) ? v : fb);
+
+/* ---------- state (switcher-local mock: flat booleans, NOT the gate-store's
+   crossings.* per-capability {open,scope,openedAtIso} shape; an on-device
+   wrapper would map these fields onto apps/noporis-gate's crossings.*) ---------- */
+function defaultState() {
+  return {
+    schema: "noporis.switcher.state", version: 1,
+    live: "none",                                   // "none" | "porog" | "nopor"
+    porogInside: false,                             // crossed the threshold?
+    porogVerdict: "genuine",                        // "genuine" | "tee" | "unverified"
+    consent: { accepted: false, scope: "session", acceptedAtIso: null },
+    bridges: { clipboard: false, files: false, mic: false, camera: false, location: false },
+    locPrecision: "coarse",
+    killSwitch: { engaged: false, engagedAtIso: null },
+    pairings: { porog: true, nopor: true },         // two independent pairings
+    grants:   { porog: true, nopor: true },         // soft, per-world login grants
+  };
+}
+function normalize(input) {
+  const out = defaultState();
+  if (!input || typeof input !== "object") return out;
+  out.live = oneOf(input.live, ["none", "porog", "nopor"], "none");
+  out.porogInside = asBool(input.porogInside);
+  out.porogVerdict = oneOf(input.porogVerdict, ["genuine", "tee", "unverified"], "genuine");
+  const c = input.consent && typeof input.consent === "object" ? input.consent : {};
+  out.consent.accepted = asBool(c.accepted);
+  out.consent.scope = oneOf(c.scope, ["session", "persistent"], "session");
+  out.consent.acceptedAtIso = out.consent.accepted ? (typeof c.acceptedAtIso === "string" ? c.acceptedAtIso : null) : null;
+  const b = input.bridges && typeof input.bridges === "object" ? input.bridges : {};
+  for (const k of BRIDGE_KEYS) out.bridges[k] = asBool(b[k]);      // default DENY
+  out.locPrecision = oneOf(input.locPrecision, ["coarse", "precise"], "coarse");
+  const ks = input.killSwitch && typeof input.killSwitch === "object" ? input.killSwitch : {};
+  out.killSwitch.engaged = asBool(ks.engaged);
+  out.killSwitch.engagedAtIso = out.killSwitch.engaged ? (typeof ks.engagedAtIso === "string" ? ks.engagedAtIso : null) : null;
+  const p = input.pairings && typeof input.pairings === "object" ? input.pairings : {};
+  out.pairings.porog = p.porog !== false;
+  out.pairings.nopor = p.nopor !== false;
+  const g = input.grants && typeof input.grants === "object" ? input.grants : {};
+  out.grants.porog = g.porog !== false;
+  out.grants.nopor = g.nopor !== false;
+  return out;
+}
+/* §pure-model-end — end of the DOM-free switcher state model */
+let state = normalize(JSON.parse(store.get(LS, "null")));
+function save() { store.set(LS, JSON.stringify(state)); }
+
+/* ---------- honesty invariant: only one world live ---------- */
+function setLive(world) {
+  // world in {"none","porog","nopor"} — presenting the keyring at exactly one door
+  state.live = world;
+  if (world === "porog") state.porogInside = true;
+  if (world === "nopor") { /* consent must already be accepted */ }
+  save(); render();
+}
+
+/* ============================================================ POROG side */
+$("#crossThreshold").addEventListener("click", () => {
+  if (state.live === "nopor") {
+    // stepping off the span first — keyring is presented at one door at a time
+    state.live = "none";
+  }
+  setLive("porog");
+});
+$("#leavePorog").addEventListener("click", () => { state.porogInside = false; if (state.live === "porog") state.live = "none"; save(); render(); });
+
+/* attestation verdict simulation (Porog only) */
+$$('[data-verdict]').forEach(b => b.addEventListener("click", () => {
+  state.porogVerdict = b.dataset.verdict; save(); renderSeal();
+}));
+function renderSeal() {
+  const seal = $("#porogSeal");
+  const v = state.porogVerdict;
+  const isGenuine = v === "genuine" || v === "tee";
+  seal.dataset.v = isGenuine ? "genuine" : "unverified";
+  $("#sealMark").style.color = isGenuine ? "var(--ok)" : "var(--warn)";
+  $(".seal-tick").style.display = isGenuine ? "" : "none";
+  if (v === "genuine") {
+    $("#sealVerdict").textContent = "Verdict::Genuine";
+    $("#sealSub").innerHTML = 'Key-attested — the <b>device</b> presented a valid StrongBox key-attestation chain rooted at a pinned anchor.';
+    $("#sealMeta").innerHTML = 'tier obtained: StrongBox (hardware-backed) · <b>key-attested, NOT measured-boot</b> — this attests the phone, not the workspace.';
+    $("#porogAttBadge").textContent = "KEY-ATTESTED";
+  } else if (v === "tee") {
+    $("#sealVerdict").textContent = "Verdict::Genuine";
+    $("#sealSub").innerHTML = 'Key-attested — the <b>device</b> presented a valid TEE key-attestation chain (no StrongBox on this hardware).';
+    $("#sealMeta").innerHTML = 'tier obtained: TEE only (no StrongBox) · <b>key-attested, NOT measured-boot</b> — reported honestly; no StrongBox claim it did not earn.';
+    $("#porogAttBadge").textContent = "KEY-ATTESTED · TEE";
+  } else {
+    $("#sealVerdict").textContent = "Verdict::Unverified";
+    $("#sealSub").innerHTML = 'No trust anchor could verify the report — fail-closed. <b>Unverified is never accepted as genuine.</b>';
+    $("#sealMeta").innerHTML = 'No seal shown. The door does not claim attestation it cannot prove.';
+    $("#porogAttBadge").textContent = "UNVERIFIED";
+  }
+}
+
+/* ============================================================ NOPORIS side (bridge) */
+$("#crossBridge").addEventListener("click", () => {
+  if (state.consent.accepted && state.consent.scope === "persistent") {
+    // compact crossing is still shown; here we honour the remembered scope but re-open a short note
+    openCross(true);
+  } else {
+    openCross(false);
+  }
+});
+$("#leaveNopor").addEventListener("click", () => stepOff());
+
+function stepOff() {
+  // step off the span: reset session bridges to deny, world at rest. Keys untouched.
+  for (const k of BRIDGE_KEYS) state.bridges[k] = false;
+  if (state.live === "nopor") state.live = "none";
+  save(); render();
+}
+
+/* ---------- crossing disclosure modal ---------- */
+let crossHoldTimer = null;
+function openCross(remembered) {
+  $("#crossNote").textContent = remembered
+    ? "You chose to remember this — a compact crossing note stands in for the full disclosure. The crossing is always shown."
+    : "";
+  const pre = state.consent.scope || "session";
+  const el = document.querySelector(`input[name="cscope"][value="${pre}"]`); if (el) el.checked = true;
+  $("#crossBack").dataset.open = "1";
+}
+function closeCross() { $("#crossBack").dataset.open = "0"; clearHold($("#crossConfirm"), () => (crossHoldTimer = clearInterval(crossHoldTimer))); }
+$("#crossCancel").addEventListener("click", closeCross);
+holdToConfirm($("#crossConfirm"), () => {
+  const scope = (document.querySelector('input[name="cscope"]:checked') || {}).value || "session";
+  state.consent = { accepted: true, scope, acceptedAtIso: nowIso() };
+  state.killSwitch = { engaged: false, engagedAtIso: null };
+  if (state.live === "porog") state.live = "none";  // one door at a time
+  setLive("nopor");
+  closeCross();
+});
+
+/* ---------- bridge levers (guarded crossing) ---------- */
+$$('[data-toggle]').forEach(cb => cb.addEventListener("change", (e) => {
+  const key = cb.dataset.toggle;
+  if (cb.checked && cb.dataset.consent) {
+    // mic/camera: a second, explicit micro-consent before the hole opens
+    cb.checked = false;                 // stays deny until confirmed
+    openMicroConsent(key);
+    return;
+  }
+  state.bridges[key] = cb.checked;
+  save(); renderBridges();
+}));
+$$('input[name="locprec"]').forEach(r => r.addEventListener("change", () => {
+  state.locPrecision = (document.querySelector('input[name="locprec"]:checked') || {}).value || "coarse"; save();
+}));
+
+let pendingConsent = null;
+function openMicroConsent(key) {
+  pendingConsent = key;
+  const label = key === "mic" ? "microphone" : "camera";
+  $("#mcTitle").textContent = `Hand the ${label} across?`;
+  $("#mcBody").innerHTML = `This feeds a live ${label} into the less-private side. An app there with ${label} permission can ` +
+    (key === "mic" ? "listen live" : "see and upload the video") + `, and it may phone home. Two locks must both be open (this crossing + the app's Android permission). Turn it off the moment you're done.`;
+  $("#mcBack").dataset.open = "1";
+}
+$("#mcCancel").addEventListener("click", () => { pendingConsent = null; $("#mcBack").dataset.open = "0"; });
+$("#mcHand").addEventListener("click", () => {
+  if (pendingConsent) { state.bridges[pendingConsent] = true; save(); renderBridges(); }
+  pendingConsent = null; $("#mcBack").dataset.open = "0";
+});
+
+/* ---------- kill-switch: drop the span (keys untouched) ---------- */
+function killSpan() {
+  state.killSwitch = { engaged: true, engagedAtIso: nowIso() };
+  for (const k of BRIDGE_KEYS) state.bridges[k] = false;   // far side stops
+  if (state.live === "nopor") state.live = "none";
+  // NOTE: porogInside / pairings / grants are deliberately NOT touched — the door and keys survive.
+  save(); render();
+  // re-arm the switch for a future crossing (engaged is a momentary action here)
+  setTimeout(() => { state.killSwitch = { engaged: false, engagedAtIso: null }; save(); }, 50);
+}
+$("#killBridge").addEventListener("click", killSpan);
+$("#killStatus").addEventListener("click", killSpan);
+
+/* ============================================================ signer — pairings + world-badged WYSIWYS */
+$$('[data-unpair]').forEach(b => b.addEventListener("click", () => {
+  const w = b.dataset.unpair;
+  state.pairings[w] = false; state.grants[w] = false;   // drop the PairingRecord for that world only
+  save(); renderPairings();
+}));
+$$('[data-grant]').forEach(b => b.addEventListener("click", () => {
+  const w = b.dataset.grant;
+  state.grants[w] = false;                               // soft revoke: collapses to "never given"
+  save(); renderPairings();
+}));
+
+function renderPairings() {
+  const meta = (paired, granted) => paired
+    ? `pin: pinned · session_root: forward-secret\ngrant (login): ${granted ? "active" : "revoked — collapses to never given"}`
+    : `unpaired · PairingRecord dropped\nthis world's session_root is gone; the other world is untouched`;
+  $("#pairPorog").classList.toggle("unpaired", !state.pairings.porog);
+  $("#pairNopor").classList.toggle("unpaired", !state.pairings.nopor);
+  $("#pairPorogMeta").textContent = meta(state.pairings.porog, state.grants.porog);
+  $("#pairNoporMeta").textContent = meta(state.pairings.nopor, state.grants.nopor);
+  $("#pairPorogPeer").textContent = state.pairings.porog ? "Tiago's ThinkPad" : "Tiago's ThinkPad — unpaired";
+  $("#pairNoporPeer").textContent = state.pairings.nopor ? "Work laptop (Google-Play side)" : "Work laptop — unpaired";
+}
+
+/* the world label is derived from WHICH PEER the request arrived on — never requester text */
+const SIMS = {
+  login:    { tier: "SingleTap — low-stakes", move: false,
+              porog: 'This signs a login challenge for "tiago" at "porog.local". It proves you hold the wallet key — it can\'t move funds.',
+              nopor: 'This signs a login challenge for "tiago" at "work-portal". It proves you hold the wallet key — it can\'t move funds.' },
+  transfer: { tier: "ExplicitReview — irreversible", move: true,
+              porog: 'This authorises a transfer of 0.42 BLCH to bc1q…k9f. Irreversible — review carefully before you confirm.',
+              nopor: 'This authorises a transfer of 0.42 BLCH to bc1q…k9f. Irreversible — review carefully before you confirm.' },
+  read:     { tier: "SilentReadOnly — no key use", move: false,
+              porog: 'Read-only — no signature, no key use. Nothing here signs.',
+              nopor: 'Read-only — no signature, no key use. Nothing here signs.' },
+};
+function frag(peer, kind) {
+  // non-crypto stand-in for confirmation_fragment (session ‖ req_nonce). Labelled a mock.
+  let h = 0x811c9dc5; const s = peer + "|" + kind + "|" + Date.now().toString(36);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  const hex = (h >>> 0).toString(16).toUpperCase().padStart(8, "0");
+  return hex.slice(0, 3) + "·" + hex.slice(3, 5);
+}
+$$('[data-sim]').forEach(b => b.addEventListener("click", () => {
+  const [world, kind] = b.dataset.sim.split("|");
+  if (!state.pairings[world]) { renderWys(world, kind, true); return; }
+  renderWys(world, kind, false);
+}));
+function renderWys(world, kind, unpaired) {
+  const sim = SIMS[kind];
+  const card = $("#wysCard"); card.dataset.world = world;
+  const isNopor = world === "nopor";
+  $("#wysWorld").textContent = isNopor ? "NOPORIS · Google-Play side" : "POROG · hardened";
+  $("#wysLess").style.display = isNopor ? "" : "none";
+  $("#wysPeer").textContent = "for " + (isNopor ? "Work laptop (Google-Play side)" : "Tiago's ThinkPad");
+  if (unpaired) {
+    $("#wysTier").textContent = "no pairing";
+    $("#wysSentence").textContent = "This world is unpaired — its session is gone, so a request bound to it fails closed. Nothing to sign.";
+    $("#wysFunds").dataset.move = "0"; $("#wysFunds").textContent = "fail-closed · no signature";
+    $("#wysFrag").textContent = "—";
+    $("#wysApprove").dataset.move = "0"; $("#wysApprove").textContent = "Approve"; $("#wysApprove").disabled = true;
+    return;
+  }
+  $("#wysApprove").disabled = false;
+  $("#wysTier").textContent = sim.tier;
+  $("#wysSentence").textContent = sim[world];
+  $("#wysFunds").dataset.move = sim.move ? "1" : "0";
+  $("#wysFunds").textContent = sim.move ? "⚠ this signature MOVES FUNDS — full explicit review" : "✓ this signature cannot move funds";
+  $("#wysFrag").textContent = frag(world, kind);
+  $("#wysApprove").dataset.move = sim.move ? "1" : "0";
+  $("#wysApprove").textContent = sim.move ? "Slide to confirm transfer" : "Approve";
+}
+
+/* ============================================================ render */
+function render() {
+  const live = state.live;
+  body.dataset.live = live;
+
+  // world panels
+  const wp = $("#worldPorog"), wn = $("#worldNopor");
+  wp.classList.toggle("live", live === "porog");
+  wn.classList.toggle("live", live === "nopor");
+  wp.classList.toggle("dim", live === "nopor");
+  wn.classList.toggle("dim", live === "porog");
+  $("#porogLive").textContent = live === "porog" ? "LIVE" : (state.porogInside ? "inside" : "at rest");
+  $("#noporLive").textContent = live === "nopor" ? "LIVE" : "at rest";
+
+  // porog buttons
+  $("#leavePorog").hidden = !(state.porogInside);
+  $("#thresholdLbl").textContent = live === "porog" ? "You are inside" : (state.porogInside ? "Return inside" : "Cross the threshold");
+  // nopor buttons
+  $("#crossBridge").hidden = live === "nopor";
+  $("#leaveNopor").hidden = live !== "nopor";
+
+  // the span animation
+  const sw = $("#spanWrap");
+  const open = live === "nopor" ? "1" : "0";
+  sw.dataset.open = open;
+  sw.dataset.side = live === "porog" ? "porog" : (live === "nopor" ? "nopor" : "mid");
+  $("#spanLabel").textContent = live === "nopor" ? "span extended · controlled crossing" :
+    live === "porog" ? "keyring at the door · span retracted" : "span retracted";
+
+  // status line
+  const sl = $("#statusline"); sl.dataset.live = live;
+  $("#statusText").innerHTML =
+    live === "porog" ? "Live: <b style='color:var(--porog)'>Porog</b> — inside the hardened room, sealed and Tor-only. The bridge is not extended." :
+    live === "nopor" ? "Live: <b style='color:var(--river-hi)'>NoporIS</b> — standing on the span to the <b style='color:var(--less-hi)'>less-private</b> Google-Play side. Both worlds still exist." :
+    "At rest. The keyring is presented at neither door. No world is live.";
+  $("#killStatus").hidden = live !== "nopor";
+
+  // bridge panel visibility (only while standing on the span)
+  const showBridge = live === "nopor";
+  $("#bridgeHead").hidden = !showBridge;
+  $("#bridgeCard").hidden = !showBridge;
+  if (showBridge) renderBridges();
+
+  renderSeal();
+  renderPairings();
+}
+
+function renderBridges() {
+  $$('[data-toggle]').forEach(cb => {
+    const k = cb.dataset.toggle;
+    cb.checked = state.bridges[k] === true;
+    const row = cb.closest(".bridge"); if (row) row.dataset.on = state.bridges[k] ? "1" : "0";
+  });
+  // in-bridge dots mirror active crossings
+  const dots = $("#bridgeDots"); dots.textContent = "";
+  const active = BRIDGE_KEYS.filter(k => state.bridges[k]);
+  if (!active.length) {
+    const d = document.createElement("span"); d.className = "dot"; d.textContent = "nothing crosses"; dots.appendChild(d);
+  } else {
+    for (const k of active) {
+      const d = document.createElement("span"); d.className = "dot"; d.dataset.on = "1";
+      if (k === "mic" || k === "camera") d.dataset.live = "1";
+      d.textContent = k === "location" ? `location · ${state.locPrecision}` : k;
+      dots.appendChild(d);
+    }
+  }
+  const loc = document.querySelector(`input[name="locprec"][value="${state.locPrecision}"]`); if (loc) loc.checked = true;
+}
+
+/* ============================================================ hold-to-confirm helper */
+function holdToConfirm(btn, done) {
+  let t = null, fired = false;
+  const start = (e) => {
+    if (btn.disabled) return; e.preventDefault(); fired = false;
+    btn.classList.add("holding");
+    t = setTimeout(() => { fired = true; btn.classList.remove("holding"); done(); }, 1100);
+  };
+  const cancel = () => { btn.classList.remove("holding"); if (t) { clearTimeout(t); t = null; } };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", cancel);
+  btn.addEventListener("pointerleave", cancel);
+  btn.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !fired) { e.preventDefault(); done(); } });
+}
+function clearHold(btn) { btn.classList.remove("holding"); }
+
+/* ============================================================ theme + reset */
+function applyTheme() {
+  const t = store.get(LS_THEME, "auto");
+  if (t === "auto") root.removeAttribute("data-theme"); else root.dataset.theme = t;
+  $("#btnTheme").textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  $("#btnTheme").setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+$("#btnTheme").addEventListener("click", () => {
+  const cur = store.get(LS_THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS_THEME, next); applyTheme();
+});
+$("#btnReset").addEventListener("click", () => {
+  state = defaultState(); save();
+  $("#mcBack").dataset.open = "0"; $("#crossBack").dataset.open = "0";
+  renderWys("porog", "login", false);
+  render();
+});
+$("#btnHome").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
+/* close modals on backdrop click / Esc */
+$$('.modal-back').forEach(m => m.addEventListener("click", (e) => { if (e.target === m) m.dataset.open = "0"; }));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$('.modal-back').forEach(m => m.dataset.open = "0"); });
+
+/* ============================================================ boot */
+applyTheme();
+renderWys("porog", "login", false);
+render();
+root.dataset.booted = "1";
+</script>
+</body>
+</html>

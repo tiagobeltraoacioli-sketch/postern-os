@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!--
+  Postern Hygiene — macOS Finder Quick Action ("Scrub metadata").
+
+  This is an Automator Quick Action (a Service). Install by copying the whole
+  "Postern Scrub Metadata.workflow" bundle into ~/Library/Services/ (the
+  installer, ../install.sh, does this and byte-checks it). It then appears in
+  Finder under right-click > Quick Actions > Scrub metadata (and under the
+  Services menu). Finder passes the selected files as arguments to the embedded
+  Run Shell Script action, which calls the shared core (postern-scrub.sh) to
+  pipe each through `postern-hygiene scrub -` into a scrubbed sibling.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Scrub metadata (Postern Hygiene)</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>runWorkflowAsService</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.item</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

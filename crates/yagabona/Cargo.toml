@@ -1,0 +1,25 @@
+# Yagabona — the privacy-first scheduled-task agent daemon for Postern OS.
+# The benevolent good-witch archetype (Latin *bona*, Propp's donor): the threshold guardian
+# that tests every task, rewards the honest, and refuses the overreaching —
+# fail-closed, local-only, zero telemetry. Ships as "Yagabona", never "Baba Yaga"
+# (that word mark is registered in Class 9 by a third party — see README).
+[package]
+name = "yagabona"
+version = "0.1.0"
+edition = "2021"
+description = "Yagabona — privacy-first scheduled-task agent daemon for Postern OS. Enforces the Izbushka capability-grant Threshold Test (fail-closed), a SHAKE-256 hash-chained append-only audit trail, and a scoped userland filesystem boundary. Local-only, zero telemetry. UNAUDITED draft."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "yagabona"
+
+[dependencies]
+postern-trail = { path = "../postern-trail" }       # the ONE shared SHAKE-256 hash-chained audit trail
+postern-policy = { path = "../postern-policy" }     # the ONE shared consent kernel (Expiry, Decision, EnforcementMode)
+serde = { version = "1", features = ["derive"] }   # manifest + trail content (de)serialization
+toml = "0.8"                                        # Izbushka manifest format
+time = { version = "0.3", features = ["parsing", "formatting"] } # RFC 3339 expiry + schedule math
+thiserror = "2"                                     # typed errors (matches sibling crates)
+
+[dev-dependencies]
+tempfile = "3"                                       # isolated workspace roots + trails in tests

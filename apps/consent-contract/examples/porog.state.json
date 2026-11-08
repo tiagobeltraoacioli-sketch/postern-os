@@ -1,0 +1,58 @@
+{
+  "schema": "postern.porog-gate.state",
+  "version": 1,
+  "tier": "key-attested-device",
+  "lang": "en",
+  "consent": {
+    "accepted": false,
+    "scope": "session",
+    "acceptedAtIso": null
+  },
+  "crossings": {
+    "intents": {
+      "open": false,
+      "direction": "none",
+      "scope": "session",
+      "openedAtIso": null
+    },
+    "clipboard": {
+      "open": false,
+      "direction": "none",
+      "scope": "session",
+      "openedAtIso": null
+    },
+    "files": {
+      "open": false,
+      "direction": "none",
+      "scope": "session",
+      "openedAtIso": null
+    },
+    "contacts": {
+      "open": false,
+      "direction": "none",
+      "scope": "session",
+      "openedAtIso": null
+    },
+    "calendar": {
+      "open": false,
+      "direction": "none",
+      "scope": "session",
+      "openedAtIso": null,
+      "package": null
+    },
+    "connectedApp": {
+      "open": false,
+      "direction": "none",
+      "scope": "session",
+      "openedAtIso": null,
+      "package": null
+    }
+  },
+  "killSwitch": {
+    "engaged": false,
+    "engagedAtIso": null
+  },
+  "sealedWallet": {
+    "preserved": true
+  }
+}

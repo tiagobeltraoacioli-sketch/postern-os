@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'sha256-SMLID9BWNjKkKtuDRZ6i3E+tksgAGbTfYINb1WxwXcA='; img-src 'self'; media-src 'self'; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests">
+<meta name="description" content="What changed so more nodes can join and mine Bloch-SIS-PoW: --max-peers (past the ~50-node wall), --dns-seed cold-start, and a mining-readiness/IBD-latch fix. Non-consensus, unaudited.">
+<meta name="color-scheme" content="dark light">
+<title>Release notes: peering upgrade · Postern Labs</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="index.html">Home</a>
+      <a href="postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="products.html">Products</a>
+      <a href="downloads.html">Downloads</a>
+      <a href="run-a-node.html">Run a node</a>
+      <a href="migration.html">SHA-256 migration</a>
+      <a href="snapshot.html">Snapshot sync</a>
+      <a href="pool.html">Pool</a>
+      <a href="asic.html">ASIC</a>
+      <a href="releases.html" aria-current="page">Releases</a>
+      <a href="security.html">Security</a>
+      <a href="/explorer/">Explorer</a>
+      <a href="disclaimer.html">Disclaimer</a>
+      <a href="acknowledgments.html">Acknowledgments</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) · very few nodes, low hashrate, 51%-attackable · not a security · for evaluation —
+  <strong>not to protect real secrets yet</strong>. <a href="disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Release notes · changelog</p>
+    <h1>What shipped.</h1>
+    <p class="lede">A plain, unaudited log of what actually went live — not plans. In-progress work is deliberately kept off this page until it ships. Newest first.</p>
+    <div class="warnpanel" role="note">
+      <h3>Honesty baseline</h3>
+      <ul>
+        <li><strong>Mainnet beta — not a security claim.</strong> The Module-SIS gate is a <strong>difficulty-driven k-ramp</strong> (k=4 today, rising with hashrate — a structural filter, not a security claim); the chain is <strong>unaudited</strong> and 51%-attackable. The coin is <strong>not a security and not an asset</strong> — no price, no value claim.</li>
+        <li><strong>Ownerless protocol.</strong> Bloch changes are non-consensus operator conveniences shipped as candidate improvements any node operator may adopt — nobody mandates them, and Postern speaks for no one. Postern-product changes are owned and operated by Postern.</li>
+        <li><strong>Only shipped items appear here.</strong> If it is a branch, a design, or "merged but not deployed," it is not on this page.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="freemium-h">
+  <div class="wrap">
+    <p class="kicker" id="freemium-h">2026-07-18 · Pricing · Postern Desktop</p>
+    <h2>Postern Desktop moves to 2 years free, then a key — mobile stays free forever, and here is what it means for your data: nothing.</h2>
+    <div class="prose">
+      <p>We are narrowing a promise we published. Our stated pricing line was <strong>"personal editions stay free regardless"</strong> — and it <strong>still holds for mobile</strong>: the mobile OS and every personal app on mobile stay <strong>free forever</strong>, our free adoption channel, untouched. The only thing changing is <strong>Postern Desktop (the personal desktop suite)</strong>, which now <strong>reserves the right to require a license in the future</strong>: each desktop install is <strong>free for 2 years</strong> (the adoption on-ramp), after which a <strong>personal key</strong> keeps <strong>updates and premium features</strong> coming. We are announcing this <strong>loudly and in plain language</strong> because narrowing a published promise quietly would be exactly the kind of dark pattern we refuse to run.</p>
+      <p><strong>What changes for your data: nothing.</strong> The key gates updates and premium features — <strong>never access to your own encrypted data</strong>. Decrypt, read, and export of every vault, wallet, credential, message, and backup you already have <strong>always work</strong> — key or not, expired or not — and safety actions like <strong>Panic Lock</strong> always fire. After 2 years with no key a desktop app enters a <strong>read-only grace mode</strong>: it fails <strong>open</strong>, never into a lockout, and your data is never held hostage.</p>
+      <p><strong>One more change, stated plainly: free versions may now show ads — but only the privacy-preserving kind.</strong> Free versions (all personal mobile apps, and Postern Desktop during its free window) <strong>may show contextual, non-tracking ads</strong>: chosen from nothing but the current screen, with <strong>no profile, no advertising or device ID, no third-party ad SDK, no telemetry, and no data leaving your device</strong>, always clearly labeled. <strong>Surveillance, behavioral, programmatic, and tracking-based ads are forbidden.</strong> Ads <strong>never</strong> appear in Panic Lock, Vault decrypt/export, or backup, and <strong>the paid Postern Desktop key removes ads entirely</strong>. Our promise of "no ads that track you" is unchanged — this narrows it to "contextual, no-tracking only," it does not walk it back.</p>
+    </div>
+    <dl>
+      <div class="defrow"><dt>Ads: contextual and non-tracking only</dt><dd>Free versions may show ads based only on the current screen — <strong>no tracking, no profile, no device ID, no telemetry, nothing leaves the device</strong>, always labeled, never in security-critical flows. The <strong>Desktop key removes ads</strong>. Surveillance/behavioral advertising is forbidden.</dd></div>
+      <div class="defrow"><dt>Mobile is free forever</dt><dd>Only <strong>Postern Desktop</strong> moves to freemium. The mobile OS and all personal <strong>mobile</strong> apps (Wallet, Vault, Keys, Courier, Seal, Hygiene, Panic, Vestnik, Tor, Quarantine, Telephony, Encrypted Backup, personal Ezekiel 1, …) stay <strong>free forever</strong> (they may carry the same contextual, no-tracking ads).</dd></div>
+      <div class="defrow"><dt>Done as fairly as we can</dt><dd>Every desktop install gets <strong>2 full years free</strong>. We are choosing to give <strong>24 months of notice-and-grace</strong> before a key is needed — a generous transition, not a fine-print switch.</dd></div>
+      <div class="defrow"><dt>Existing installs grandfathered</dt><dd>Anyone who installed Postern Desktop under the old "stays free" line is <strong>grandfathered a full 2-year window from the changeover date</strong> — you are not cut short.</dd></div>
+      <div class="defrow"><dt>No surveillance, no coin</dt><dd>The key is verified <strong>100% offline</strong> — no phone-home, no account, no telemetry; we store only a <strong>salted hash and dates</strong>, never your identity. The coin (BLCH) is <strong>never</strong> monetized and is <strong>not</strong> involved in licensing.</dd></div>
+      <div class="defrow"><dt>Not live yet — honest status</dt><dd>This is the <strong>announced model plus the offline-key mechanism</strong>, not a running billing system. <strong>There is no payment integration and no price today, the per-install free-window clock is not built, and no ad system is built — no ad network is integrated and no placements ship.</strong> Everything Postern ships remains an <strong>unaudited reference prototype</strong>. Full detail on the <a href="disclaimer.html#d9">disclaimer §9</a> and the <a href="products.html">product tiers</a>.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="reanchor-h">
+  <div class="wrap">
+    <p class="kicker" id="reanchor-h">2026-07-16 · Bloch node v0.1.0-alpha3</p>
+    <h2>Two consensus fixes the k-ramp exposed — the network converges again.</h2>
+    <div class="prose">
+      <p>Relaxing the gate back to k=4 (alpha2) un-choked block production — and that surfaced <strong>two latent consensus bugs</strong> that had been masked while the chain crawled: non-mining nodes stopped converging (they <strong>froze on ingest</strong>) and the sole miner ran away. Both are fixed here; both are <strong>backward-safe</strong> — historical blocks validate byte-for-byte, so there is no fork.</p>
+    </div>
+    <dl>
+      <div class="defrow"><dt>Finality checkpoint — unit fix</dt><dd>The finality checkpoint was <strong>computed in blue-score but enforced in height</strong>; once the DAG-width skew passed the checkpoint depth, a node "finalized" a height <strong>above its own tip</strong> and permanently rejected every chain-extending block. It now uses the selected tip's <strong>height</strong>, and a one-time startup clamp heals the poisoned value. Ingesting nodes converge again.</dd></div>
+      <div class="defrow"><dt>ASERT difficulty — height-switched re-anchor</dt><dd>ASERT clamped the <strong>absolute</strong> schedule exponent to ±4×, a <em>lifetime</em> cap — difficulty could never exceed 4× the genesis target however much hashrate joined (ASICs/FPGA included). A height-switched <strong>re-anchor</strong> resets the schedule and — only for the re-anchored regime — widens the bound so difficulty <strong>tracks real hashrate</strong>. Blocks below the anchor keep the old bound byte-for-byte.</dd></div>
+      <div class="defrow"><dt>Verified live</dt><dd>Two nodes were reset to a shared base and converged on the re-anchored chain, both mining — the finality fix confirmed by nodes <strong>accepting</strong> the blocks they previously froze on. Unaudited; the coin has no value; Bloch is <strong>ownerless</strong> — a candidate release operators adopt, not a mandate.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="kramp-h">
+  <div class="wrap">
+    <p class="kicker" id="kramp-h">2026-07-16 · Bloch node v0.1.0-alpha2</p>
+    <h2>Difficulty-driven k-ramp — the fixed k=8 gate is retired.</h2>
+    <div class="prose">
+      <p>The Module-SIS residual gate no longer jumps to a fixed <strong>k=8</strong> — which had been misapplied onto the live chain and was choking block production at low hashrate for <strong>no security gain</strong> (the source flags both k=4 and k=8 as the trivial q-ary regime at β=q/16). It now rides the network's own <strong>ASERT difficulty</strong> — the Bitcoin model: more hashrate → higher difficulty → higher k.</p>
+    </div>
+    <dl>
+      <div class="defrow"><dt>k = 4 now, rising with hashrate</dt><dd>k stays 4 below a <strong>future</strong> activation height (every node upgrades first — <strong>no fork</strong>), then rises 5→6→7→8 as sustained difficulty crosses ~8×-spaced thresholds, and <strong>eases back if hashrate falls</strong> (self-healing — a capacity crash can't re-choke the chain). Backward-safe: existing k=8 blocks stay valid (k=8 ⊃ k=4).</dd></div>
+      <div class="defrow"><dt>Security is the cumulative work, not k</dt><dd>Raising k is a structural / throughput filter, <strong>not cryptographic hardness</strong> (β=q/16 is trivial-regime at any k∈{4..8}). Real security is <strong>cumulative SHAKE-256 hashcash work = hashrate × time</strong> — which needs a <em>live</em> chain to grow. The real hardness lever is a smaller β plus the outstanding audit, not k.</dd></div>
+      <div class="defrow"><dt>Also in v0.1.0-alpha2</dt><dd>The peering upgrade (<code>--max-peers</code>, <code>--dns-seed</code>, <code>--behind-proxy</code>, IBD-latch release, fresh-miner fork guard), the DAG-ordering consensus-halt fix, and the security-audit fixes. Unaudited; the coin has no value; Bloch is <strong>ownerless</strong> — a candidate release operators adopt, not a mandate.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="up-h">
+  <div class="wrap">
+    <p class="kicker" id="up-h">2026-07-15 · updates</p>
+    <h2>Also shipped today.</h2>
+    <dl>
+      <div class="defrow"><dt>Signed snapshot fast-sync — live</dt><dd>A <strong>signed chain snapshot is published</strong>, so a fresh node can onboard in one pass: download, <strong>verify its SHA-256</strong>, extract, and mine forward. (At the time this shipped, the then-active fixed k=8 gate made genesis sync impractical, so the snapshot was the only practical path; under the k-ramp above, <strong>genesis sync works again and the snapshot is an optional convenience</strong>.) See <a href="snapshot.html">Snapshot sync</a> for the direct download, the published checksum, and a worked node-deploy example. Two independent nodes were brought online from it and are mining.</dd></div>
+      <div class="defrow"><dt>Narrated node-setup video</dt><dd>A ~2½-minute narrated walkthrough with English captions — miner address, snapshot download + checksum verify, running with <code>--peer</code>/<code>--mine</code>, and keeping it alive under systemd — now on <a href="index.html">Home</a>, <a href="run-a-node.html">Run a node</a>, and <a href="snapshot.html">Snapshot sync</a>. The written steps stay authoritative.</dd></div>
+      <div class="defrow"><dt>Vestnik node-setup assistant</dt><dd>An opt-in chat helper on <a href="run-a-node.html">Run a node</a>, scoped strictly to building, peering, mining, and troubleshooting a Bloch node — nothing else. Its knowledge tracks the current onboarding path — the <strong>difficulty-driven k-ramp with the snapshot as an optional fast-sync</strong> (real CLI verbs, the miner-address step, the verified run command, systemd). It runs the one bit of JavaScript on the site and forwards a question to a language model only when you send it; it stores nothing. Live.</dd></div>
+      <div class="defrow"><dt>Reference mining pool — relaunched</dt><dd>The Postern-operated reference pool was rebuilt and redeployed (<code>postern-pool.fly.dev</code>: stratum <code>:3335</code>, dashboard over HTTPS), and the site's connection instructions were corrected to the working endpoint. Fee 0% — no revenue line touches the token. One independent pool among any number; verify or run your own.</dd></div>
+      <div class="defrow"><dt>Public bootstrap node — <code>--max-peers 500</code></dt><dd>The demo bootstrap node was redeployed with the raised peer cap, so newcomers are no longer dropped once it fills (see the peering upgrade below). Non-consensus; an external node now connects where it previously could not.</dd></div>
+      <div class="defrow"><dt>Site fixes</dt><dd>Added a <a href="pool.html">Pool</a> tab and this <strong>Releases</strong> tab; fixed the Pool nav link (a stale redirect sent it to the home page); corrected the pool endpoint text; refreshed an outbound profile link.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="what-h">
+  <div class="wrap">
+    <p class="kicker" id="what-h">2026-07-15 · Bloch peering upgrade</p>
+    <h2>Past the ~50-node wall — three non-consensus changes.</h2>
+    <div class="prose">
+      <p>PoW, block validation, serialization, and GhostDAG are <strong>untouched</strong>. The changes are operator knobs and a mining-readiness guard:</p>
+    </div>
+    <dl>
+      <div class="defrow"><dt><code>--max-peers &lt;N&gt;</code></dt><dd>The inbound peer cap was a hardcoded <strong>50</strong> — a bootstrap/hub node dropped every newcomer once full (the "~50-node wall"). It is now an operator setting. The public bootstrap runs <code>--max-peers 500</code>; a leaf node keeps it modest.</dd></div>
+      <div class="defrow"><dt><code>--dns-seed &lt;host&gt;</code></dt><dd>Opt-in, Bitcoin-style cold-start: the node resolves a hostname's A/AAAA records and dials them as peers. <code>DEFAULT_SEEDS</code> stays empty — <strong>non-privileged</strong>: run, or point at, any seed you trust.</dd></div>
+      <div class="defrow"><dt>Mining-readiness guard</dt><dd>A node told to <em>join</em> a network (has <code>--peer</code>/<code>--dns-seed</code>) no longer mines until it has connected and evaluated the network tip — so a fresh miner can't fork from genesis. Intentional solo/island miners are unaffected. Also fixed an IBD latch that left a synced node paused forever (<code>is_syncing</code> only cleared on a message no peer ever sends).</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="setup-h">
+  <div class="wrap">
+    <p class="kicker" id="setup-h">Setup, correctly</p>
+    <h2>Join, sync, then mine.</h2>
+<pre><code># 1) join &amp; sync FIRST (relay)
+./target/release/bloch --data-dir ./bloch-data \
+  --listen /ip4/0.0.0.0/tcp/16110 \
+  --peer /dns4/&lt;a-reachable-node&gt;/tcp/16110
+
+# 2) confirm it caught up
+./target/release/bloch-cli getpeerinfo      # peer_count &gt; 0
+./target/release/bloch-cli getblockcount    # reaches the tip
+
+# 3) only then add --mine  (a hub also adds --max-peers 500)</code></pre>
+    <p class="prose small">Full root-cause write-up: <a href="/Bloch-Peering-50-Node-Fix.pdf">Peering &amp; the ~50-node wall (PDF)&nbsp;↓</a>. Building/running instructions: <a href="run-a-node.html">Run a node</a>.</p>
+  </div>
+</section>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Postern Labs</h4>
+        <p>Privacy &amp; security products, sold the honest way — the BlackBerry model, on permissive Linux, built on an ownerless post-quantum commons.</p>
+        <p>No tracking. No analytics. This site makes zero network requests beyond its own pages.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="products.html">Products</a>
+          <a href="downloads.html">Downloads</a>
+          <a href="run-a-node.html">Run a node</a>
+          <a href="/explorer/">Explorer</a>
+          <a href="disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="acknowledgments.html">Acknowledgments &amp; homage</a>
+          <a href="blochprotocol.html">The blochprotocol.com domain</a>
+          <a href="https://t.me/posternlabs" rel="noopener">Community · Telegram</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>The underlying protocol runs a <strong>mainnet beta</strong> — <strong>unaudited</strong> (audit contracted, not done), nascent, <strong>low-hashrate and 51%-attackable</strong>. The Module-SIS gate is now a <strong>difficulty-driven k-ramp</strong> (v0.1.0-alpha2): k=4 today, rising 5→6→7→8 as the network's own difficulty grows, easing back if hashrate falls — the Bitcoin model. The ramp is a <em>structural</em> filter, <strong>not a security claim</strong>: real security is cumulative SHAKE-256 hashcash work — hashrate × time. Nothing here is a certified security product yet.</p>
+        <p>The coin is <strong>not a security and not an asset</strong>. No token sale, no listing effort, no price. Disclosed in full: a 17% founder premine (10-year cliff, 40-year vest), structurally passive.</p>
+      </div>
+    </div>
+    <p class="legal">MIT / Apache-2.0, per crate — no copyleft embedded in the products. The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; it lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to). <strong>Postern Labs holds no ownership of, representation of, or prerogative over the protocol</strong>, and for that reason maintains <strong>no website for Bloch-SIS-PoW</strong> (including <code>blochprotocol.com</code>) — <a href="blochprotocol.html">read the full statement</a>.</p>
+  </div>
+</footer>
+
+</body>
+</html>

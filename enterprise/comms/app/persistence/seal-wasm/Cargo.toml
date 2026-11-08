@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# bloch-comms-seal-wasm — the REAL, in-process seal binding for the Bloch comms
+# sealed-at-rest store (Business/Enterprise edition only).
+#
+# STATUS: reference prototype — UNAUDITED, pre-production.
+#
+# WHAT THIS IS
+# ------------
+# A thin WebAssembly binding that exposes the ONE canonical Postern seal
+# (postern_core::aead — XChaCha20-Poly1305, versioned, key-committing,
+# context-bound) to the JS store in `../sealed-store.mjs` WITHOUT crossing a
+# process boundary: the JS loader instantiates this module in-process and the
+# 32-byte store key never leaves the address space (contrast the SHIELD
+# container's prototype CLI adapter, which spawns a subprocess). It reimplements
+# NO cryptography — every op delegates to postern-core.
+#
+# Randomness: on wasm32-unknown-unknown getrandom has no OS source, so we wire a
+# CUSTOM getrandom that imports a host function (`postern_seal::host_getrandom`)
+# backed by Node's crypto.randomFillSync (a CSPRNG). The seal's fresh nonce is
+# therefore drawn from the host CSPRNG, in-process.
+#
+# Own workspace root (empty [workspace] below) so it is excluded from the repo's
+# virtual workspace and needs NO edit to the root Cargo.toml.
+
+[package]
+name = "bloch-comms-seal-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "In-process WASM binding wiring the Bloch comms sealed-store to the canonical postern-core seal (XChaCha20-Poly1305, key-committing). Business edition only. UNAUDITED reference prototype."
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Own workspace root: exclude from the parent virtual workspace.
+[workspace]
+
+[lib]
+# cdylib so the wasm32 build emits a standalone .wasm with our exported symbols.
+crate-type = ["cdylib"]
+
+[dependencies]
+# The canonical Postern seal (AEAD + Argon2id KDF). No crypto is defined here.
+postern-core = { path = "../../../../../crates/postern-core" }
+# Custom getrandom source: on wasm32-unknown-unknown there is no OS RNG, so we
+# register a host-provided source (see src/lib.rs). Same 0.2.x already in the
+# lock via postern-core's transitive deps.
+getrandom = { version = "0.2", features = ["custom"] }
+
+# Argon2id at the at-rest tier (64 MiB, t = 3) is unusably slow unoptimized;
+# keep the KDF path fast even in a debug wasm build. Inert unless THIS crate is
+# the workspace root (which it is — see the [workspace] note above).
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+# Abort on panic: no unwinding tables in the wasm, smaller module, and a panic
+# in the seal path should hard-fail, never limp on.
+panic = "abort"
+lto = true

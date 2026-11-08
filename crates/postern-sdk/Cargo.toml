@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "postern-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Postern SDK — the ONE wiring seam between the app front-ends and the audited product cores. Native builds a unified UniFFI/cdylib facade (wallet, vault, courier, seal, hygiene, panic, keys) for the Android/iOS/desktop shells; the `wasm` build exposes the browser-safe subset (Argon2id at-rest KDF + AEAD seal/open) the HTML front-ends probe as `globalThis.PosternSDK`. One binding instead of per-product FFI."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "postern_sdk"
+# staticlib/cdylib for the mobile/desktop targets; rlib for tests; cdylib is also
+# the wasm output the browser seam loads.
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[features]
+# Default is the full native facade so every existing consumer (mobile/desktop
+# shells, other workspace members) keeps building exactly as before.
+default = ["native"]
+
+# ── native: the UniFFI/cdylib facade over the WHOLE product suite ────────────
+# Pulls the heavy product cores + UniFFI scaffolding. This is what the
+# Android/iOS/desktop shells link.
+native = [
+  "dep:uniffi",
+  "dep:serde_json",
+  "dep:bloch-mobile",
+  "dep:postern-courier",
+  "dep:postern-seal-companion",
+  "dep:postern-hygiene",
+  "dep:postern-panic",
+  "dep:postern-keys",
+]
+
+# ── wasm: the browser seam ───────────────────────────────────────────────────
+# Binds ONLY the pure-Rust cores that cross to wasm32-unknown-unknown:
+#   * postern-core  — Argon2id at-rest KDF (the real S2 primitive)
+#   * postern-vault — XChaCha20-Poly1305 AEAD-at-rest seal/open
+# The hybrid-PQ wallet path (bloch-mobile -> bloch-crypto) is DELIBERATELY
+# excluded: bloch-crypto links PQClean C (cc + libc) and does not build for
+# wasm32-unknown-unknown. So in a browser build S1 (Falcon-1024 ‖ ML-DSA-65
+# signing) stays a labeled *classical stand-in* until a pure-Rust PQ backend
+# lands; S2 (Argon2id + AEAD at-rest) becomes REAL through this build. Honest,
+# not aspirational — see wasm/README.md.
+wasm = ["dep:wasm-bindgen", "dep:getrandom", "getrandom/js"]
+
+# ── mobile-attest: passthrough to the seal-companion Android Key-Attestation
+# verifier ───────────────────────────────────────────────────────────────────
+# A THIN passthrough that (a) turns on the full `native` facade and (b) flips
+# `postern-seal-companion/mobile-attest` so its `mobile` module compiles. It
+# adds ONE UniFFI-exported function — `verify_key_attestation(chain_der,
+# expected) -> Verdict` (see `seal.rs`) — giving the Android
+# `StrongBoxAttestationGateway.Verifier` seam a real Rust backend instead of
+# `Verifier.None`. OFF by default so the lean native build/test gate is
+# unchanged (mirrors the seal-companion crate's own lean-default discipline).
+# Honest limit inherited wholesale: still vector-tested, NOT attested — no real
+# StrongBox chain has ever crossed this seam (`vector-tested ≠ attested`).
+#   build: cargo build -p postern-sdk --features mobile-attest
+#   test:  cargo test  -p postern-sdk --features mobile-attest
+mobile-attest = ["native", "postern-seal-companion/mobile-attest"]
+
+[dependencies]
+# ── shared by both builds (cheap, pure Rust) ────────────────────────────────
+# Ergonomic typed error at the FFI boundary.
+thiserror = "2"
+# Wipe Rust-side copies of secrets (mnemonic, keys, passphrases) before drop.
+zeroize = "1"
+# The two pure-Rust cores the browser seam is allowed to bind.
+postern-core = { path = "../postern-core" }
+postern-vault = { path = "../postern-vault" }
+
+# ── native-only (heavy / C-backed / UniFFI) ─────────────────────────────────
+# UniFFI: proc-macro (no UDL) bindings. `cli` pulls in the bindgen entrypoint.
+uniffi = { version = "0.28", features = ["cli"], optional = true }
+# For the wallet's rpc_request param JSON.
+serde_json = { version = "1", optional = true }
+# The wallet core. `default-features = false` is a historical no-op (bloch-mobile
+# no longer ships its own UniFFI feature) but kept for intent.
+bloch-mobile = { path = "../../mobile/core", default-features = false, optional = true }
+postern-courier = { path = "../postern-courier", optional = true }
+postern-seal-companion = { path = "../postern-seal-companion", optional = true }
+postern-hygiene = { path = "../postern-hygiene", optional = true }
+postern-panic = { path = "../postern-panic", optional = true }
+postern-keys = { path = "../postern-keys", optional = true }
+
+# ── wasm-only ────────────────────────────────────────────────────────────────
+wasm-bindgen = { version = "0.2", optional = true }
+# postern-core reaches getrandom (via chacha20poly1305 OsRng); on
+# wasm32-unknown-unknown that needs the `js` backend, enabled by the `wasm`
+# feature above.
+getrandom = { version = "0.2", optional = true }
+
+# The UniFFI bindings generator is native tooling only.
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["native"]
+
+[dev-dependencies]
+# Test-only (never shipped): synthesize a REAL leaf←intermediate←root ECDSA
+# P-256 chain carrying the Android Key-Attestation extension, so the
+# `mobile-attest` passthrough round-trips a genuine and a wrong-root chain to
+# a Verdict THROUGH the SDK wrapper (same rcgen pattern the seal-companion
+# crate's own mobile vectors use). Only referenced by the `mobile-attest`
+# gated test module; unused when the feature is off.
+rcgen = { version = "0.13", features = ["crypto", "pem", "ring"] }

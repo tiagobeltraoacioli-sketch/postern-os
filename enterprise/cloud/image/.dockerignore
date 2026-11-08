@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Keep the build context minimal + deterministic. The Containerfile only COPYs
+# vendor/services, so nothing else needs to enter the context (smaller context =
+# fewer inputs that can perturb the image bytes).
+*
+!vendor/services/**
+
+# Never let operator-owned config/secrets leak into the image context.
+config/
+secrets/
+*.env

@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'sha256-SMLID9BWNjKkKtuDRZ6i3E+tksgAGbTfYINb1WxwXcA=' 'unsafe-hashes' 'sha256-OerbkFTZcev1vnw2V8Pvf/LSwPnMHvr3SwmLNpY3VcY=' 'sha256-duB80EBga2D8sM4uqBxfocWSpMpdPUKhDJEws/AJJEY=' 'sha256-W44lYdlXEIdXA+u5lS5qL1dxr2TojBp4p14yOMW6Jz0=' 'sha256-vyaCh9A5MeESrzYoay95A6yLQjJ388e8La2tXHqoVQQ=' 'sha256-49u6Cy0rhn1sPTOXK3ewj9YIySFZYgbgjB3KtaK+jRU=' 'sha256-/8bPNTwQpOj3ZluB4/gq33E+uCo9ilMR0qHN6pKAjZM='; img-src 'self'; media-src 'self'; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests">
+<meta name="description" content="The Postern suite with honest labels: built vs designed, reference prototypes, and an unaudited badge on everything.">
+<meta name="color-scheme" content="dark light">
+<title>Products — the honest catalog · Postern Labs</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="index.html">Home</a>
+      <a href="postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="products.html" aria-current="page">Products</a>
+      <a href="downloads.html">Downloads</a>
+      <a href="run-a-node.html">Run a node</a>
+      <a href="migration.html">SHA-256 migration</a>
+      <a href="snapshot.html">Snapshot sync</a>
+      <a href="pool.html">Pool</a>
+      <a href="asic.html">ASIC</a>
+      <a href="releases.html">Releases</a>
+      <a href="security.html">Security</a>
+      <a href="/explorer/">Explorer</a>
+      <a href="disclaimer.html">Disclaimer</a>
+      <a href="acknowledgments.html">Acknowledgments</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) · very few nodes, low hashrate, 51%-attackable · not a security · for evaluation —
+  <strong>not to protect real secrets yet</strong>. <a href="disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">The Postern Store — presented honestly</p>
+    <h1>The catalog, with its labels on.</h1>
+    <p class="lede">Every entry below carries an honest status badge. <strong>Built</strong> means the Rust core compiles and its tests pass. <strong>Reference prototype</strong> means a working front-end that demonstrates the design. <strong>Design / spec</strong> means a documented plan, not running software. And <strong>everything</strong> — no exceptions — is <strong>unaudited</strong>.</p>
+    <div style="margin-top:1.4rem" class="cta-row">
+      <span class="badge built">core: built · tests pass</span>
+      <span class="badge proto">reference prototype</span>
+      <span class="badge design">design / spec</span>
+      <span class="badge unaud">unaudited</span>
+    </div>
+    <p class="prose small" style="margin-top:1.2rem">Where an OS image exists, its badge states exactly how far it has been proven: <em>built</em> is not <em>booted</em>, and a <em>QEMU boot</em> is not a <em>hardware boot</em>.</p>
+  </div>
+</section>
+
+<section aria-labelledby="cores-h">
+  <div class="wrap">
+    <p class="kicker" id="cores-h">The cores</p>
+    <h2>Product cores — built, test-verified, unaudited.</h2>
+    <p class="prose">The verified Rust foundations (<code>crates/postern-*</code>). All of them seal with one canonical primitive set: an XChaCha20-Poly1305 AEAD seal and an Argon2id KDF, so one core to audit protects everything.</p>
+    <div class="grid">
+      <article class="card">
+  <h3>Postern Wallet</h3>
+  <p>Post-quantum hybrid wallet (Falcon‖ML-DSA), diversified addresses, on-device key vault. Talks to the ownerless protocol via public RPC — now the unaudited mainnet beta (nascent, 51%-attackable), so the coins it holds carry no value claim and are not for investment.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Vault</h3>
+  <p>A secrets / password vault, sealed at rest. Reuses the wallet's key-wrapping design (StrongBox / Secure Enclave class) — highest infrastructure reuse in the portfolio. On desktop it now has a <strong>live macOS-Keychain vault path</strong> (the wrap key held in the OS keystore). Unaudited.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Courier</h3>
+  <p>Serverless person-to-person file drop: the payload is sealed with ML-KEM-1024 (FIPS-203) and delivered over an ephemeral Tor onion service. No server ever holds your file.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Vestnik</h3>
+  <p>The Megolm E2EE core (via vodozemac — the Matrix project's Rust Olm/Megolm, Apache-2.0, audited by Least Authority in 2022; that audit covers vodozemac, not this product) now backs a real, offline-testable Matrix client: login / sync / room-tier / tier-gated-E2EE-send with PQ-sealable saved-session custody, wired end-to-end behind a desktop pane. Live login/sync/send stay ignore-gated (never booted in CI); Megolm is classical, not post-quantum, and the homeserver still sees the social graph.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Seal Companion</h3>
+  <p>The user-facing attestation verifier: self-audit and peer-verify. Turns the Seal from invisible infrastructure into something you can see and use — verify Postern's claims instead of trusting them. It now validates a <strong>genuine AWS SEV-SNP attestation report</strong> end-to-end — the full VLEK→ASVK→ARK certificate chain to AMD's pinned root, bound to a fresh nonce, proven against <strong>real AMD Milan silicon</strong>. An <strong>unaudited reference verifier</strong>: “verified against real hardware” is not “audited” or “production.”</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Panic Lock</h3>
+  <p>A panic button that instantly re-locks: one call seals the vault. It destroys nothing — an ethics decision, not a limitation.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Keys</h3>
+  <p>A passkey / FIDO2 credential core. Identity is the biggest unfilled gap in the permissive-license daily-driver — this is the Apache-side answer. A passphrase-sealed export / import path (carry a credential between machines over the existing sealed blob) is built and test-verified in review — unaudited, not yet deployed.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Hygiene</h3>
+  <p>Document metadata scrubbing for OOXML, ODF, and JPEG — the author fields, revision trails, and EXIF that leak when nothing else does.</p>
+  <div class="badges"><span class="badge built">core: built · tests pass</span> <span class="badge unaud">unaudited</span></div>
+</article>
+    </div>
+    <h3 style="margin-top:2.2rem">Under the hood</h3>
+    <p class="prose small">Shared plumbing you don't install separately: <strong>Postern Core</strong> (the one canonical seal), <strong>Postern Quarantine</strong> (inbound-document safety — the mirror of Hygiene), <strong>Postern Tor</strong> (in-process Tor via Arti), <strong>Postern Telephony</strong> (carrier SMS/calls surface for Postern OS Mobile), the <strong>Postern SDK</strong> (now the single UniFFI <code>setup_scaffolding!</code> surface over the whole suite for Android / iOS / desktop — exactly-one-scaffolding, CI-checked; the app shells import <code>postern_sdk</code> directly; the SDK now exposes the <strong>real Argon2id KDF Rust-side</strong>, though the HTML app demos such as Chiave still use a PBKDF2 stand-in until they adopt it), <strong>postern-trail</strong> (the one append-only, SHAKE-256 hash-chained audit trail behind Yagabona and Ezekiel 1 — tamper-<em>evident</em>, not tamper-<em>proof</em>), and <strong>postern-policy</strong> (the one shared consent kernel — fail-closed decisions, required grant expiry, revocation-as-never-given, and the honest userland-not-kernel enforcement caveat every surface reuses). All built and test-verified; all unaudited. The mobile signer tracks the node's signed bytes per network; the byte-identity golden re-pin is still pending. The <strong>mobile↔desktop integration that turns the phone into an offline signer for the desktop (phone-as-signer)</strong> has a <strong>working v1 reference implementation (real interop)</strong> — QR + spoken-code pairing over a post-quantum-hybrid channel, a replay-proof sign-request protocol whose keys structurally cannot cross the wire, a WalletCore-backed mobile signer, and <strong>monotonic per-grant revoke</strong> (“revoke this laptop”). A <strong>v2 message shape is forward-declared but not built</strong>; everything is <strong>unaudited, and the desktop and phone ends are not yet unified on one wire</strong>. It is a reference of the shape, not a shipped feature.</p>
+  </div>
+</section>
+
+<section aria-labelledby="apps-h">
+  <div class="wrap">
+    <p class="kicker" id="apps-h">The apps</p>
+    <h2>Reference front-ends — self-contained, honest by construction.</h2>
+    <p class="prose">Each app is a single self-contained HTML file. Where an AI concierge is offered, you bring your own Claude key — nothing is proxied through us. Every app carries an honest privacy panel, and none of them claims “100% private”.</p>
+    <div class="grid">
+      <article class="card">
+  <h3>Sotto</h3>
+  <p>A quiet, privacy-first voice assistant.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Vedetta</h3>
+  <p>A quiet lookout on the markets — voice-driven; your holdings never leave the device.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Tolmach</h3>
+  <p>A private interpreter and meeting-minutes taker.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Store</h3>
+  <p>Say what you need; it parameterizes the search across the catalog. Backed by a self-hosted, F-Droid-style multi-repo <strong>Depot</strong> — a reproducible-build verifier and CRL revocation, so apps are distributed without a gatekeeper.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Chiave</h3>
+  <p>Sign in with your wallet — no email, no account. The postern-sdk now provides a real Argon2id KDF, but this HTML demo still uses a PBKDF2 stand-in until it adopts it.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Sarto</h3>
+  <p>The onboarding configurator — set up your Postern, including transparent (never covert) parental and corporate controls.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Consiglio</h3>
+  <p>The enterprise admin console, now with a real hybrid-PQ (Falcon‖ML-DSA) signature verifier. The server-side authorization now binds every privileged control verb to an authenticated PQ-login session (closing the caller-identity spoofing that previously defeated dual-control) — built and test-verified in review, unaudited and not yet deployed. Full dual-control / separation-of-duties and Chinese-Wall enforcement remains in progress; LGPD/GDPR/CCPA-enabling controls.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Yagabona</h3>
+  <p>Privacy-first scheduled-task agent daemon for Postern OS: a task runs only when you author an Izbushka manifest granting it a scoped, expiring capability. Fail-closed, hash-chained tamper-evident audit — enforced in userland by construction, not an OS sandbox; a rooted host defeats it. Local-only, zero telemetry.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Izbushka</h3>
+  <p>The task portal — the only door into Yagabona: a console that authors signed task manifests and makes no network calls of its own (<code>connect-src 'none'</code>).</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Ezekiel 1 — Personal</h3>
+  <p>Parental controls, nothing more: one household, parent → child levels, no tenants, no spying — a child reaching up to a parent is refused. Per-access fail-closed, hash-chained audit; the console runs fully offline. Free forever on mobile; the desktop build is freemium — 2 years free, then a key for updates — and your household's data always stays openable either way.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Ezekiel 1 — Business</h3>
+  <p>Consiglio's access-layer governance engine: nested no-widening layers, Bell-LaPadula levels, Brewer-Nash Chinese walls, tenant isolation — every access evaluated fail-closed in userland, hash-chained tamper-evident audit, no Postern server. Not legal advice: it demonstrates controls that enable compliance, it is not compliance.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>NoporIS</h3>
+  <p>The guarded <em>bridge</em> between the Google-Play side and the hardened world. Now unified on one canonical consent kernel (parity-tested), with strict gate-state loading, revoke-all fan-out, and <code>from_persona</code> enforced at the receiver — a managed-profile persona switch that actually drives the daemon. Android bridge tier; reference front-end, unaudited.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Porog</h3>
+  <p>The guarded <em>door</em> into the hardened world — an AOSP managed profile. Collapsed to <strong>one</strong> Kotlin reconcile decision path (golden-vector-pinned, 321 parity checks green); StrongBox key-attestation now <strong>pinned to a real captured attestation cert chain</strong>, with a <code>--mobile</code> verify CLI. Verified on a real device only; Kotlin is compile-correct by inspection here.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Sloboda</h3>
+  <p>The tier where data <em>leaves</em> the sealed base entirely, over a host-side Tor egress rail (a POSIX-sh watcher). By design it is <strong>never Seal-covered and never attested</strong> — and states that plainly in-product.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+      <article class="card">
+  <h3>Postern Wallet — mobile</h3>
+  <p>A touch-first mobile wallet face for the ownerless Bloch base: the screens and the phone-as-signer approve / WYSIWYS flow. A <strong>reference prototype</strong> — a browser software keystore (not the phone's StrongBox / Secure Enclave), a <strong>labelled placeholder</strong> PQ signature (not a real Falcon‖ML-DSA sign), and illustrative balances with the live-node RPC seam disabled. Installs as a <strong>PWA</strong> — add it to your home screen or desktop and it opens full-screen and works offline (<code>connect-src 'self'</code>, same-origin only — still no live node, no external network). Moves <strong>no real funds</strong>.</p>
+  <div class="badges"><span class="badge proto">reference prototype</span> <span class="badge unaud">unaudited</span></div>
+</article>
+    </div>
+  </div>
+</section>
+
+
+<section aria-labelledby="ai-h">
+  <div class="wrap">
+    <p class="kicker">AI interactions · bring your own key</p>
+    <h2 id="ai-h">Some apps talk to Claude — with your key, not ours.</h2>
+    <div class="prose">
+      <p>A few of the apps use Claude to do their work. <strong>Sotto</strong>, <strong>Vedetta</strong>, and <strong>Tolmach</strong> need a key to function; <strong>Postern Store</strong> and <strong>Sarto</strong> take one only for an optional feature; <strong>Izbushka</strong> and <strong>Ezekiel 1</strong> never touch the network at all. Wherever a key is used, you supply your <strong>own Anthropic (Claude) key</strong> and the app calls Anthropic directly from your browser — <strong>nothing is proxied through a Postern server</strong> (the one exception, Tolmach's subscription tier, is called out below). The AI path is optional; the parts of each app that don't need Claude work with no key at all.</p>
+    </div>
+
+    <div class="panel owned">
+      <header>
+        <span class="tag"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="9" r="4.6"/><path d="M11.3 12.2 20 21"/><path d="M17 18l2.2-2.2M15 16l1.6-1.6"/></svg> how the AI concierge is wired</span>
+        <h3>Bring your own key</h3>
+        <p style="margin-top:1.2rem"><span class="badge byok">bring your own key</span> <span class="badge unaud">unaudited</span></p>
+      </header>
+      <div class="body">
+        <p><strong>How the AI works — and what leaves your machine.</strong> These apps talk to Claude using <strong>your own Anthropic API key</strong>. The key is entered in your browser and stored in this browser's <code>localStorage</code>; on the apps that offer it, you can <strong>seal the key at rest</strong> with a passphrase (AES-256-GCM), so the browser holds only ciphertext until you unlock it for a session. <strong>There is no Postern server in this path</strong> — nothing we run ever sees your key or your prompts.</p>
+        <p><strong>But "your own key" is not "private AI," and it is not "local AI."</strong> Every message you send is transmitted from your browser <strong>directly to Anthropic</strong> (<code>api.anthropic.com</code>) and is processed on <strong>Anthropic's servers</strong>, under <strong>Anthropic's terms</strong>. Using your own key changes <em>who is billed</em> (you, on your Anthropic account) and <em>who contracts with Anthropic</em> (you) — it does <strong>not</strong> keep your prompt on your machine. <strong>Sending a prompt to Claude is sending your data to a third party.</strong> If a message would be unsafe for Anthropic to see, do not send it.</p>
+        <p>What this design <em>does</em> give you: no extra middleman between you and Anthropic, no Postern account, no Postern-side logging, and a single readable HTML file you can inspect to confirm the only place your prompt goes is <code>api.anthropic.com</code>.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:2.2rem">Which apps use it</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>App</th><th>AI role</th><th>Key path</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Sotto</strong></td><td>Voice assistant — Claude is the brain.</td><td><span class="badge byok">bring your own key</span></td></tr>
+          <tr><td><strong>Vedetta</strong></td><td>Markets lookout — AI analysis over your holdings.</td><td><span class="badge byok">bring your own key</span> <span class="small dim">· optional Finnhub key for near-real-time US quotes</span></td></tr>
+          <tr><td><strong>Tolmach</strong></td><td>Interpreter and meeting-minutes.</td><td><span class="badge byok">bring your own key</span> <span class="small dim">· subscription tier planned (not enabled today)</span></td></tr>
+          <tr><td><strong>Postern Store</strong></td><td>Natural-language catalog search (opt-in).</td><td><span class="badge byok">bring your own key</span> <span class="small dim">· optional — the catalog works keyless</span></td></tr>
+          <tr><td><strong>Sarto</strong></td><td>Onboarding configurator (spoken/typed intent → profile).</td><td><span class="badge byok">bring your own key</span> <span class="small dim">· optional — the manual editor works keyless and offline</span></td></tr>
+          <tr><td><strong>Izbushka / Yagabona</strong></td><td>Task portal — authors signed manifests; makes no calls.</td><td><span class="small dim">none — <code>connect-src 'none'</code></span></td></tr>
+          <tr><td><strong>Ezekiel 1</strong></td><td>Governance console — runs entirely offline.</td><td><span class="small dim">none — <code>connect-src 'none'</code></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warnpanel" role="note">
+      <h3>The honest caveats</h3>
+      <p><strong>Voice input goes to a third party too — and it is a <em>different</em> third party.</strong> Voice uses your browser's built-in speech recognition (the Web Speech API). In Chrome and Chromium-based browsers this <strong>streams your microphone audio to Google's servers</strong> for transcription — it is <strong>not</strong> on-device, and this is the one data flow that does <strong>not</strong> go to Anthropic. It cannot be restricted by our page's network policy, because the browser performs it. Voice is <strong>off until you turn it on</strong>, is <strong>push-to-talk</strong> (the mic is live only while you hold the button — except Tolmach's Listen/Minutes modes, where the mic stays hot for as long as the mode runs), and we keep no recordings and add no telemetry. Once audio reaches Google it is handled under Google's terms, outside our control. <strong>Want nothing audio to leave the machine? Type instead — typed input stays local until you send it to Claude.</strong> Spoken replies are generated on your device.</p>
+      <p><strong>Vedetta also talks to your market-data providers.</strong> To fetch quotes it connects to the providers you choose from a fixed allowlist (CoinGecko, Frankfurter, Finnhub, Yahoo Finance). <strong>Each quote lookup reveals the symbol you searched to that provider</strong>, and your Finnhub key is sent to Finnhub. So Vedetta's honest destination list is: <strong>Anthropic (your prompts), your chosen quote providers (your symbols), and — if you use voice — your browser's speech vendor (your audio).</strong> Never described as fully private.</p>
+      <p><strong>Tolmach is bring-your-own-key only, for now.</strong> A hosted <em>Subscription</em> tier — where Claude usage would be billed to the operator instead of you, so your messages would pass through a Postern/operator proxy that sees the prompt text in transit — is <strong>planned as a future evolution, not enabled today</strong>. When it ships it will be clearly labelled the <strong>less-private</strong> option; the bring-your-own-key path will always remain and be the recommended one; and it will never be marketed as equally private.</p>
+    </div>
+  </div>
+</section>
+
+
+<section aria-labelledby="appvid-h">
+  <div class="wrap">
+    <p class="kicker" id="appvid-h">See them in action</p>
+    <h2>Short demos — the real apps, labelled for what they are.</h2>
+    <div class="prose">
+      <p>Each clip is the <strong>actual app running</strong> (or, for the headless daemons, an honest explainer card), narrated and subtitled. All are <strong>pre-release beta and unaudited</strong>. Where an app offers an AI concierge, you bring your own Claude key and that cloud path is honestly the <strong>less-private</strong> one — nothing is proxied through us (except the clearly-labelled Tolmach subscription tier). Nothing shown is a security claim.</p>
+    </div>
+    <div class="videos">
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/sotto-demo.mp4" type="video/mp4"></video><figcaption class="small"><strong>Sotto</strong> — privacy-first voice assistant (bring-your-own key)</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/vedetta-demo.mp4" type="video/mp4"></video><figcaption class="small"><strong>Vedetta</strong> — voice markets lookout; research only, holdings stay on-device</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/tolmach-demo.mp4" type="video/mp4"></video><figcaption class="small"><strong>Tolmach</strong> — private interpreter + meeting minutes</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/store-demo.mp4" type="video/mp4"></video><figcaption class="small"><strong>Postern Store</strong> — natural-language catalog search (local, no tracking)</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/postern-chiave-presentation.mp4" type="video/mp4"></video><figcaption class="small"><strong>Chiave</strong> — sign in with your wallet; no email, no account, no server. Prototype: keys are a browser software keystore, hardware-backed unlock is the labelled goal · unaudited</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/sarto-demo.mp4" type="video/mp4"></video><figcaption class="small"><strong>Sarto</strong> — onboarding + transparent (never covert) controls</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/postern-consiglio-presentation.mp4" type="video/mp4"></video><figcaption class="small"><strong>Consiglio</strong> — enterprise console: wallet-as-login, RBAC, dual-control / separation-of-duties, Chinese-Wall barriers. Prototype: the hybrid-PQ verify is real; dual-control/SoD and walls are declared-not-yet-runtime-wired · not legal advice</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/postern-ezekiel1-presentation.mp4" type="video/mp4"></video><figcaption class="small"><strong>Ezekiel 1</strong> — access-layer governance, personal + business editions: nested layers that never widen their parent, Chinese walls, SHAKE-256 hash-chained audit. Enforced in userland by construction, not an OS/kernel boundary · unaudited</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/postern-yagabona-presentation.mp4" type="video/mp4"></video><figcaption class="small"><strong>Yagabona</strong> — the privacy-first scheduled-task daemon: fail-closed Threshold Test, explicit expiring capability grants, hash-chained audit trail. An explainer of the manifest + rules (the daemon is headless); UNBUILT/UNBOOTED on a device · unaudited</figcaption></figure>
+      <figure><video controls playsinline muted preload="metadata"><source src="/media/postern-izbushka-presentation.mp4" type="video/mp4"></video><figcaption class="small"><strong>Izbushka</strong> — the task portal, the door into Yagabona: author/grant/schedule tasks, TOML manifests, the cursor-companion mascot. <code>connect-src 'none'</code> — no network; it only authors manifests</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="plat-h">
+  <div class="wrap">
+    <p class="kicker" id="plat-h">OS &amp; platform</p>
+    <h2>The bigger surfaces — labelled built vs designed.</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Surface</th><th>What it is</th><th>Honest status</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Postern OS (node appliance)</strong></td><td>A reproducible NixOS image that boots straight into a running node — same inputs, same image. Nix profiles in <code>os/</code>. x86_64 ISO built, hosted, and release-signed; now <strong>QEMU/TCG-boots to a login prompt</strong> (boot log recorded, grader rc=0); hardware boot further out. <a href="downloads.html">Download &amp; verify →</a></td><td><span class="badge built">node iso: built · signed · QEMU/TCG boots to login</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Postern OS — Desktop</strong></td><td>The daily-driver privacy OS: reproducible, hardened, attestable-by-design (hardened GNOME, LUKS, Tor, Postern Browser — its DNS and hardening were recently tightened, still <strong>hardened, not anonymous</strong>, unaudited public beta). x86_64 ISO built, hosted, and release-signed; QEMU boot pending (no boot log published yet); hardware boot further out. <a href="downloads.html">Download &amp; verify →</a></td><td><span class="badge built">iso: built · hosted + signed · QEMU boot pending</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Postern OS — Mobile</strong></td><td>The wallet-first phone OS on Mobile NixOS (PinePhone / aarch64), defined by the <code>os/mobile.nix</code> module (documented build target <code>.#mobile-image</code>). Image is built, hosted, and release-signed — but <strong>not yet boot-tested on QEMU-aarch64 or hardware</strong>: built ≠ booted.</td><td><span class="badge proto">img: built · hosted + signed · not yet boot-tested (QEMU or hardware)</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Kalinov Bridge</strong> <span class="small dim">— Postern backups on Filecoin</span></td><td>The <em>Kalinov</em> bridge between worlds — a <strong>Bloch ↔ Postern ↔ Filecoin</strong> path for private user backups of Postern OS files: sealed client-side with the <strong>Postern seal</strong> (XChaCha20-Poly1305) <em>before</em> leaving the sealed base, then stored on <strong>Filecoin</strong> as ciphertext (Filecoin never sees plaintext; keys never leave the device). Post-quantum integrity via a <strong>SHAKE-256</strong> manifest signed <strong>ML-DSA-65&nbsp;‖&nbsp;Falcon</strong>, anchored to the ownerless Bloch base as a <strong>zero-value “DATA0” commitment</strong>. <strong>Status:</strong> the <strong>ML-DSA-65&nbsp;‖&nbsp;Falcon signer over the SHAKE-256 manifest is now implemented + tested at the crate level</strong> (<code>postern-backup-net</code>, unaudited — an end-to-end test signs a real backup and verifies both signature halves); the <strong>on-chain DATA0 broadcast + desktop-pane wiring remain roadmap</strong>. A first slice already runs as an <strong>unaudited reference prototype</strong> — the <a href="downloads.html#desk-h">Encrypted Backup pane</a> seals locally, writes the SHAKE-256 “DATA0” anchor, and does a <strong>real Filecoin upload of the sealed ciphertext</strong> (real CID, ciphertext-only). Not audited, not production — no real backup should rely on it yet. Designed ≠ built ≠ booted. <a href="/Postern-Roadmap.md">Roadmap →</a></td><td><span class="badge design">design / spec</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Postern for postmarketOS (community edition)</strong></td><td>The non-attestable tier: the app suite + wallet as signed apk packages on stock postmarketOS. Signed only — no reproducibility or attestation claim, software keystore. The apk repo is now live (3 packages); never device-booted.</td><td><span class="badge proto">3 signed apks · repo live · non-attestable · never device-booted</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Porog</strong> <span class="small dim">— Postern Container (Android)</span></td><td>The <em>porog</em> is the threshold — the guarded doorstep of the Izbushka hut — the door meant to unite two worlds on the phone you already own: your personal side and a hardened workspace. It has nudged past pure design on one front: a <strong>real StrongBox key-attestation skeleton</strong> now lives in the Android app shell (a hardware-backed X.509 attestation chain). The <strong>defining self-enrolled-DPC / managed-profile isolation and Tor-only egress remain design/spec</strong> (unstarted in code). Bounded honestly: even complete this yields a <strong>key-attested device, not a measured-boot workspace</strong>; it is <strong>hardened, not anonymous</strong>; a <strong>rooted host defeats it</strong>; and it is <strong>never “Postern OS.”</strong> Not shipping. <em>Porog</em> is a <strong>proposed name, pending trademark clearance</strong>.</td><td><span class="badge design">name proposed · pending trademark clearance</span> <span class="badge proto">StrongBox key-attest skeleton · DPC isolation design-only · not shipping</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>NoporIS</strong> <span class="small dim">— the bridge (dual-persona Android)</span></td><td>Where <em>Porog</em> is the <strong>door</strong>, <strong>NoporIS is the <em>bridge</em></strong> (the Kalinov crossing of the tales): a dual-persona layer that joins two worlds on one phone — your personal side and a second, <strong>Google-Play-enabled</strong> persona — so you don't carry two devices. The Google side is honestly the <strong>less-private</strong> side: it phones home to Google, so NoporIS sells <strong>separation, not privacy</strong> on that side, and it <strong>respects Google/Android licenses</strong> (no GMS redistribution — the user brings their own Google install; no SafetyNet/Play-Integrity circumvention — honest labelling instead; Android &amp; Google Play named nominatively only). Reuses <em>Porog</em>'s managed-profile plumbing without forking it; the guarded crossing is deny-by-default, per-capability. A <strong>concept scaffold</strong>, not shipping; a rooted host defeats the separation; <strong>never “Postern OS.”</strong> <em>NoporIS</em> is a <strong>proposed name, pending trademark clearance</strong>.</td><td><span class="badge design">name proposed · pending trademark clearance</span> <span class="badge design">design / spec</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Cloud edition</strong></td><td>Confidential-VM deployment (SEV-SNP / TDX). The attested path advanced past spec: the <strong>SEV-SNP attestation verifier now validates a genuine AWS SEV-SNP attestation report end-to-end</strong> — the full <strong>VLEK→ASVK→ARK</strong> certificate chain to AMD's pinned root, bound to a fresh nonce, proven against <strong>real AMD Milan silicon</strong> (an <strong>unaudited reference verifier</strong>: “verified against real hardware” is <em>not</em> “audited” or “production”). Alongside it, a <strong>TDX quote parser that stays fail-closed</strong> (it never returns <em>Genuine</em>) and an <code>os/cloud.nix</code> profile (in-guest LUKS-keyed <code>/persist</code>). The <strong>guest-side deployment</strong> — the confidential VM you would actually run — is still <strong>unbuilt and unbooted</strong>: code, a proven verifier, and profiles, not a running, hosted TEE. A <strong>hosted reference-prototype</strong> of the license-verification service is live for inspection at <a href="https://postern-cloud-demo.fly.dev/v1/posture" rel="nofollow noopener">postern-cloud-demo.fly.dev</a> — its <code>/v1/posture</code> endpoint discloses, in its own words, that hosting is <strong>less private than on-device verification</strong> (the operator sees which org checked in and when). No private key is hosted; unaudited staging, not production.</td><td><span class="badge proto">reference prototype</span> <span class="badge design">design / spec</span> <span class="badge unaud">unaudited</span></td></tr>
+          <tr><td><strong>Business &amp; enterprise editions</strong></td><td>Identity &amp; governance model (wallet-as-login, org controls); Consiglio is its console prototype — now with a real hybrid-PQ verifier (dual-control / separation-of-duties declared but not yet runtime-enforced). Admin console + master→sub licensing (a revocation-list / CRL endpoint now exists as a reference prototype; Dun &amp; Bradstreet KYC remains a documented TODO — DUNS is format-checked only), internal team comms with the compliance-engine prototypes mounted, and the BYOD shield — <a href="#biz-h">detailed below</a>. Only the master-license generator ships today.</td><td><span class="badge design">design / spec</span> <span class="badge proto">reference prototype</span></td></tr>
+          <tr><td><strong>Postern Svitok</strong> <span class="small dim">— encrypted office suite (свиток)</span></td><td>An <strong>encrypted office suite</strong> — deliberately <strong>not</strong> named after the Word/Excel/PowerPoint/Office marks (&ldquo;office&rdquo; is a plain descriptor only). It gives <strong>.docx / .pptx / .xlsx-compatible</strong> editing by <strong>aggregating unmodified LibreOffice</strong> (MPL — never forked) under a Postern shell: documents are <strong>sealed at rest by default</strong> with the one canonical seal (<code>postern-core</code>), scrubbed on export (Hygiene) and sanitized on import (Quarantine). <strong>Design / scaffold</strong>: the seal-at-rest + Panic-evict session core is started and tested (crate <code>postern-office</code>); the LibreOffice-aggregate editor is planned. Honest limit — an inherent <strong>non-zero plaintext-while-editing window</strong> (minimized via secured scratch / no-swap / secure-delete / Panic-Lock eviction; never claimed zero). Name pending trademark clearance.</td><td><span class="badge design">design / spec</span> <span class="badge design">name proposed · pending trademark clearance</span> <span class="badge unaud">unaudited</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose small" style="margin-top:1.2rem">Licensing, suite-wide: MIT / Apache-2.0 per crate, no GPL/AGPL embedded anywhere in the products. Ready to try something? Head to <a href="downloads.html">downloads</a> — and read the <a href="disclaimer.html">disclaimer</a> first.</p>
+    <p class="prose small" style="margin-top:.6rem"><strong>Two roadmaps.</strong> What comes next lives in two deliberately separate documents. The <a href="/Postern-Roadmap.md">Postern products roadmap (Markdown)&nbsp;↓</a> is the <strong>owned</strong> plan for everything on this page — the suite cores and their Tauri/TUF signed packaging, Vestnik, the Postern OS images, Terem, and the Layer-2 <strong>RWA / BaaS</strong> products that anchor to the ownerless base. The <a href="/Bloch-Roadmap.md">Bloch open protocol items (Markdown)&nbsp;↓</a> is <strong>not</strong> a plan of ours or anyone's: the base is <strong>ownerless</strong> — no owner, no authority, no schedule, no governance, <strong>pure PoW</strong> — just candidate items any node operator or community member may pursue, the way Bitcoin has BIPs. Together they replace the old single "Future Roadmap" PDF that mixed the two layers. Both are honest and unaudited; BLCH is <strong>not a security</strong>, and Postern's revenue never touches the token.</p>
+  </div>
+</section>
+
+<section aria-labelledby="biz-h">
+  <div class="wrap">
+    <p class="kicker" id="biz-h">Business &amp; enterprise editions</p>
+    <h2>The corporate story — mostly designed, honestly labelled.</h2>
+    <div class="prose">
+      <p>With <strong>two exceptions</strong>, the business and enterprise editions are <strong>designs and reference prototypes — pre-production, UNAUDITED, not shipping</strong>. The two things that are actually <strong>live</strong> today are the <a href="/license/master">master-license generator</a> and the <a href="postern-vs-bloch.html#build-h">public SDK clients</a>. Everything below is labelled with exactly what it is. <strong>“Adherence-by-design” is a design goal, not a certification</strong>; for the regulated pieces a <strong>legal review is a hard gate</strong> before anything ships.</p>
+    </div>
+    <figure style="margin:1.6rem 0">
+      <video controls playsinline preload="metadata" style="width:100%;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#000"><source src="/media/postern-enterprise.mp4" type="video/mp4"></video>
+      <figcaption class="small dim" style="margin-top:.6rem">A ~2.5-minute overview of the business / enterprise edition (English narration, English captions burned in). Almost everything shown is <strong>designed / reference prototype, pre-production, unaudited</strong> — only the master-license generator and the open-source SDK clients are live today. Employer-run tools are <strong>not “fully private”</strong>; the BYOD shield <strong>never touches the personal side</strong>; the mobile↔desktop integration was <strong>designed</strong> when this video was made — a <strong>v1 reference implementation now exists (real interop, with monotonic per-grant revoke); a v2 shape is forward-declared but not built — still unaudited and not wired end-to-end</strong>. Coin is worthless / not a security; billing, if any, is in fiat, never the coin.</figcaption>
+    </figure>
+    <dl>
+      <div class="defrow">
+        <dt>Admin console &amp; master→sub licensing</dt>
+        <dd>A company with a <strong>DUNS number</strong> generates a <strong>master license</strong> — unlimited users, offline-verified, no telemetry — and splits it into scoped sub-accesses. The <strong>generator is live</strong> at <a href="/license/master">/license/master</a>; the <strong>admin console and its management features are a reference prototype</strong>, not shipping software. The previously-missing <strong>revocation path now exists</strong> as a reference prototype: a published <strong>revocation-list (CRL) endpoint</strong> — an <strong>in-memory reference store</strong>, keyed by a token-signature hash rather than serials, and <strong>not server-signed</strong> (a durable, signed store is the design, not the state today). <strong>Dun &amp; Bradstreet KYC at renewal is still a documented TODO</strong> — the DUNS is <strong>format-checked only</strong> (9 digits), not verified against D&amp;B. The CRL endpoint lives in the licensing service, <strong>merged but not yet deployed</strong> — not a live endpoint. <span class="badge built">live</span> <span class="small dim">— generator</span> <span class="badge built">merged · not yet deployed</span> <span class="small dim">— CRL endpoint</span> <span class="badge design">designed · reference prototype · not shipping</span> <span class="small dim">— console</span> <span class="badge unaud">unaudited</span></dd>
+      </div>
+      <div class="defrow">
+        <dt>Internal team communication</dt>
+        <dd>Org-wide end-to-end-encrypted messaging built on the <strong>Vestnik core</strong>, now with the <strong>compliance-engine prototypes mounted</strong> — retention, DSAR (data-subject-access requests), breach notification, and an admin-actions audit trail. LGPD/GDPR <strong>adherence-BY-DESIGN — not certified</strong> (legal review is a hard gate; these reference-prototype engines are plumbing, not a compliance certificate). Because it is an <strong>employer-run tool it is honestly not “fully private”</strong>: message <strong>bodies are E2EE</strong>, but <strong>metadata is visible to the organization</strong> and <strong>retention is disclosed</strong> — there is <strong>no silent backdoor</strong>, and the employer-visibility wrinkle is stated, not hidden. <span class="badge design">designed · reference prototype · not shipping</span> <span class="badge unaud">unaudited</span></dd>
+      </div>
+      <div class="defrow">
+        <dt>BYOD shield container</dt>
+        <dd>Reach the corporate Linux system from a <strong>personal phone</strong>; <strong>leaving the container loses access</strong> to corporate data. Honestly: containment is <strong>by construction — a rooted phone defeats it</strong>; offline revoke is <strong>best-effort</strong>; and it <strong>never surveils the personal side</strong> — it touches corporate data only, that scope is disclosed and employee-visible. LGPD/GDPR BYOD <strong>adherence-by-design, not certified</strong>; legal review is a hard gate. <span class="badge design">designed · reference prototype · not shipping</span> <span class="badge unaud">unaudited</span></dd>
+      </div>
+      <div class="defrow">
+        <dt>Deployment, signed-build channel &amp; SLA support</dt>
+        <dd>The <a href="disclaimer.html#d9">§9</a> revenue line: deployment tooling, a signed/notarized build channel, and priority/SLA support. <strong>Reference tooling</strong> — it sells work and assurance, never your data and never the coin. <span class="badge design">designed · reference prototype · not shipping</span> <span class="badge unaud">unaudited</span></dd>
+      </div>
+      <div class="defrow">
+        <dt>Cloud edition (hosted)</dt>
+        <dd>An <strong>opt-in, business-only</strong> Postern-hosted option for teams that don't want to self-host — it sells <strong>convenience and ops, not privacy</strong>. Two distinct things: the <strong>Chiostro</strong> confidential-VM profile (a TEE you can <em>verify</em> — its attestation verifier now validates a <strong>genuine AWS SEV-SNP report</strong> end-to-end, VLEK→ASVK→ARK to AMD's pinned root, against <strong>real AMD Milan silicon</strong>; an unaudited reference verifier, not audited/production — plus a fail-closed TDX parser and the <code>os/cloud.nix</code> profile, while the guest VM itself is still <strong>unbuilt and unbooted</strong>) and a <strong>managed-node service</strong> (which <em>promises</em>, does no cryptography). Honestly: <strong>hosting is less private than self-hosting</strong> — a hosted relay carries E2EE message bodies opaquely but sees routing metadata; disclosed up front, "a promise, not a proof". <strong>Personal editions stay local and never move to the cloud</strong> (their own freemium terms are on the pricing tiers above; the cloud option is business-only). Running it makes Postern a <strong>data processor</strong> (a DPA is required); billed in fiat, never the coin. A <strong>hosted reference-prototype</strong> of the managed license-verification endpoint is up for inspection at <a href="https://postern-cloud-demo.fly.dev/v1/posture" rel="nofollow noopener">postern-cloud-demo.fly.dev/v1/posture</a> — it states its own privacy trade-off in plain words and hosts no private key. Staging demo, unaudited, not production. <span class="badge design">designed · reference prototype · not shipping</span> <span class="badge unaud">unaudited</span></dd>
+      </div>
+    </dl>
+
+    <h3 style="margin-top:2.2rem">The tiers</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Tier</th><th>Who</th><th>Terms</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Platform, mobile &amp; dev</strong></td><td>Everyone — the free adoption channel</td><td><strong>Free forever</strong> — Postern OS (Mobile / Desktop / Node), Core, the SDK, the Store, the Browser, Terem, Depot, <strong>and every personal app on mobile</strong> (Wallet, Vault, Keys, Courier, Seal, Hygiene, Panic, Vestnik, Tor, Quarantine, Telephony, Encrypted Backup, personal Ezekiel 1, …). No login, no tracking, no telemetry. Running a node is participation, not a purchase. <strong>Free versions may show contextual, no-tracking ads</strong> — chosen only from what's on the current screen, <strong>no profile, no ad/device ID, no third-party ad SDK, no telemetry, nothing leaves the device</strong>, always labeled, and <strong>never</strong> in Panic, Vault decrypt/export, or backup. Surveillance / behavioral / programmatic ads are forbidden.</td></tr>
+          <tr><td><strong>Postern Desktop (personal)</strong></td><td>Individuals, on desktop only</td><td><strong>Free for 2 years · then a key.</strong> Postern Desktop <strong>reserves the right to require a license in the future</strong>: each install is free for 24 months, after which a personal key keeps updates and premium features coming. No login, no tracking, no telemetry. The key gates features/updates, <strong>never your own data</strong> — decrypt, read, export, and Panic always work, key or not. The free version may show the same <strong>contextual, no-tracking ads</strong>; <strong>the paid key removes ads</strong>. <strong>Mobile personal apps are unaffected — free forever.</strong></td></tr>
+          <tr><td><strong>Business (freemium)</strong></td><td>Small teams — no DUNS needed</td><td>Up to <strong>3 desktops</strong>, free for <strong>2 years</strong>, then a key.</td></tr>
+          <tr><td><strong>Corporate (master)</strong></td><td>Companies with a DUNS number</td><td><strong>Unlimited users</strong>, split from one master license. <strong>Free 6-month evaluation</strong> while pricing is being structured; after it a license is required. Any future charge is <strong>fiat, never the coin</strong>; <strong>offline-verified, no telemetry</strong> (we store only your DUNS and the dates).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose small" style="margin-top:1.2rem">Consistent with <a href="disclaimer.html#d9">§9 of the disclaimer</a>. Revenue never comes from the coin (worthless, not a security) and never from surveilling the personal user.</p>
+  </div>
+</section>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Postern Labs</h4>
+        <p>Privacy &amp; security products, sold the honest way — the BlackBerry model, on permissive Linux, built on an ownerless post-quantum commons.</p>
+        <p>No tracking. No analytics. This site makes zero network requests beyond its own pages.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="products.html">Products</a>
+          <a href="downloads.html">Downloads</a>
+          <a href="run-a-node.html">Run a node</a>
+          <a href="/explorer/">Explorer</a>
+          <a href="disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="acknowledgments.html">Acknowledgments &amp; homage</a>
+          <a href="blochprotocol.html">The blochprotocol.com domain</a>
+          <a href="https://t.me/posternlabs" rel="noopener">Community · Telegram</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>The underlying protocol runs a <strong>mainnet beta</strong> — <strong>unaudited</strong> (audit contracted, not done), nascent, <strong>low-hashrate and 51%-attackable</strong>. The Module-SIS gate is now a <strong>difficulty-driven k-ramp</strong> (v0.1.0-alpha2): k=4 today, rising 5→6→7→8 as the network's own difficulty grows, easing back if hashrate falls — the Bitcoin model. The ramp is a <em>structural</em> filter, <strong>not a security claim</strong>: real security is cumulative SHAKE-256 hashcash work — hashrate × time. Nothing here is a certified security product yet.</p>
+        <p>The coin is <strong>not a security and not an asset</strong>. No token sale, no listing effort, no price. Disclosed in full: a 17% founder premine (10-year cliff, 40-year vest), structurally passive.</p>
+      </div>
+    </div>
+    <p class="legal">MIT / Apache-2.0, per crate — no copyleft embedded in the products. The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; it lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to). <strong>Postern Labs holds no ownership of, representation of, or prerogative over the protocol</strong>, and for that reason maintains <strong>no website for Bloch-SIS-PoW</strong> (including <code>blochprotocol.com</code>) — <a href="blochprotocol.html">read the full statement</a>.</p>
+  </div>
+</footer>
+
+</body>
+</html>

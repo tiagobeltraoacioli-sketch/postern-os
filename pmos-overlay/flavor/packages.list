@@ -1,0 +1,38 @@
+# packages.list -- the default package set ("world") for the
+# "Postern for postmarketOS -- community edition" flavor.
+#
+# HONESTY / UNBOOTED: community, NON-attestable tier. This is the intended flavor
+# world; it has NOT been resolved/installed on a device. Signed (who published),
+# not reproducible (what it was built from). This is NOT "Postern OS".
+# See ../PUBLISHED.md (what is LIVE) and README.md (the flavor spec).
+#
+# This file documents the set; it is consumed two ways:
+#   - the postern-flavor package `depends=` mirrors the "flavor" rows below;
+#   - build/build.sh installs the `postern` meta, which pulls the "meta" rows.
+# Lines are "pkgname  # source  # why". Blank lines and #comments ignored.
+
+# --- Postern packages (LIVE in the R2 apk repo -- PUBLISHED.md) --------------
+postern                 # R2 apk repo (meta)   # pulls wallet + apps + phosh + tor
+postern-wallet          # R2 apk repo          # offline PQ wallet CLI (software keystore)
+postern-apps            # R2 apk repo (noarch) # web app suite + first-run note
+
+# --- Flavor package (this overlay -- scaffold, UNBUILT) ----------------------
+postern-flavor          # this overlay         # owns the ../overlay rootfs: services, firewall, MOTD, phosh defaults, first-run
+
+# --- Privacy / security (Alpine + pmaports) ----------------------------------
+arti                    # Alpine community     # in-process/on-device Tor (Rust); verify pkg name/ABI on device
+nftables                # Alpine main          # /sbin/nft for the default-deny firewall
+xdg-utils               # Alpine main          # xdg-open for the app launchers (also a postern-apps dep)
+
+# --- UI shell (pmaports) -----------------------------------------------------
+postmarketos-ui-phosh   # pmaports             # default shell; the postern meta hard-deps it (see README.md 1)
+
+# --- Notes -------------------------------------------------------------------
+# * `tor` (C daemon) is currently pulled by the postern meta's depends; the
+#   flavor documents the Arti (Rust) direction and ships the Arti overlay
+#   wiring. Reconciling the meta's `tor` dep is flagged for the APKBUILD owners
+#   (README.md 2), not changed here.
+# * FDE unlock (unl0kr/osk-sdl) is chosen at pmbootstrap install time, not by a
+#   package; verify the current v26.06 component name on device.
+# * notify-send (libnotify) is optional -- the first-run helper degrades
+#   gracefully without it.

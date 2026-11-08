@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs
+#
+# Consiglio console HTTP service — Fly.io app config (reference prototype).
+#
+# STATUS: DEFERRED / VM-host-service-gated. WRITTEN and host-tested; NOT deployed.
+# Running this needs an operator: `fly launch --no-deploy` (or `fly apps create`),
+# create the durable volume, set the (optional) MASTER_BUNDLE secret, `fly deploy`.
+# This is a SERVER, not a Cloudflare Pages asset — it spawns the native hybrid-PQ
+# verifier, which an edge/browser runtime cannot do. Do NOT treat as live.
+app = "consiglio-console"
+primary_region = "gru"
+
+[build]
+  # Build context is the repo ROOT so crates/ + enterprise/ are both present.
+  dockerfile = "enterprise/cloud/services/console/http/deploy/Dockerfile"
+
+[env]
+  PORT = "8803"
+  CONSOLE_DATA_DIR = "/data"
+  SESSION_TTL_SECS = "3600"
+  # CONSIGLIO_VERIFIER_BIN is pinned in the image (fail-closed); do not override
+  # it to an untrusted path.
+
+# Durable state: enrollments, live sessions, the sub registry, the audit chain.
+# The atomic file store (store.mjs) writes here; a restart restores from it.
+[mounts]
+  source = "consiglio_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8803
+  force_https = true
+  # Single machine: the file store is node-local. Do NOT scale >1 without moving
+  # to a shared durable backend (the snapshot/restore seam supports that swap).
+  auto_stop_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
+
+# Operator secrets (NOT committed — set with `fly secrets set`):
+#   MASTER_BUNDLE — path to a JSON master bundle mounted into the machine to
+#                   enable the seat/device verbs. Omit to run auth-only.
+# The master PRIVATE key is read into memory only; this code never writes it out.

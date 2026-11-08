@@ -1,0 +1,12 @@
+# Keep the build context tiny and secret-free. The image needs only server/,
+# tools/, and package.json (copied explicitly in the Dockerfile). Never let a
+# local data store or a stray .env into the image.
+data/
+**/data/
+client/
+.env
+*.env
+.env.*
+!.env.example
+*.log
+.DS_Store

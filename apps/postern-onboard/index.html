@@ -1,0 +1,2797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src data:; connect-src https://api.anthropic.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sarto — set up your Postern · Postern Labs</title>
+<style>
+/* ============================================================
+   SARTO · Postern Labs
+   "sarto" — the tailor. The onboarding configurator: it fits
+   the system to the wearer (profession, activity, risk), and
+   holds the managed-device policy desk (parental / corporate)
+   — transparent by construction, never covert.
+   Graphite/ink instrument panel + one madder accent — the
+   tailor's red thread. (Sotto wears brass, Vedetta steel blue,
+   the Store amethyst, Tolmach verdigris, Chiave iris; Sarto
+   wears madder.)
+   Only possible network call: the user's OWN Claude request to
+   api.anthropic.com. Everything else is fully local.
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink (neutrals = _design-system/tokens.css) */
+  --bg:        #0d1014;
+  --bg-glow:   #10141b;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e8ec;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --acc:       #d0819a;   /* madder — the tailor's red thread */
+  --acc-hi:    #e39fb4;
+  --acc-dim:   #94586c;
+  --acc-ink:   #1f0d14;
+
+  --live:      #e4574f;   /* mic hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+
+/* light — neutrals = _design-system/tokens.css; accent stays madder */
+:root[data-theme="light"] {
+  --bg:        #f0eff3;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #eceae2;
+  --surface-3: #e3e0d5;
+  --border:    #d5d0c4;
+  --border-hi: #bdb7a8;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --acc:       #a4415f;
+  --acc-hi:    #873049;
+  --acc-dim:   #c07f93;
+  --acc-ink:   #fff5f8;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(40,50,64,.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0eff3; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#eceae2;
+    --surface-3:#e3e0d5; --border:#d5d0c4; --border-hi:#bdb7a8;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --acc:#a4415f; --acc-hi:#873049; --acc-dim:#c07f93; --acc-ink:#fff5f8;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(40,50,64,.14);
+  }
+}
+
+/* high-contrast — stronger borders, denser secondary text, thicker focus ring.
+   Neutrals only; the madder accent and semantics keep their meaning. */
+@media (prefers-contrast: more) {
+  :root {
+    --border:    #3f4b5a;
+    --border-hi: #5a6a7e;
+    --text:      #f4f5f8;
+    --text-dim:  #c6cbd2;
+    --muted:     #9aa2ad;
+  }
+  :root[data-theme="light"] {
+    --border:    #a9a390;
+    --border-hi: #857e6a;
+    --text:      #14171c;
+    --text-dim:  #3a3f47;
+    --muted:     #5b626c;
+  }
+  :focus-visible { outline-width: 3px; }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --border:#a9a390; --border-hi:#857e6a;
+    --text:#14171c; --text-dim:#3a3f47; --muted:#5b626c;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1100px 520px at 50% -180px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--acc); color: var(--acc-ink); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 4px; }
+
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.wordmark {
+  font-family: var(--font-mono); font-size: 17px; font-weight: 700;
+  letter-spacing: .34em; text-indent: .34em; color: var(--text); user-select: none;
+  background: none; border: none; padding: 0;
+}
+.wordmark .tick { color: var(--acc); }
+.byline {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+  border-left: 1px solid var(--border); padding-left: 12px; margin-top: 2px;
+}
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn[data-attn="1"] { border-color: var(--acc); color: var(--acc); }
+
+/* ---------- the ALWAYS-VISIBLE managed-device banner ---------- */
+.managed-banner {
+  border-bottom: 1px solid color-mix(in srgb, var(--acc) 45%, var(--border));
+  background: color-mix(in srgb, var(--acc) 10%, var(--surface));
+}
+.managed-banner[data-sig="bad"] {
+  border-bottom-color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, var(--surface));
+}
+.mb-inner { display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 13px; flex-wrap: wrap; }
+.mb-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  background: var(--acc); color: var(--acc-ink);
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+.managed-banner[data-sig="bad"] .mb-badge { background: var(--err); color: #fff; }
+.mb-text { color: var(--text-dim); }
+.mb-text b { color: var(--text); }
+.mb-text .fpr { font-family: var(--font-mono); font-size: 11.5px; color: var(--acc); }
+.mb-link {
+  margin-left: auto; background: none; border: none; padding: 0;
+  color: var(--acc); text-decoration: underline; text-underline-offset: 3px; font-size: 12.5px;
+  white-space: nowrap;
+}
+.mb-link:hover { color: var(--acc-hi); }
+
+/* ---------- hero ---------- */
+.hero { text-align: center; padding: 30px 0 4px; }
+.emblem-stage { position: relative; width: 118px; height: 118px; margin: 0 auto; }
+.emblem-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--border-hi) 70%, transparent);
+  opacity: .7;
+}
+.emblem {
+  position: absolute; inset: 13px; border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  background:
+    radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--acc) 22%, transparent), transparent 58%),
+    linear-gradient(160deg, var(--surface-3), var(--surface));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 0 0 1px color-mix(in srgb, var(--acc) 10%, transparent),
+    0 0 36px color-mix(in srgb, var(--acc) 12%, transparent),
+    var(--shadow);
+  display: grid; place-items: center;
+}
+.emblem svg { width: 44px; height: 44px; color: var(--acc); }
+@keyframes breathe { 0%,100% { transform: scale(1); opacity:.75 } 50% { transform: scale(1.03); opacity: 1 } }
+.emblem-ring { animation: breathe 4.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.hero h1 { margin: 16px 0 4px; font-size: 21px; font-weight: 650; letter-spacing: .01em; }
+.status-line { min-height: 1.5em; margin: 4px auto 0; font-size: 14.5px; color: var(--text-dim); max-width: 620px; }
+.status-line[data-tone="err"]  { color: var(--err); }
+.status-line[data-tone="ok"]   { color: var(--ok); }
+.status-line[data-tone="live"] { color: var(--live); font-weight: 500; }
+.status-line .hint-key {
+  font-family: var(--font-mono); font-size: 11px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 7px; margin: 0 2px;
+  color: var(--muted); background: var(--surface-2);
+}
+
+/* ---------- cards / views ---------- */
+.view { margin: 20px 0 46px; }
+.card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.card h2 {
+  margin: 0 0 12px; font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc); font-weight: 700;
+}
+.card p.lead { margin: 0 0 14px; font-size: 14.5px; color: var(--text-dim); }
+
+/* entry path cards */
+.paths { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) { .paths { grid-template-columns: 1fr; } }
+.path-card {
+  text-align: left; border: 1px solid var(--border); background: var(--surface);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px;
+  transition: border-color .15s, transform .12s;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.path-card:hover { border-color: var(--acc); transform: translateY(-1px); }
+.path-card .pc-glyph { font-size: 22px; color: var(--acc); font-family: var(--font-mono); }
+.path-card .pc-t { font-size: 16.5px; font-weight: 650; }
+.path-card .pc-d { font-size: 13px; color: var(--text-dim); line-height: 1.55; }
+.path-card .pc-note { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); letter-spacing: .02em; margin-top: auto; }
+
+.crumb {
+  background: none; border: none; padding: 0; margin: 0 0 12px;
+  color: var(--muted); font-size: 12.5px; text-decoration: none;
+  display: inline-flex; gap: 6px; align-items: center;
+}
+.crumb:hover { color: var(--text-dim); }
+
+/* ---------- fields ---------- */
+.field { margin-bottom: 16px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field input[type="password"], .field input[type="text"], .field input[type="time"],
+.field select, .field textarea {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+}
+.field textarea { font-family: var(--font-mono); font-size: 13px; min-height: 64px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--acc); outline: none; }
+.keyrow { display: flex; gap: 8px; }
+.keyrow input { flex: 1; font-family: var(--font-mono); font-size: 13px; }
+.keyrow .hbtn { flex: none; }
+
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 6%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--acc); }
+.radio-card .rc-t { font-size: 14px; font-weight: 600; }
+.radio-card .rc-d { font-size: 12.5px; color: var(--muted); }
+
+.checkline { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; margin: 10px 0 4px; cursor: pointer; }
+.checkline input { margin-top: 3px; accent-color: var(--acc); flex: none; }
+.checkline .cl-d { font-size: 12px; color: var(--muted); display: block; }
+
+.btn-acc {
+  background: var(--acc); border: 1px solid var(--acc); color: var(--acc-ink);
+  border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600;
+}
+.btn-acc:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.btn-acc:disabled { opacity: .45; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 10px; padding: 10px 16px; font-size: 14px;
+}
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text); }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 12.5px;
+}
+button.linkish:hover { color: var(--text-dim); }
+.err-line { color: var(--err); font-size: 13px; min-height: 1.4em; margin-top: 8px; }
+
+/* honesty note strip — labeled stand-ins */
+.standin {
+  border: 1px dashed var(--border-hi);
+  border-radius: 10px; padding: 9px 12px; margin-top: 14px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--muted);
+}
+.standin b { color: var(--acc); font-weight: 600; }
+
+.warnbox {
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  background: color-mix(in srgb, var(--warn) 9%, var(--surface));
+  border-radius: 10px; padding: 12px 14px; margin: 12px 0;
+  font-size: 13px; line-height: 1.55;
+}
+.warnbox strong { color: var(--warn); }
+.refusebox {
+  border: 1px solid color-mix(in srgb, var(--err) 45%, var(--border));
+  background: color-mix(in srgb, var(--err) 7%, var(--surface));
+  border-radius: 10px; padding: 12px 14px; margin: 12px 0;
+  font-size: 13px; line-height: 1.55;
+}
+.refusebox strong { color: var(--err); }
+
+/* ---------- Part A: composer ---------- */
+.composer {
+  display: flex; gap: 8px; align-items: center;
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 14px; padding: 7px;
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--acc) 60%, var(--border)); }
+.composer input[type="text"] {
+  flex: 1; background: none; border: 0; outline: none;
+  padding: 8px 10px; font-size: 14.5px; color: var(--text); min-width: 0;
+}
+.composer input::placeholder { color: var(--muted); }
+.cbtn {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 10px; width: 38px; height: 38px; flex: none;
+  display: grid; place-items: center; color: var(--text-dim); position: relative;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.cbtn:hover { color: var(--text); border-color: var(--border-hi); }
+.cbtn svg { width: 17px; height: 17px; }
+.cbtn.primary { background: var(--acc); border-color: var(--acc); color: var(--acc-ink); }
+.cbtn.primary:hover { background: var(--acc-hi); border-color: var(--acc-hi); }
+.cbtn:disabled { opacity: .45; cursor: not-allowed; }
+body[data-state="listening"] .cbtn.mic { color: #fff; background: var(--live); border-color: var(--live); }
+.mic-live {
+  display: none; position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+  align-items: center; gap: 6px; background: var(--live); color: #fff;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .12em;
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap; z-index: 5;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--live) 50%, transparent);
+}
+.mic-live .dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: breathe 1s infinite; }
+body[data-state="listening"] .mic-live { display: inline-flex; }
+.composer-foot {
+  display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  font-size: 11px; color: var(--muted); padding: 8px 4px 0;
+  font-family: var(--font-mono); letter-spacing: .02em;
+}
+.composer-foot .lock { color: var(--acc); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 2px; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: 5px 13px; font-size: 12.5px; color: var(--text-dim);
+  transition: border-color .15s, color .15s;
+}
+.chip:hover { border-color: var(--acc); color: var(--text); }
+
+/* transcript (compact) */
+.transcript { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.turn { display: flex; flex-direction: column; max-width: 92%; }
+.turn.user { align-self: flex-end; align-items: flex-end; }
+.turn.assistant { align-self: flex-start; }
+.turn .who { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 6px 3px; }
+.turn .bubble {
+  padding: 9px 13px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface-2); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px;
+}
+.turn.user .bubble { background: color-mix(in srgb, var(--acc) 12%, var(--surface)); border-color: color-mix(in srgb, var(--acc) 35%, var(--border)); border-bottom-right-radius: 4px; }
+.turn.assistant .bubble { border-bottom-left-radius: 4px; }
+.turn.assistant .bubble.streaming::after { content: "▍"; color: var(--acc); animation: breathe 1s infinite; }
+.turn .sys { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); border: 1px dashed var(--border); border-radius: 9px; padding: 6px 10px; }
+
+/* ---------- the review panel / profile editor ---------- */
+.review-flash { transition: box-shadow .25s; }
+.review-flash[data-flash="1"] { box-shadow: 0 0 0 2px var(--acc), var(--shadow); }
+.persona-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.persona-row .field { flex: 1 1 240px; margin-bottom: 10px; }
+
+.appgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; margin: 4px 0 6px; }
+.appchip {
+  display: flex; align-items: center; gap: 9px; text-align: left;
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 10px; padding: 8px 10px; font-size: 13px;
+  transition: border-color .15s, background .15s, opacity .15s;
+}
+.appchip .ac-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appchip .ac-state {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  border-radius: 999px; padding: 2px 8px; flex: none;
+  border: 1px solid var(--border); color: var(--muted);
+}
+.appchip[data-state="foreground"] { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 9%, var(--surface)); }
+.appchip[data-state="foreground"] .ac-state { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+.appchip[data-state="hidden"] { opacity: .55; border-style: dashed; }
+.appchip[data-state="hidden"] .ac-state { border-style: dashed; }
+.legend { font-size: 11.5px; color: var(--muted); margin: 2px 0 10px; font-family: var(--font-mono); }
+
+.togglerow { display: flex; gap: 10px; align-items: flex-start; border-bottom: 1px solid var(--border); padding: 10px 2px; }
+.togglerow:last-of-type { border-bottom: 0; }
+.togglerow input[type="checkbox"] { margin-top: 3px; accent-color: var(--acc); width: 16px; height: 16px; flex: none; }
+.togglerow .tr-t { font-size: 14px; }
+.togglerow .tr-d { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.togglerow select { margin-left: auto; flex: none; max-width: 210px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+
+details.json summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 10px; }
+details.json pre {
+  margin: 6px 0 0; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto;
+}
+
+/* sealed profile summary */
+.sealed-line { display: flex; align-items: center; gap: 10px; font-size: 14px; flex-wrap: wrap; }
+.sealed-line .fpr { font-family: var(--font-mono); font-size: 12px; color: var(--acc); }
+.okmark { color: var(--ok); font-weight: 600; }
+
+/* ---------- Part B ---------- */
+.who-fpr {
+  font-family: var(--font-mono); font-size: clamp(15px, 3.6vw, 19px); font-weight: 700;
+  letter-spacing: .04em; color: var(--acc); overflow-wrap: anywhere;
+}
+.who-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+.catgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; margin: 4px 0 8px; }
+.catchip {
+  display: flex; gap: 9px; align-items: flex-start; text-align: left;
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 10px; padding: 9px 11px; cursor: pointer;
+}
+.catchip input { margin-top: 3px; accent-color: var(--acc); flex: none; }
+.catchip .cc-t { font-size: 13.5px; font-weight: 600; }
+.catchip .cc-d { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+.catchip:has(input:checked) { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 7%, var(--surface)); }
+
+.window-row {
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+  background: var(--surface-2);
+}
+.window-row .wr-grid { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.window-row .field { margin-bottom: 8px; }
+.window-row .f-label { flex: 1 1 150px; }
+.window-row .f-time { flex: 0 1 110px; }
+.daytoggles { display: flex; gap: 4px; flex-wrap: wrap; }
+.daytoggles button {
+  font-family: var(--font-mono); font-size: 10.5px; border: 1px solid var(--border);
+  background: var(--surface); border-radius: 7px; padding: 4px 7px; color: var(--muted);
+}
+.daytoggles button[aria-pressed="true"] { background: var(--acc); border-color: var(--acc); color: var(--acc-ink); }
+.wr-blocks { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.wr-blocks label { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text-dim); cursor: pointer; }
+.wr-blocks input { accent-color: var(--acc); }
+.wr-remove { margin-left: auto; }
+
+/* ---------- managed-user view ---------- */
+.policy-panel {
+  border: 1px solid color-mix(in srgb, var(--acc) 50%, var(--border));
+  background: color-mix(in srgb, var(--acc) 6%, var(--surface));
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px 22px; margin-bottom: 16px;
+}
+.policy-panel[data-sig="bad"] {
+  border-color: var(--err);
+  background: color-mix(in srgb, var(--err) 8%, var(--surface));
+}
+.pp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.pp-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  background: var(--acc); color: var(--acc-ink); padding: 3px 10px; border-radius: 999px;
+}
+.policy-panel[data-sig="bad"] .pp-badge { background: var(--err); color: #fff; }
+.pp-sig { font-family: var(--font-mono); font-size: 11px; margin-left: auto; }
+.pp-sig[data-ok="1"] { color: var(--ok); }
+.pp-sig[data-ok="0"] { color: var(--err); font-weight: 700; }
+.pp-title { font-size: 16.5px; font-weight: 650; margin: 0 0 2px; }
+.pp-title .fpr { font-family: var(--font-mono); font-size: 13px; color: var(--acc); }
+.pp-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+.limitlist { list-style: none; margin: 0; padding: 0; }
+.limitlist li {
+  display: grid; grid-template-columns: 20px 1fr; gap: 10px;
+  padding: 8px 2px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: 13.5px;
+}
+.limitlist li .lm { color: var(--acc); font-family: var(--font-mono); }
+.limitlist li.good .lm { color: var(--ok); }
+
+.sitecheck { display: flex; gap: 8px; margin-top: 4px; }
+.sitecheck input { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; font-family: var(--font-mono); font-size: 13px; min-width: 0; }
+.sitecheck input:focus { border-color: var(--acc); outline: none; }
+.check-result { margin-top: 10px; font-size: 13.5px; min-height: 1.5em; }
+.check-result[data-verdict="allowed"] { color: var(--ok); }
+.check-result[data-verdict="blocked"] { color: var(--err); }
+
+/* view-as toggle */
+.viewas { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.viewas button { background: var(--surface); border: none; padding: 7px 14px; font-size: 12.5px; color: var(--text-dim); }
+.viewas button[aria-pressed="true"] { background: var(--acc); color: var(--acc-ink); font-weight: 600; }
+
+/* ---------- ledger (privacy dialog) ---------- */
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 10px 0 16px; }
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; line-height: 1.4; }
+.ledger-row.local .mark { color: var(--ok); }
+.ledger-row.leaves .mark { color: var(--warn); }
+.ledger-row.never .mark { color: var(--err); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--acc); }
+.pv-note { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+table.standins { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 10px 0 6px; }
+table.standins th, table.standins td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+table.standins th { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+.tblwrap { overflow-x: auto; }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--text); padding: 0;
+  width: min(620px, calc(100vw - 36px)); max-height: min(86vh, 780px);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(6,8,10,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--acc); font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+.danger-zone { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+
+footer.site {
+  padding: 8px 0 26px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+.foot-lock { color: var(--acc); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+[hidden] { display: none !important; }
+@media (max-width: 560px) {
+  .byline { display: none; }
+  .togglerow select { max-width: 150px; }
+}
+</style>
+</head>
+<body data-state="idle" data-view="home">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <button class="wordmark" id="btnHome" aria-label="Sarto — home">S<span class="tick">·</span>ARTO</button>
+    <div class="byline">Postern Labs · su misura — made to measure</div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnGuardrails">Guardrails</button>
+      <button class="hbtn" id="btnPrivacy">Privacy</button>
+      <button class="hbtn" id="btnSettings">Settings</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<!-- The ALWAYS-VISIBLE managed-device banner. If a policy is installed on this
+     device it renders on EVERY view, admin and managed alike. There is no code
+     path that hides it while a policy exists — that is the design. -->
+<div class="managed-banner" id="managedBanner" hidden role="region" aria-label="This device is managed">
+  <div class="wrap mb-inner">
+    <span class="mb-badge" id="mbBadge">MANAGED DEVICE</span>
+    <span class="mb-text" id="mbText"></span>
+    <button class="mb-link" id="mbDetails">see every limit</button>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <section class="hero" aria-label="Sarto">
+    <div class="emblem-stage">
+      <div class="emblem-ring" aria-hidden="true"></div>
+      <div class="emblem" aria-hidden="true">
+        <!-- the tailor's needle + thread -->
+        <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 35 L31 9"/>
+          <ellipse cx="33.5" cy="6.5" rx="3.4" ry="4.6" transform="rotate(40 33.5 6.5)"/>
+          <path d="M9 35 C 14 38, 20 30, 25 33 S 35 30, 37 24" stroke-dasharray="3.5 4" stroke-width="1.8"/>
+        </svg>
+      </div>
+    </div>
+    <h1 id="heroTitle">Fit this system to its wearer</h1>
+    <p class="status-line" id="statusLine" aria-live="polite"></p>
+  </section>
+
+  <!-- ================= HOME: two entry paths ================= -->
+  <section class="view" id="viewHome">
+    <div class="paths">
+      <button class="path-card" id="pathMine">
+        <span class="pc-glyph">◧</span>
+        <span class="pc-t">Set up MY device</span>
+        <span class="pc-d">Tell Sarto your profession or what you do — by voice, by typing, or by
+          flipping the switches yourself — and it tailors the Postern defaults: which apps are
+          foregrounded, Tor, metadata scrubbing, the panic gesture, notifications.
+          Everything lands in an editable review panel before anything applies.</span>
+        <span class="pc-note">your device · your choices · works fully offline without a key</span>
+      </button>
+      <button class="path-card" id="pathManage">
+        <span class="pc-glyph">◪</span>
+        <span class="pc-t">Manage a device I own or guard</span>
+        <span class="pc-d">Parental or corporate limits for a device you legitimately control —
+          a child's tablet, a company-owned laptop. The policy is signed by your wallet key and is
+          <em>always visible</em> to the person using the device. Limits, never surveillance:
+          nothing is watched, recorded, or reported.</span>
+        <span class="pc-note">transparent by construction · no covert mode exists</span>
+      </button>
+    </div>
+
+    <div class="card" id="homeProfileCard" hidden>
+      <h2>This device's profile</h2>
+      <div class="sealed-line" id="homeProfileLine"></div>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnHomeEditProfile">Unlock &amp; edit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PART A: MY DEVICE ================= -->
+  <section class="view" id="viewMine" hidden>
+    <button class="crumb" data-nav="home">← all paths</button>
+
+    <div class="card">
+      <h2>Describe yourself — voice, text, or neither</h2>
+      <p class="lead">Say what you do and Sarto's configurator drafts a profile:
+        <em>"I'm a journalist protecting sources"</em>, <em>"a lawyer with privileged files"</em>,
+        <em>"just a private person"</em>. Nothing applies until you review and confirm below —
+        and the switches themselves work with no key and no network at all.</p>
+
+      <form class="composer" id="composer">
+        <button type="button" class="cbtn mic" id="btnMic"
+          aria-label="Hold to talk. Push-to-talk only: the microphone is on only while you hold this button.">
+          <span class="mic-live" role="status"><span class="dot"></span>MIC LIVE</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        </button>
+        <input type="text" id="textInput" autocomplete="off"
+               placeholder="Type your profession or activity — the fully local input path"
+               aria-label="Describe your profession or activity">
+        <button type="button" class="cbtn" id="btnStop" disabled aria-label="Stop the assistant" title="Stop">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+        <button type="submit" class="cbtn primary" id="btnSend" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+      <div class="composer-foot">
+        <span><span class="lock">●</span> <span id="composerNote">no server · key stays in this browser · manual editing needs no key at all</span></span>
+        <span>model: <button class="linkish" id="modelHint" type="button">—</button></span>
+      </div>
+
+      <div class="chips" id="chips" aria-label="Examples">
+        <button class="chip">I'm a journalist protecting sources</button>
+        <button class="chip">A lawyer with privileged client files</button>
+        <button class="chip">Just a private person — sane defaults</button>
+        <button class="chip">I cross borders with sensitive work</button>
+        <button class="chip">Setting up my kid's tablet</button>
+      </div>
+
+      <ol class="transcript" id="transcript" aria-label="Configurator conversation"></ol>
+    </div>
+
+    <!-- THE review panel: the single profile object all three paths edit.
+         Voice and text end in set_profile(); the switches below edit it directly. -->
+    <div class="card review-flash" id="reviewPanel">
+      <h2>Review before it applies — every switch is yours</h2>
+      <p class="lead">This is the derived profile. Nothing here is active yet: edit anything, then
+        seal &amp; apply. The suggestion engine only ever writes to this panel — it cannot apply
+        settings behind your back.</p>
+
+      <div class="persona-row">
+        <div class="field">
+          <label for="personaInput">Profile persona</label>
+          <input type="text" id="personaInput" maxlength="80" placeholder="e.g. Journalist protecting sources">
+        </div>
+        <div class="field">
+          <label for="rationaleInput">Why these defaults (one line)</label>
+          <input type="text" id="rationaleInput" maxlength="160" placeholder="the reasoning behind this tailoring">
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:6px">
+        <span class="flabel">Apps — tap to cycle: foreground → available → hidden</span>
+        <div class="appgrid" id="appGrid"></div>
+        <p class="legend">foreground = pinned first on the launcher · available = installed, findable · hidden = not shown (re-enable any time; hiding is a preference, not a lock)</p>
+      </div>
+
+      <div class="field" style="margin-bottom:4px">
+        <span class="flabel">Privacy defaults</span>
+        <div class="togglerow">
+          <input type="checkbox" id="pvTor" aria-labelledby="pvTorT">
+          <div><div class="tr-t" id="pvTorT">Tor by default</div>
+            <div class="tr-d">Route app traffic through in-process Tor (Arti — <span style="font-family:var(--font-mono)">postern-tor</span>). Hides your IP from services; your ISP still sees that you use Tor.</div></div>
+        </div>
+        <div class="togglerow">
+          <input type="checkbox" id="pvScrub" aria-labelledby="pvScrubT">
+          <div><div class="tr-t" id="pvScrubT">Auto-scrub metadata on share</div>
+            <div class="tr-d">Every outgoing document/photo passes through Postern Hygiene: author, company, GPS, revision trails stripped before it leaves your hands.</div></div>
+        </div>
+        <div class="togglerow">
+          <input type="checkbox" id="pvPanic" aria-labelledby="pvPanicT">
+          <div><div class="tr-t" id="pvPanicT">Panic gesture</div>
+            <div class="tr-d">One gesture instantly re-locks everything to ciphertext and evicts keys from RAM (<span style="font-family:var(--font-mono)">postern-panic</span>). Locks, never wipes.</div></div>
+        </div>
+        <div class="togglerow">
+          <input type="checkbox" id="pvCourier" aria-labelledby="pvCourierT">
+          <div><div class="tr-t" id="pvCourierT">Courier as the default file-share path</div>
+            <div class="tr-d">Person-to-person file drops go over an ephemeral Tor onion with a post-quantum payload seal — no server in the middle.</div></div>
+        </div>
+        <div class="togglerow">
+          <input type="checkbox" id="pvMsgTor" aria-labelledby="pvMsgTorT">
+          <div><div class="tr-t" id="pvMsgTorT">Messenger over Tor</div>
+            <div class="tr-d">Reach your Matrix homeserver through Tor so it can't tie your account to your IP. The homeserver still sees the social graph — stated honestly.</div></div>
+        </div>
+        <div class="togglerow">
+          <div style="flex:1"><div class="tr-t">Attestation posture</div>
+            <div class="tr-d">How much this device demands proof-of-genuine-build (Seal Companion) — of itself and of peers before trusting them with secrets.</div></div>
+          <select id="pvAttest" aria-label="Attestation posture">
+            <option value="relaxed">Relaxed — on demand only</option>
+            <option value="self_audit">Self-audit at boot</option>
+            <option value="verify_peers">Verify peers before sharing</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:2px">
+        <span class="flabel">Notifications</span>
+        <div class="togglerow">
+          <div style="flex:1"><div class="tr-t">Posture</div>
+            <div class="tr-d">"Quiet" keeps banners minimal; "Silenced" holds everything for when you open the app.</div></div>
+          <select id="ntPosture" aria-label="Notification posture">
+            <option value="full">Full — show everything</option>
+            <option value="quiet">Quiet — minimal banners</option>
+            <option value="silenced">Silenced — nothing pushes</option>
+          </select>
+        </div>
+        <div class="togglerow">
+          <input type="checkbox" id="ntLock" aria-labelledby="ntLockT">
+          <div><div class="tr-t" id="ntLockT">Show message content on the lock screen</div>
+            <div class="tr-d">Off = a shoulder-surfer or a seized phone shows "1 message", never the words.</div></div>
+        </div>
+      </div>
+
+      <details class="json"><summary>the profile as JSON (what actually gets sealed)</summary><pre id="profileJson"></pre></details>
+
+      <div class="btnrow" style="margin-top:14px">
+        <button class="btn-acc" id="btnApplyProfile">Seal &amp; apply profile</button>
+        <button class="btn-ghost" id="btnResetProfile">Reset to plain defaults</button>
+        <span class="err-line" id="applyErr" style="margin:0"></span>
+      </div>
+      <p class="standin" id="profileSealLabel">Applying seals the profile with <b>AES-256-GCM</b> under a key from
+        <b>PBKDF2-SHA-256 (310,000 it.)</b> — the WebCrypto stand-in for the product's
+        <b>Argon2id</b> vault KDF (<b>postern-vault</b> / <b>postern-core</b>). Only ciphertext is
+        stored in this browser; on Postern OS the profile lives in the TEE-wrapped vault.</p>
+    </div>
+
+    <div class="card" id="sealedCard" hidden>
+      <h2>Profile on this device</h2>
+      <div class="sealed-line" id="sealedLine"></div>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnUnlockProfile">Unlock &amp; edit</button>
+        <button class="btn-danger" id="btnEraseProfile">Erase profile</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PART B: MANAGED DEVICE (admin desk) ================= -->
+  <section class="view" id="viewManage" hidden>
+    <button class="crumb" data-nav="home">← all paths</button>
+
+    <div class="refusebox" role="note">
+      <strong>What this is — and refuses to be.</strong> These are <em>transparent limits</em> for a
+      device you legitimately own or guard. The person using the device <strong>always sees the
+      full policy</strong> — a permanent, plainly-worded panel names you, your key fingerprint, and
+      every limit. There is <strong>no covert mode, no activity log, no reporting</strong>: Sarto
+      does not collect, store, or transmit anything the managed person does. If you are looking for
+      a way to watch someone without their knowledge, that is surveillance — stalkerware — and this
+      tool will not do it.
+    </div>
+
+    <!-- Step 1: admin of record -->
+    <div class="card" id="cardAdmin">
+      <h2>1 · Admin of record — your wallet identity</h2>
+      <p class="lead" id="adminLead">The policy must be signed by whoever answers for it. Your
+        admin identity is a wallet keypair (the Chiave pattern): the managed device pins your
+        public key at enrollment, and every policy must verify against it.</p>
+
+      <div id="adminNone">
+        <div class="field">
+          <label for="adminLabel">Your name as the managed person will see it</label>
+          <input type="text" id="adminLabel" maxlength="48" placeholder='e.g. "Mom" · "Dad" · "Blochwerk GmbH — IT"'>
+        </div>
+        <div class="field">
+          <label for="adminPass1">Passphrase to seal the admin key on this device (min 8 chars)</label>
+          <input type="password" id="adminPass1" autocomplete="new-password">
+        </div>
+        <p class="err-line" id="adminErr" aria-live="polite"></p>
+        <div class="btnrow">
+          <button class="btn-acc" id="btnCreateAdmin">Create admin identity</button>
+        </div>
+        <p class="standin">Signing key: <b id="adminAlgNote">Ed25519 (WebCrypto)</b> — a
+          <b>classical stand-in</b> for the wallet's hybrid <b>Falcon-1024 ‖ ML-DSA-65</b>
+          post-quantum key in the device TEE. Sealed at rest with AES-256-GCM + PBKDF2, exactly
+          like the Chiave wallet keyfile. In the product this <em>is</em> your Postern wallet —
+          no separate admin account exists.</p>
+      </div>
+
+      <div id="adminLocked" hidden>
+        <div class="sealed-line" style="margin-bottom:10px">
+          <span>Admin identity sealed on this device:</span>
+          <span class="fpr" id="adminLockedFpr"></span>
+        </div>
+        <form id="adminUnlockForm">
+          <div class="field">
+            <label for="adminPassUnlock">Unlock passphrase</label>
+            <input type="password" id="adminPassUnlock" autocomplete="current-password">
+          </div>
+          <p class="err-line" id="adminUnlockErr" aria-live="assertive"></p>
+          <div class="btnrow">
+            <button type="submit" class="btn-acc">Unlock admin key</button>
+            <button type="button" class="linkish" id="btnAdminReset">discard this admin identity</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="adminOpen" hidden>
+        <div class="who-fpr" id="adminFpr"></div>
+        <div class="who-sub" id="adminWho"></div>
+        <div class="btnrow">
+          <button class="btn-ghost" id="btnAdminLock">Lock admin key</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: role -->
+    <div class="card">
+      <h2>2 · Relationship to this device</h2>
+      <label class="radio-card">
+        <input type="radio" name="role" value="parental" checked>
+        <div><div class="rc-t">Parental — I am the guardian of the child using this device</div>
+          <div class="rc-d">A guardian setting age-appropriate limits on a child's device. The child sees the policy, in words a child can read.</div></div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="role" value="corporate">
+        <div><div class="rc-t">Corporate — this is a company-OWNED device I administer</div>
+          <div class="rc-d">A hierarchical admin configuring equipment the organization owns and issues. Not for employees' personal devices — ownership is the legitimacy line.</div></div>
+      </label>
+      <div class="field" style="margin-top:10px">
+        <label for="deviceLabel">Device label (as shown to its user)</label>
+        <input type="text" id="deviceLabel" maxlength="48" placeholder='e.g. "Nora&#39;s tablet" · "Laptop BW-0042"'>
+      </div>
+    </div>
+
+    <!-- Step 3: limits -->
+    <div class="card">
+      <h2>3 · Limits — what this policy enforces</h2>
+      <p class="lead">Limits only. There is nothing here that watches, logs, or reports — such a
+        control does not exist in Sarto and will not be added.</p>
+
+      <div class="field">
+        <span class="flabel">Site categories blocked at all times</span>
+        <div class="catgrid" id="catGrid"></div>
+      </div>
+
+      <div class="persona-row">
+        <div class="field">
+          <label for="siteAllow">Always allowed (one domain per line)</label>
+          <textarea id="siteAllow" spellcheck="false" placeholder="wikipedia.org&#10;khanacademy.org"></textarea>
+          <p class="fhelp">Wins over a category block — carve-outs for good sites in blocked categories.</p>
+        </div>
+        <div class="field">
+          <label for="siteBlock">Always blocked (one domain per line)</label>
+          <textarea id="siteBlock" spellcheck="false" placeholder="example-forum.net"></textarea>
+          <p class="fhelp">Wins over everything, including the allow list.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="flabel">Time windows — extra blocks during set hours</span>
+        <div id="windowList"></div>
+        <div class="btnrow" style="margin-top:2px">
+          <button class="btn-ghost" id="btnAddWindow">+ add a time window</button>
+          <span class="fhelp" style="margin:0">e.g. school hours: social &amp; games blocked Mon–Fri 08:30–15:00.</span>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:4px">
+        <span class="flabel">App availability — tap to hide/show</span>
+        <div class="appgrid" id="mgAppGrid"></div>
+        <p class="legend">hidden apps are removed from the launcher by policy · everything else stays available</p>
+      </div>
+    </div>
+
+    <!-- Step 4: sign -->
+    <div class="card">
+      <h2>4 · Sign &amp; install — the tamper-evident step</h2>
+      <p class="lead">The policy is canonicalized and signed with your admin key. The managed
+        device verifies it against your <em>pinned</em> enrollment key on every render: any edit by
+        anyone else — including softening it — breaks the signature visibly.</p>
+      <label class="checkline">
+        <input type="checkbox" id="ckLegit">
+        <span>I am the legitimate owner or legal guardian for this device, and I understand the
+          person using it <strong>will always see</strong> my name, my key fingerprint, and every
+          limit in this policy.
+          <span class="cl-d">Required. Sarto does not install policies whose subjects can't see them.</span></span>
+      </label>
+      <p class="err-line" id="policyErr" aria-live="polite"></p>
+      <div class="btnrow">
+        <button class="btn-acc" id="btnSignPolicy" disabled>Sign &amp; install policy</button>
+        <button class="btn-ghost" id="btnPreviewManaged">Preview what the managed user sees</button>
+        <button class="btn-danger" id="btnRemovePolicy" hidden>Remove installed policy</button>
+      </div>
+      <div class="warnbox" style="margin-bottom:0">
+        <strong>Honest enforcement limit.</strong> This page demonstrates the <em>policy model</em>:
+        signed, transparent, verifiable. A browser cannot truly enforce it — a determined, technical
+        user can clear this browser's storage or use another app. Real enforcement needs OS-level
+        integration (Postern OS applies the signed policy in the network layer and launcher, and
+        removing it without the admin key is a visible, factory-reset-grade event). Client-side
+        controls are advisory; we do not claim otherwise.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MANAGED-USER VIEW ================= -->
+  <section class="view" id="viewManaged" hidden>
+    <div class="btnrow" style="justify-content:space-between; margin-bottom:14px">
+      <div class="viewas" role="group" aria-label="Demo: which view">
+        <button id="vaAdmin" aria-pressed="false">admin view</button>
+        <button id="vaManaged" aria-pressed="true">managed-user view</button>
+      </div>
+      <button class="crumb" data-nav="home" style="margin:0">← all paths</button>
+    </div>
+
+    <div id="managedEmpty" hidden>
+      <div class="card">
+        <h2>No policy on this device</h2>
+        <p class="lead">Nothing is managed here. If a policy were installed, this screen would show
+          it in full — it can never be hidden from you.</p>
+      </div>
+    </div>
+
+    <!-- The transparency panel. Rendered whenever a policy exists; there is no
+         setting, flag, or code path that suppresses it. -->
+    <div id="managedFull" hidden>
+      <div class="policy-panel" id="policyPanel">
+        <div class="pp-head">
+          <span class="pp-badge">THIS DEVICE IS MANAGED</span>
+          <span class="pp-sig" id="ppSig"></span>
+        </div>
+        <p class="pp-title" id="ppTitle"></p>
+        <p class="pp-sub" id="ppSub"></p>
+        <ul class="limitlist" id="limitList"></ul>
+      </div>
+
+      <div class="card">
+        <h2>What this policy can NOT do</h2>
+        <ul class="limitlist">
+          <li class="good"><span class="lm">●</span><span>It cannot see your browsing, messages, files, or anything you type. <strong>No activity is collected at all.</strong></span></li>
+          <li class="good"><span class="lm">●</span><span>It cannot report anything to <span id="ppAdminName2">the admin</span> or anyone else. This page's only possible network call is a Claude request <em>you</em> make in the configurator — the policy engine makes none.</span></li>
+          <li class="good"><span class="lm">●</span><span>It cannot be hidden. If someone claims a device is "managed invisibly" by Postern, that is false — no covert mode exists, by refusal, not by omission.</span></li>
+          <li class="good"><span class="lm">●</span><span>It cannot be silently changed. The policy is signed by the admin's pinned key; any tampering shows as a big red signature failure on this panel.</span></li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Check a site against this policy</h2>
+        <p class="lead">See for yourself what would be blocked right now — the same check the
+          enforcement layer runs. It happens entirely on this page; the lookup is not sent anywhere.</p>
+        <form class="sitecheck" id="siteCheckForm">
+          <input type="text" id="siteCheckInput" placeholder="e.g. instagram.com" autocomplete="off" spellcheck="false" aria-label="Domain to check">
+          <button type="submit" class="btn-ghost">Check</button>
+        </form>
+        <p class="check-result" id="siteCheckResult" aria-live="polite"></p>
+        <p class="fhelp">Category lookup here uses a small built-in demo list; on Postern OS an
+          on-device category list does this (still no network, still no logging).</p>
+      </div>
+
+      <div class="warnbox">
+        <strong>And honestly:</strong> in this browser demo the policy is advisory — it shows the
+        model, it cannot force your traffic. On a Postern OS device the same signed policy is
+        enforced by the system network layer. Either way it only ever <em>blocks</em>; it never watches.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site wrap"><span class="foot-lock">●</span> sarto · a postern labs instrument · limits are visible or they are surveillance</footer>
+
+<!-- ================= SETTINGS ================= -->
+<dialog id="dlgSettings" aria-labelledby="settingsTitle">
+  <div class="dlg-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <button class="x" data-close aria-label="Close settings">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="field">
+      <label for="apiKey">Your Anthropic API key (only for the voice/text configurator)</label>
+      <div class="keyrow">
+        <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button type="button" class="hbtn" id="btnShowKey">show</button>
+      </div>
+      <p class="fhelp">Held in this tab's memory and sent only to
+        <code style="font-family:var(--font-mono)">api.anthropic.com</code>. It is never stored readable —
+        seal it below to keep it across sessions. Without a key, the manual profile editor and the whole
+        managed-device desk still work — fully offline.</p>
+    </div>
+    <div class="field">
+      <span class="flabel">Key at rest — sealed by default</span>
+      <p class="fhelp" id="keyLockState" aria-live="polite"></p>
+      <div class="keyrow">
+        <input type="password" id="keyPass" placeholder="passphrase (min 6 characters)" autocomplete="off" spellcheck="false" aria-label="Passphrase to seal the API key">
+        <button type="button" class="hbtn" id="btnKeyLock">seal key</button>
+      </div>
+      <p class="fhelp">Sarto never writes your key to disk readable. Unsealed, it lives only in this tab's
+        memory and disappears when the tab closes. Sealing stores it as <b>AES-256-GCM</b> ciphertext under
+        a key derived from your passphrase (<b>PBKDF2-SHA-256, 310,000 it.</b> — the same construction that
+        already seals your profile and admin identity here, and Chiave's keyfile); you unlock once per
+        session, and forgetting the passphrase just means re-entering the key. A key saved readable by an
+        earlier Sarto is adopted into memory and removed from disk the moment you seal or edit it.</p>
+    </div>
+    <div class="field">
+      <label for="modelSel">Claude model</label>
+      <select id="modelSel">
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest (default)</option>
+        <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable, slower</option>
+      </select>
+      <p class="fhelp">Billed to your own Anthropic account at your account's rates.</p>
+    </div>
+    <div class="danger-zone">
+      <span class="flabel" style="display:block; font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim); margin-bottom:7px">Erase everything</span>
+      <p class="fhelp" style="margin:0 0 10px">Wipes the API key, settings, the sealed profile, the
+        admin identity, and any installed policy from this browser. There is no server copy to erase.</p>
+      <button type="button" class="btn-danger" id="btnEraseAll">Erase key, profile, admin &amp; policy</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= PRIVACY ================= -->
+<dialog id="dlgPrivacy" aria-labelledby="privacyTitle">
+  <div class="dlg-head">
+    <h2 id="privacyTitle">Privacy — who sees what</h2>
+    <button class="x" data-close aria-label="Close privacy panel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">Sarto is a static page. <strong>There is no Postern
+      server, no account, no telemetry, no analytics</strong> — and therefore no server copy of
+      your key, your profile, the admin identity, or any installed policy. The honest ledger:</p>
+    <div class="ledger">
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div><h3>Your words → Anthropic (only if you use the configurator agent)</h3>
+          <p>When you describe your profession by voice or text, that text goes from your browser
+          directly to <code>api.anthropic.com</code> under <em>your own</em> key — no middleman,
+          and the key is never stored readable (sealed AES-256-GCM at rest). Skip the agent and
+          use the switches: manual editing needs no key and no network — nothing is ever
+          transmitted.</p></div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div><h3>Your voice → your browser's vendor (only while you hold to talk)</h3>
+          <p>Voice input uses the browser's Web Speech API, which in most browsers sends audio to
+          the browser vendor (Google in Chrome/Chromium) for transcription. Strictly push-to-talk: the mic is on only while you
+          hold the button. Typing is the fully local path.</p></div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div><h3>Your profile — ciphertext in this browser only</h3>
+          <p>Sealed with AES-256-GCM under your passphrase (PBKDF2, 310k it.). localStorage holds
+          only ciphertext + salt. Same shape as the Chiave/vault keyfile.</p></div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div><h3>The managed policy — plaintext on purpose, signed for integrity</h3>
+          <p>The policy is stored <em>readable</em> because the managed person must be able to read
+          it; what protects it is the admin's <em>signature</em> (tamper-evidence), not secrecy.
+          The admin's private key is sealed like the profile.</p></div>
+      </div>
+      <div class="ledger-row never">
+        <div class="mark">◄</div>
+        <div><h3>The managed person's activity → nowhere, ever</h3>
+          <p>Sarto's policy engine collects nothing, logs nothing, transmits nothing. There is no
+          code in this file that records browsing, messages, keystrokes, or app usage — verify it;
+          it is one readable HTML file, and the only network destination anywhere in it is
+          <code>api.anthropic.com</code>.</p></div>
+      </div>
+    </div>
+    <p class="pv-note"><strong>What we won't claim:</strong> if you use the configurator agent, your
+      description of yourself necessarily reaches Anthropic under your own agreement with them. If
+      that description is itself sensitive ("investigating X"), use the manual switches instead —
+      they are equivalent and fully local.</p>
+    <p style="text-align:right; margin: 14px 0 0"><button class="btn-acc" data-close>Understood</button></p>
+  </div>
+</dialog>
+
+<!-- ================= GUARDRAILS ================= -->
+<dialog id="dlgGuardrails" aria-labelledby="guardrailsTitle">
+  <div class="dlg-head">
+    <h2 id="guardrailsTitle">Managed devices — the rules</h2>
+    <button class="x" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">Device management is legitimate only as
+      <strong>transparent policy enforcement on a device the admin legitimately controls</strong>.
+      Sarto builds these rules into the mechanism, not the fine print:</p>
+    <div class="ledger">
+      <div class="ledger-row local"><div class="mark">●</div>
+        <div><h3>An admin of record, cryptographically</h3>
+          <p>Whoever sets limits signs them with a wallet key and is named — label, role
+          (parental / corporate) and key fingerprint — inside the policy itself. Anonymous
+          management does not exist here.</p></div></div>
+      <div class="ledger-row local"><div class="mark">●</div>
+        <div><h3>Signed and pinned — tamper-evident both ways</h3>
+          <p>The managed device pins the admin's public key at enrollment and verifies the policy
+          signature on every render. The managed user cannot silently forge or soften the policy;
+          the admin cannot deny having set it.</p></div></div>
+      <div class="ledger-row local"><div class="mark">●</div>
+        <div><h3>Transparent, always — no covert mode</h3>
+          <p>A managed device permanently shows who manages it and every active limit, in plain
+          language. There is no hidden state, no stealth install, no "employee monitoring dashboard".
+          Sarto <strong>refuses</strong> covert capability: a control the subject can't see is
+          surveillance, and surveillance is out of scope by design.</p></div></div>
+      <div class="ledger-row never"><div class="mark">◄</div>
+        <div><h3>Enforcement, never exfiltration</h3>
+          <p>Controls limit (site categories, app availability, time windows). They do not monitor:
+          no browsing history, no content, no screenshots, no location, no reports to the admin.
+          The policy engine has no transmit path at all.</p></div></div>
+      <div class="ledger-row leaves"><div class="mark">◮</div>
+        <div><h3>Honest about its own strength</h3>
+          <p>Client-side controls are advisory — a determined technical user can bypass a browser
+          page. This is the reference for the <em>policy model</em>; real enforcement is Postern OS
+          integration. We say so on the signing screen, in the managed view, and here.</p></div></div>
+    </div>
+    <p class="pv-note"><strong>Stand-ins, labeled:</strong></p>
+    <div class="tblwrap">
+    <table class="standins">
+      <tr><th>In this demo</th><th>In the product</th></tr>
+      <tr><td>Ed25519 (or ECDSA P-256) via WebCrypto signs the policy</td><td>Hybrid <strong>Falcon-1024 ‖ ML-DSA-65</strong> wallet key in the admin's device TEE (Chiave identity)</td></tr>
+      <tr><td>PBKDF2-SHA-256, 310,000 it. seals profile &amp; admin key</td><td><strong>Argon2id</strong> (memory-hard) — the <code>postern-core</code> vault KDF</td></tr>
+      <tr><td>Pinned admin key in localStorage</td><td>Enrollment record in the OS policy store, attestation-gated (Postern Seal)</td></tr>
+      <tr><td>Advisory site check on this page</td><td>OS network-layer + launcher enforcement; removal without the admin key is factory-reset-visible</td></tr>
+    </table>
+    </div>
+    <p style="text-align:right; margin: 14px 0 0"><button class="btn-acc" data-close>Understood</button></p>
+  </div>
+</dialog>
+
+<!-- ================= PASSPHRASE ================= -->
+<dialog id="dlgPass" aria-labelledby="passTitle">
+  <div class="dlg-head">
+    <h2 id="passTitle">Passphrase</h2>
+    <button class="x" id="passCancel" aria-label="Cancel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <form id="passForm">
+      <p class="pv-note" id="passLead" style="margin-top:0"></p>
+      <div class="field">
+        <label for="passInput" id="passLabel">Passphrase</label>
+        <input type="password" id="passInput" autocomplete="off">
+      </div>
+      <div class="field" id="passConfirmField" hidden>
+        <label for="passInput2">Repeat it</label>
+        <input type="password" id="passInput2" autocomplete="off">
+      </div>
+      <p class="err-line" id="passErr" aria-live="assertive"></p>
+      <div class="btnrow">
+        <button type="submit" class="btn-acc" id="passOk">Continue</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script id="srt-core">
+"use strict";
+/* ============================================================
+   SARTO — core (DOM-free; runs in Node ≥ 18 for tests).
+   Crypto: WebCrypto only. Zero network in this block.
+   ============================================================ */
+const SRT = (() => {
+  const te = new TextEncoder();
+  const td = new TextDecoder();
+  const subtle = () => crypto.subtle;
+
+  /* ---- bytes ---- */
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => {
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  const rand = (n) => crypto.getRandomValues(new Uint8Array(n));
+
+  /* ---- canonical JSON: sorted keys, so sign/verify see identical bytes ---- */
+  function stableStringify(v) {
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+    return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + stableStringify(v[k])).join(",") + "}";
+  }
+
+  /* ---- passphrase KDF + AEAD seal (the Chiave/vault keyfile pattern) ----
+     Adopts the ONE postern-sdk wiring seam (globalThis.PosternSDK): when a
+     Postern host shell has installed the wasm core, at-rest blobs are sealed
+     with the REAL Argon2id(64 MiB, t=3) + XChaCha20-Poly1305 from postern-core
+     — killing stand-in S2. In a plain browser tab (this page's strict CSP
+     forbids fetching wasm) the seam is absent and we keep the honest classical
+     stand-in: PBKDF2-SHA-256 (310,000 it.) → AES-256-GCM. Never silently weaker
+     — every blob is tagged with the KDF that produced it, and a real-sealed
+     blob refuses to open without the core (fail-closed). */
+  const KDF_ITER = 310000;
+  const KDF_REAL = "Argon2id-postern-sdk";   // on-disk tag for real-core seals
+  function sdk() { return (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null; }
+  function kdfReal() { const s = sdk(); return !!(s && s.kdf && s.kdf.available); }
+  /* Clamp KDF iterations read from a STORED blob. Anything that can write
+     localStorage (extension, same-origin XSS) could otherwise rewrite
+     kdf.iter to 1 and have the next legitimate unlock run an essentially
+     unhardened PBKDF2 over the real passphrase (KDF-parameter downgrade).
+     Floor = our own constant; the cap only bounds a denial-of-service value. */
+  const kdfIter = (n) => Math.min(Math.max(Math.floor(Number(n) || 0), KDF_ITER), KDF_ITER * 10);
+  async function passKey(passphrase, salt, iterations) {
+    const base = await subtle().importKey("raw", te.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+    return subtle().deriveKey(
+      { name: "PBKDF2", hash: "SHA-256", salt, iterations },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function sealJSON(key, obj, aad) {
+    const iv = rand(12); // fresh IV per write, always
+    const ct = await subtle().encrypt(
+      { name: "AES-GCM", iv, additionalData: te.encode(aad) },
+      key, te.encode(JSON.stringify(obj)));
+    return { iv: b64(iv), ct: b64(ct) };
+  }
+  async function openJSON(key, ivB64, ctB64, aad) {
+    const pt = await subtle().decrypt(
+      { name: "AES-GCM", iv: unb64(ivB64), additionalData: te.encode(aad) },
+      key, unb64(ctB64)); // throws on a wrong key — all-or-nothing
+    return JSON.parse(td.decode(pt));
+  }
+  /* Derive an at-rest key wrapper: { real, key, label }. `useReal` picks the
+     primitive — kdfReal() when sealing fresh, or the blob's own tag when
+     opening, so the key type always matches the ciphertext. */
+  async function deriveVaultKey(passphrase, saltBytes, useReal) {
+    if (useReal) {
+      const s = sdk();
+      return { real: true, label: (s.kdf.label || "Argon2id"), key: s.kdf.deriveKey(te.encode(passphrase), saltBytes) };
+    }
+    return { real: false, key: await passKey(passphrase, saltBytes, KDF_ITER) };
+  }
+  /* Seal an object under a key wrapper → a self-describing cipher object. */
+  async function aeadSeal(keyWrap, aad, obj) {
+    if (keyWrap.real) {
+      const blob = sdk().kdf.seal(keyWrap.key, te.encode(aad), te.encode(JSON.stringify(obj)));
+      return { algo: "XChaCha20-Poly1305", blob: b64(blob) };
+    }
+    const { iv, ct } = await sealJSON(keyWrap.key, obj, aad);
+    return { algo: "AES-256-GCM", iv, ct };
+  }
+  /* Open a cipher object; dispatch on its stored algo. Throws on wrong key, or
+     if a real-sealed blob is opened without the core. */
+  async function aeadOpen(keyWrap, aad, cipher) {
+    if (cipher && cipher.algo === "XChaCha20-Poly1305") {
+      if (!keyWrap.real) throw new Error("sealed with the real postern-sdk core — open it in the Postern shell");
+      return JSON.parse(td.decode(sdk().kdf.open(keyWrap.key, te.encode(aad), unb64(cipher.blob))));
+    }
+    return openJSON(keyWrap.key, cipher.iv, cipher.ct, aad);
+  }
+
+  /* whole-blob helpers: seal an object under a passphrase → storable blob */
+  async function sealBlob(passphrase, payload, aad, meta) {
+    const useReal = kdfReal();
+    if (useReal) {
+      const salt = sdk().kdf.generateSalt();
+      const key = sdk().kdf.deriveKey(te.encode(passphrase), salt);
+      try {
+        const blob = sdk().kdf.seal(key, te.encode(aad), te.encode(JSON.stringify(payload)));
+        return {
+          v: 1,
+          kdf: { algo: KDF_REAL, label: (sdk().kdf.label || "Argon2id"), salt: b64(salt) },
+          cipher: { algo: "XChaCha20-Poly1305", blob: b64(blob) },
+          meta: meta || {},
+        };
+      } finally { try { key.free(); } catch {} }
+    }
+    const salt = rand(16);
+    const key = await passKey(passphrase, salt, KDF_ITER);
+    const { iv, ct } = await sealJSON(key, payload, aad);
+    return {
+      v: 1,
+      kdf: { algo: "PBKDF2-SHA-256", iter: KDF_ITER, salt: b64(salt) },
+      cipher: { algo: "AES-256-GCM", iv, ct },
+      meta: meta || {},
+    };
+  }
+  async function openBlob(passphrase, blob, aad) {
+    if (blob && blob.kdf && blob.kdf.algo === KDF_REAL) {
+      if (!kdfReal()) throw new Error("This blob was sealed by the real postern-sdk core, which isn't loaded here — open it inside the Postern host shell.");
+      const key = sdk().kdf.deriveKey(te.encode(passphrase), unb64(blob.kdf.salt));
+      try {
+        return JSON.parse(td.decode(sdk().kdf.open(key, te.encode(aad), unb64(blob.cipher.blob))));
+      } finally { try { key.free(); } catch {} }
+    }
+    const key = await passKey(passphrase, unb64(blob.kdf.salt), kdfIter(blob.kdf.iter));
+    return openJSON(key, blob.cipher.iv, blob.cipher.ct, aad);
+  }
+
+  /* ---- admin signing key — CLASSICAL STAND-IN for Falcon-1024 ‖ ML-DSA-65 ---- */
+  async function genKeypair() {
+    try {
+      const kp = await subtle().generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+      return {
+        alg: "Ed25519",
+        priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)),
+        pub: b64(await subtle().exportKey("raw", kp.publicKey)),
+      };
+    } catch {
+      const kp = await subtle().generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+      return {
+        alg: "ECDSA-P256",
+        priv: b64(await subtle().exportKey("pkcs8", kp.privateKey)),
+        pub: b64(await subtle().exportKey("raw", kp.publicKey)),
+      };
+    }
+  }
+  const algParams = (alg) => alg === "Ed25519" ? { name: "Ed25519" } : { name: "ECDSA", namedCurve: "P-256" };
+  const sigParams = (alg) => alg === "Ed25519" ? { name: "Ed25519" } : { name: "ECDSA", hash: "SHA-256" };
+  const importSigner = (alg, privB64) => subtle().importKey("pkcs8", unb64(privB64), algParams(alg), false, ["sign"]);
+  const importVerifier = (alg, pubB64) => subtle().importKey("raw", unb64(pubB64), algParams(alg), false, ["verify"]);
+  const sign = async (alg, key, bytes) => b64(await subtle().sign(sigParams(alg), key, bytes));
+  const verify = (alg, key, bytes, sigB64) => subtle().verify(sigParams(alg), key, unb64(sigB64), bytes);
+
+  /* ---- identity fingerprint: SHA-256(pubkey), first 8 bytes ---- */
+  async function fingerprint(pubB64) {
+    const d = new Uint8Array(await subtle().digest("SHA-256", unb64(pubB64)));
+    const h = hex(d.slice(0, 8)).toUpperCase();
+    return `PL-${h.slice(0, 4)}-${h.slice(4, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}`;
+  }
+
+  /* ============================================================
+     THE APP CATALOG — grounded in the real repo
+     (crates/postern-* doc comments + docs/POSTERN-APPS-ROADMAP.md
+     + the Store catalog). Ids are shared with the Postern Store.
+     ============================================================ */
+  const APPS = [
+    { id: "messenger",  name: "Messenger",      blurb: "Matrix E2EE chat (Megolm via vodozemac); homeserver still sees the social graph" },
+    { id: "courier",    name: "Courier",        blurb: "serverless P2P file drop over an ephemeral Tor onion, post-quantum payload seal" },
+    { id: "hygiene",    name: "Hygiene",        blurb: "scrubs author/company/GPS/revision metadata from documents & photos before sharing" },
+    { id: "quarantine", name: "Quarantine",     blurb: "opens untrusted inbound files by rebuilding them from rendered pixels" },
+    { id: "vault",      name: "Vault",          blurb: "secrets & passwords sealed at rest (XChaCha20-Poly1305, Argon2id key — software keystore)" },
+    { id: "keys",       name: "Keys",           blurb: "passkey / FIDO2 authenticator, credentials sealed in the Vault" },
+    { id: "panic",      name: "Panic Lock",     blurb: "one gesture re-locks everything to ciphertext and evicts keys — locks, never wipes" },
+    { id: "seal",       name: "Seal Companion", blurb: "attestation verifier: self-audit this device, peer-verify before trusting" },
+    { id: "tor",        name: "Tor",            blurb: "in-process Tor circuits (Arti) — no daemon, no SOCKS port to leak on" },
+    { id: "wallet",     name: "Wallet",         blurb: "hold & sign for the Bloch chain, hybrid PQ keys in a software keystore" },
+    { id: "sotto",      name: "Sotto",          blurb: "the quiet push-to-talk voice assistant on your own Claude key" },
+    { id: "tolmach",    name: "Tolmach",        blurb: "interpreter-secretary: live interpreting and meeting minutes" },
+    { id: "vedetta",    name: "Vedetta",        blurb: "private market lookout: watchlists & portfolio encrypted in the browser" },
+    { id: "telephony",  name: "SMS & Dialer",   blurb: "carrier SMS/calls with a sealed local history — carrier telephony is NOT private" },
+  ];
+  const APP_IDS = APPS.map(a => a.id);
+
+  /* ---- site categories for managed policies ---- */
+  const SITE_CATEGORIES = {
+    adult:    { name: "Adult content",    desc: "pornography and other explicitly adult sites" },
+    gambling: { name: "Gambling",         desc: "betting, casinos, loot-box style wagering" },
+    social:   { name: "Social networks",  desc: "feeds and DMs: Instagram, TikTok, X, Facebook…" },
+    video:    { name: "Video streaming",  desc: "YouTube, Twitch, Netflix and similar" },
+    games:    { name: "Online games",     desc: "browser and platform gaming sites" },
+  };
+  /* demo domain→category map — stand-in for the on-device category list of Postern OS */
+  const DEMO_DOMAIN_CATEGORIES = {
+    "instagram.com": "social", "tiktok.com": "social", "x.com": "social",
+    "twitter.com": "social", "facebook.com": "social", "reddit.com": "social",
+    "snapchat.com": "social", "youtube.com": "video", "twitch.tv": "video",
+    "netflix.com": "video", "roblox.com": "games", "poki.com": "games",
+    "store.steampowered.com": "games", "bet365.com": "gambling", "pokerstars.com": "gambling",
+    "stake.com": "gambling", "pornhub.com": "adult", "onlyfans.com": "adult",
+    "wikipedia.org": null, "khanacademy.org": null,
+  };
+
+  /* ============================================================
+     PROFILE — the Part A preferences object.
+     Voice, text (via set_profile) and the manual switches all
+     edit this one shape.
+     ============================================================ */
+  function defaultProfile() {
+    return {
+      v: 1,
+      persona: "Private person",
+      rationale: "Sane private defaults: scrub what leaves, lock what stays, no drama.",
+      apps: { foreground: ["messenger", "vault", "hygiene"], hidden: [] },
+      privacy: {
+        tor_by_default: false,
+        hygiene_autoscrub_on_share: true,
+        panic_gesture: false,
+        attestation_posture: "relaxed",       // relaxed | self_audit | verify_peers
+        courier_for_files: false,
+        messenger_over_tor: false,
+      },
+      notifications: { posture: "quiet", lockscreen_content: false }, // full | quiet | silenced
+    };
+  }
+  const ATTEST_VALUES = ["relaxed", "self_audit", "verify_peers"];
+  const NOTIF_VALUES  = ["full", "quiet", "silenced"];
+
+  /* Coerce anything (e.g. a model's tool input) into a valid profile. */
+  function normalizeProfile(raw) {
+    const p = defaultProfile();
+    if (!raw || typeof raw !== "object") return p;
+    if (typeof raw.persona === "string" && raw.persona.trim()) p.persona = raw.persona.trim().slice(0, 80);
+    if (typeof raw.rationale === "string" && raw.rationale.trim()) p.rationale = raw.rationale.trim().slice(0, 160);
+    const apps = raw.apps && typeof raw.apps === "object" ? raw.apps : {};
+    const idlist = (a) => Array.isArray(a) ? [...new Set(a.filter(x => APP_IDS.includes(x)))] : null;
+    const fg = idlist(apps.foreground); if (fg) p.apps.foreground = fg.slice(0, 6);
+    const hid = idlist(apps.hidden); if (hid) p.apps.hidden = hid.filter(x => !p.apps.foreground.includes(x));
+    const pv = raw.privacy && typeof raw.privacy === "object" ? raw.privacy : {};
+    for (const k of ["tor_by_default", "hygiene_autoscrub_on_share", "panic_gesture", "courier_for_files", "messenger_over_tor"]) {
+      if (typeof pv[k] === "boolean") p.privacy[k] = pv[k];
+    }
+    if (ATTEST_VALUES.includes(pv.attestation_posture)) p.privacy.attestation_posture = pv.attestation_posture;
+    const nt = raw.notifications && typeof raw.notifications === "object" ? raw.notifications : {};
+    if (NOTIF_VALUES.includes(nt.posture)) p.notifications.posture = nt.posture;
+    if (typeof nt.lockscreen_content === "boolean") p.notifications.lockscreen_content = nt.lockscreen_content;
+    return p;
+  }
+
+  /* ============================================================
+     MANAGED POLICY — Part B.
+     Transparency fields are CONSTANTS: buildPolicy cannot emit a
+     covert or monitoring policy, whatever it is asked for.
+     ============================================================ */
+  const POLICY_KIND = "postern.managed-policy.v1";
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const cleanDomain = (s) => String(s || "").trim().toLowerCase()
+    .replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].slice(0, 100);
+
+  function normalizeLimits(raw) {
+    const r = raw && typeof raw === "object" ? raw : {};
+    const cats = Array.isArray(r.categories_blocked)
+      ? [...new Set(r.categories_blocked.filter(c => SITE_CATEGORIES[c]))] : [];
+    const domains = (a) => Array.isArray(a)
+      ? [...new Set(a.map(cleanDomain).filter(Boolean))].slice(0, 50) : [];
+    const windows = Array.isArray(r.time_windows) ? r.time_windows.map(w => ({
+      label: String(w && w.label || "Scheduled hours").slice(0, 48),
+      days: Array.isArray(w && w.days) ? [...new Set(w.days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : [],
+      start: /^\d{2}:\d{2}$/.test(w && w.start) ? w.start : "08:00",
+      end:   /^\d{2}:\d{2}$/.test(w && w.end)   ? w.end   : "17:00",
+      blocks: Array.isArray(w && w.blocks) ? [...new Set(w.blocks.filter(c => SITE_CATEGORIES[c]))] : [],
+    /* start === end would be a zero-length window (ambiguous: "never" or "always").
+       It is DROPPED here rather than shown-but-unenforced — a limit the panel
+       displays must be a limit checkSite enforces. end < start is a valid
+       overnight window (e.g. 21:00–06:00) and IS enforced; see checkSite. */
+    })).filter(w => w.days.length && w.blocks.length && w.start !== w.end).slice(0, 8) : [];
+    return {
+      categories_blocked: cats,
+      site_allow: domains(r.site_allow),
+      site_block: domains(r.site_block),
+      time_windows: windows,
+      apps_hidden: Array.isArray(r.apps_hidden) ? [...new Set(r.apps_hidden.filter(x => APP_IDS.includes(x)))] : [],
+    };
+  }
+
+  function buildPolicy({ role, admin, device_label, limits }) {
+    if (role !== "parental" && role !== "corporate") throw new Error("role must be parental or corporate");
+    if (!admin || !admin.pub || !admin.fpr || !admin.alg) throw new Error("admin identity incomplete");
+    return {
+      v: 1,
+      kind: POLICY_KIND,
+      role,
+      admin: {
+        label: String(admin.label || "").slice(0, 48) || (role === "parental" ? "Guardian" : "Administrator"),
+        fpr: admin.fpr, alg: admin.alg, pub: admin.pub,
+      },
+      device_label: String(device_label || "").slice(0, 48) || "this device",
+      set_on: new Date().toISOString(),
+      limits: normalizeLimits(limits),
+      /* CONSTANTS — the ethical floor. No parameter can change these. */
+      transparency: {
+        visible_to_managed_user: true,
+        monitoring: "none",
+        data_collected: "none",
+        covert_mode: "does-not-exist",
+      },
+    };
+  }
+
+  const policyBytes = (payload) => te.encode(POLICY_KIND + "\n" + stableStringify(payload));
+
+  async function signPolicy(signerKey, payload) {
+    const sig = await sign(payload.admin.alg, signerKey, policyBytes(payload));
+    return { payload, sig };
+  }
+
+  /* Verify against the PINNED enrollment key (never only the key embedded in
+     the payload — otherwise a forger just swaps the key). The pin stands in
+     for the OS policy store's enrollment record. */
+  async function verifyPolicy(signed, pinned) {
+    try {
+      if (!signed || !signed.payload || !signed.sig) return { ok: false, reason: "missing policy or signature" };
+      const p = signed.payload;
+      if (p.kind !== POLICY_KIND) return { ok: false, reason: "unknown policy kind" };
+      if (!pinned || !pinned.pub) return { ok: false, reason: "no enrolled admin key pinned on this device" };
+      if (p.admin.pub !== pinned.pub || p.admin.alg !== pinned.alg)
+        return { ok: false, reason: "policy admin key does not match the enrolled admin of record" };
+      if (p.transparency == null || p.transparency.visible_to_managed_user !== true || p.transparency.monitoring !== "none")
+        return { ok: false, reason: "policy violates the transparency floor — refused" };
+      const key = await importVerifier(pinned.alg, pinned.pub);
+      const ok = await verify(pinned.alg, key, policyBytes(p), signed.sig);
+      return ok ? { ok: true, reason: "signature verified against the enrolled admin key" }
+                : { ok: false, reason: "SIGNATURE INVALID — the policy was altered after signing" };
+    } catch (e) {
+      return { ok: false, reason: "verification error: " + (e && e.message || e) };
+    }
+  }
+
+  /* ---- the plain-language rendering the managed user always sees ---- */
+  const fmtDays = (days) => {
+    if (days.length === 7) return "every day";
+    if (String(days) === "1,2,3,4,5") return "Mon–Fri";
+    if (String(days) === "0,6") return "weekends";
+    return days.map(d => DAY_NAMES[d]).join(", ");
+  };
+  function policyPlainLanguage(policy) {
+    const L = policy.limits;
+    const out = [];
+    for (const c of L.categories_blocked)
+      out.push(`${SITE_CATEGORIES[c].name} sites are blocked at all times (${SITE_CATEGORIES[c].desc}).`);
+    if (L.site_block.length)
+      out.push(`Always blocked, by name: ${L.site_block.join(", ")}.`);
+    if (L.site_allow.length)
+      out.push(`Always allowed, even inside a blocked category: ${L.site_allow.join(", ")}.`);
+    for (const w of L.time_windows) {
+      const span = w.end < w.start ? `${w.start}–${w.end} overnight, into the following morning` : `${w.start}–${w.end}`;
+      out.push(`${w.label} (${fmtDays(w.days)}, ${span}): ${w.blocks.map(c => SITE_CATEGORIES[c].name.toLowerCase()).join(", ")} additionally blocked.`);
+    }
+    if (L.apps_hidden.length) {
+      const names = L.apps_hidden.map(id => (APPS.find(a => a.id === id) || { name: id }).name);
+      out.push(`Apps removed from the launcher: ${names.join(", ")}.`);
+    }
+    if (!out.length) out.push("No limits are currently active — the policy exists but restricts nothing.");
+    return out;
+  }
+
+  /* ---- the enforcement check itself (pure; also what the tests exercise) ----
+     Precedence: explicit block > explicit allow > category (incl. time windows). */
+  function checkSite(policy, rawDomain, now) {
+    const domain = cleanDomain(rawDomain);
+    if (!domain) return { allowed: true, reason: "no domain given" };
+    const L = policy.limits;
+    const matches = (list) => list.some(d => domain === d || domain.endsWith("." + d));
+    if (matches(L.site_block)) return { allowed: false, reason: `"${domain}" is on the always-blocked list.` };
+    if (matches(L.site_allow)) return { allowed: true, reason: `"${domain}" is on the always-allowed list.` };
+    let cat = null;
+    for (const [d, c] of Object.entries(DEMO_DOMAIN_CATEGORIES)) {
+      if (domain === d || domain.endsWith("." + d)) { cat = c; break; }
+    }
+    if (!cat) return { allowed: true, reason: `"${domain}" matches no blocked category or list (demo category list).` };
+    const catName = SITE_CATEGORIES[cat].name;
+    if (L.categories_blocked.includes(cat))
+      return { allowed: false, reason: `"${domain}" is ${catName} — blocked at all times by this policy.` };
+    const t = now instanceof Date ? now : new Date();
+    const hm = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+    const dow = t.getDay(), prevDow = (dow + 6) % 7;
+    /* A window with end < start crosses midnight: it runs from `start` on each
+       listed day until `end` the NEXT morning. Attribution: `days` names the
+       pre-midnight day, so "Mon 21:00–06:00" covers Mon 21:00 → Tue 06:00.
+       (normalizeLimits already dropped start === end, so the two arms below
+       are exhaustive and a displayed window is always enforceable.) */
+    const inWindow = (w) => w.start < w.end
+      ? (w.days.includes(dow) && hm >= w.start && hm < w.end)
+      : ((w.days.includes(dow) && hm >= w.start) || (w.days.includes(prevDow) && hm < w.end));
+    for (const w of L.time_windows) {
+      if (inWindow(w) && w.blocks.includes(cat))
+        return { allowed: false, reason: `"${domain}" is ${catName} — blocked right now by "${w.label}" (${w.start}–${w.end}${w.end < w.start ? " overnight" : ""}).` };
+    }
+    return { allowed: true, reason: `"${domain}" is ${catName} — not blocked at this time.` };
+  }
+
+  return {
+    te, td, b64, unb64, hex, rand, stableStringify,
+    KDF_ITER, KDF_REAL, kdfIter, passKey, sealJSON, openJSON, sealBlob, openBlob,
+    kdfReal, deriveVaultKey, aeadSeal, aeadOpen,
+    genKeypair, importSigner, importVerifier, sign, verify, fingerprint,
+    APPS, APP_IDS, SITE_CATEGORIES, DEMO_DOMAIN_CATEGORIES, DAY_NAMES,
+    defaultProfile, normalizeProfile, ATTEST_VALUES, NOTIF_VALUES,
+    POLICY_KIND, normalizeLimits, buildPolicy, policyBytes, signPolicy, verifyPolicy,
+    policyPlainLanguage, checkSite, cleanDomain, fmtDays,
+  };
+})();
+if (typeof globalThis !== "undefined") globalThis.SRT = SRT;
+</script>
+
+<script id="srt-app">
+"use strict";
+/* ============================================================
+   SARTO — UI wiring. The ONLY network call in this file is the
+   user's own Claude request in streamMessage().
+   ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+const LS = {
+  KEY:    "sarto.apiKey",        // LEGACY readable slot — read once for migration, deleted on seal/edit; never written anymore
+  SEALED: "sarto.apiKey.sealed", // the ONLY persistent form of the key: AES-256-GCM ciphertext
+  MODEL:  "sarto.model",
+  THEME:  "sarto.theme",
+  PROFILE:"sarto.profile",     // sealed blob (ciphertext)
+  ADMIN:  "sarto.admin",       // sealed admin wallet blob (ciphertext + public meta)
+  POLICY: "sarto.policy",      // signed policy — PLAINTEXT on purpose (the user must read it)
+  PIN:    "sarto.adminPin",    // pinned admin-of-record key (enrollment record stand-in)
+};
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+const jget = (k) => { try { return JSON.parse(store.get(k, "null")); } catch { return null; } };
+
+/* ---------- API key at rest: SEALED BY DEFAULT ----------
+   The key is never written readable to storage. Unsealed, it lives only in
+   this tab's memory and dies with the tab. Persisting it means sealing it,
+   with SRT's Chiave construction (PBKDF2-SHA-256 310k it. → non-extractable
+   AES-256-GCM, fresh IV per write, AAD-bound) — the same primitives that
+   seal the profile and admin identity. localStorage holds ONLY ciphertext.
+   Keys stored readable by earlier Sarto builds are adopted into memory and
+   removed from disk the moment they are sealed or edited. */
+const AAD_APIKEY = "postern.sarto.apikey.v1";
+const KeySeal = (() => {
+  let plain = null;    // the readable key — this tab's memory only, never persisted
+  let aesKey = null;   // derived, non-extractable; kept so edits re-seal without re-running the KDF
+  let saltB64 = null;
+  let legacy = false;  // a pre-seal-by-default readable record still exists on disk
+  let writing = Promise.resolve(); // serialize re-seals (last write wins)
+
+  const record = () => jget(LS.SEALED);
+  const freeReal = () => { if (aesKey && aesKey.real && aesKey.key) { try { aesKey.key.free(); } catch {} } };
+  async function persist() {
+    const cipher = await SRT.aeadSeal(aesKey, AAD_APIKEY, { key: plain });
+    store.set(LS.SEALED, JSON.stringify({
+      v: 1,
+      kdf: { algo: aesKey.real ? SRT.KDF_REAL : "PBKDF2-SHA-256", iter: SRT.KDF_ITER, label: aesKey.label, salt: saltB64 },
+      cipher,
+    }));
+  }
+  /* migration: adopt a legacy readable key into memory. It stays on disk only
+     until the user seals or edits it — new plaintext is never written. */
+  if (!record()) {
+    const old = store.get(LS.KEY, null);
+    if (old) { plain = old; legacy = true; }
+  }
+  return {
+    isSealed: () => !!record(),
+    isLocked: () => !!record() && plain === null,
+    isLegacyPlain: () => legacy,
+    key: () => plain,
+    real: () => SRT.kdfReal(),              // is the real core installed right now?
+    cipherLabel: () => {                    // what actually sealed the current blob
+      const r = record();
+      if (r && r.kdf && r.kdf.algo === SRT.KDF_REAL) return "XChaCha20-Poly1305 (real Argon2id, via postern-sdk)";
+      return "AES-256-GCM (PBKDF2-SHA-256 stand-in)";
+    },
+    set(v, commit) {                        // memory always; ciphertext only on commit while unlocked
+      plain = v;
+      if (legacy) { store.del(LS.KEY); legacy = false; } // a stale readable copy must not linger
+      if (aesKey && commit) writing = writing.then(persist).catch(() => {});
+    },
+    async seal(pass) {                      // the ONLY way the key ever reaches disk
+      const salt = SRT.rand(16);
+      aesKey = await SRT.deriveVaultKey(pass, salt, SRT.kdfReal());
+      saltB64 = SRT.b64(salt);
+      await persist();
+      store.del(LS.KEY);                    // clears any legacy readable copy
+      legacy = false;
+    },
+    async unlock(pass) {                    // per-session; a wrong passphrase fails the AEAD tag
+      const r = record(); if (!r) return false;
+      const wantReal = !!(r.kdf && r.kdf.algo === SRT.KDF_REAL);
+      if (wantReal && !SRT.kdfReal()) return false;   // fail-closed: the real core isn't loaded here
+      try {
+        const k = await SRT.deriveVaultKey(pass, SRT.unb64(r.kdf.salt), wantReal);
+        plain = (await SRT.aeadOpen(k, AAD_APIKEY, r.cipher)).key;
+        aesKey = k; saltB64 = r.kdf.salt;
+        return true;
+      } catch { return false; }             // all-or-nothing: nothing decrypted, nothing leaked
+    },
+    removeSeal() {                          // drops the ciphertext; the key stays in MEMORY only, never plaintext-at-rest
+      if (plain === null) return false;
+      store.del(LS.SEALED);
+      freeReal(); aesKey = null; saltB64 = null;
+      return true;
+    },
+    forget() { plain = null; freeReal(); aesKey = null; saltB64 = null; legacy = false; },
+  };
+})();
+
+const API_URL = "https://api.anthropic.com/v1/messages";
+const MODELS = {
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+  "claude-sonnet-5": "Sonnet 5",
+  "claude-opus-4-8": "Opus 4.8",
+};
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const MAX_TOKENS = 2048;
+const MAX_TOOL_ROUNDS = 3;
+const AAD_PROFILE = "postern.sarto.profile.v1";
+const AAD_ADMIN   = "postern.sarto.admin.v1";
+
+/* ---------- elements ---------- */
+const el = {
+  body: document.body,
+  status: $("#statusLine"), heroTitle: $("#heroTitle"),
+  banner: $("#managedBanner"), mbText: $("#mbText"), mbBadge: $("#mbBadge"), mbDetails: $("#mbDetails"),
+  // views
+  viewHome: $("#viewHome"), viewMine: $("#viewMine"), viewManage: $("#viewManage"), viewManaged: $("#viewManaged"),
+  pathMine: $("#pathMine"), pathManage: $("#pathManage"),
+  homeProfileCard: $("#homeProfileCard"), homeProfileLine: $("#homeProfileLine"), btnHomeEditProfile: $("#btnHomeEditProfile"),
+  // composer / agent
+  composer: $("#composer"), textInput: $("#textInput"), btnMic: $("#btnMic"),
+  btnStop: $("#btnStop"), btnSend: $("#btnSend"), chips: $("#chips"),
+  transcript: $("#transcript"), composerNote: $("#composerNote"), modelHint: $("#modelHint"),
+  // review panel
+  reviewPanel: $("#reviewPanel"),
+  personaInput: $("#personaInput"), rationaleInput: $("#rationaleInput"),
+  appGrid: $("#appGrid"), profileJson: $("#profileJson"),
+  pvTor: $("#pvTor"), pvScrub: $("#pvScrub"), pvPanic: $("#pvPanic"),
+  pvCourier: $("#pvCourier"), pvMsgTor: $("#pvMsgTor"), pvAttest: $("#pvAttest"),
+  ntPosture: $("#ntPosture"), ntLock: $("#ntLock"),
+  btnApplyProfile: $("#btnApplyProfile"), btnResetProfile: $("#btnResetProfile"), applyErr: $("#applyErr"),
+  sealedCard: $("#sealedCard"), sealedLine: $("#sealedLine"),
+  btnUnlockProfile: $("#btnUnlockProfile"), btnEraseProfile: $("#btnEraseProfile"),
+  // admin
+  adminNone: $("#adminNone"), adminLocked: $("#adminLocked"), adminOpen: $("#adminOpen"),
+  adminLabel: $("#adminLabel"), adminPass1: $("#adminPass1"), adminErr: $("#adminErr"),
+  btnCreateAdmin: $("#btnCreateAdmin"), adminLockedFpr: $("#adminLockedFpr"),
+  adminUnlockForm: $("#adminUnlockForm"), adminPassUnlock: $("#adminPassUnlock"),
+  adminUnlockErr: $("#adminUnlockErr"), btnAdminReset: $("#btnAdminReset"),
+  adminFpr: $("#adminFpr"), adminWho: $("#adminWho"), btnAdminLock: $("#btnAdminLock"),
+  adminAlgNote: $("#adminAlgNote"),
+  // policy form
+  deviceLabel: $("#deviceLabel"), catGrid: $("#catGrid"),
+  siteAllow: $("#siteAllow"), siteBlock: $("#siteBlock"),
+  windowList: $("#windowList"), btnAddWindow: $("#btnAddWindow"),
+  mgAppGrid: $("#mgAppGrid"), ckLegit: $("#ckLegit"), policyErr: $("#policyErr"),
+  btnSignPolicy: $("#btnSignPolicy"), btnPreviewManaged: $("#btnPreviewManaged"),
+  btnRemovePolicy: $("#btnRemovePolicy"),
+  // managed view
+  vaAdmin: $("#vaAdmin"), vaManaged: $("#vaManaged"),
+  managedEmpty: $("#managedEmpty"), managedFull: $("#managedFull"),
+  policyPanel: $("#policyPanel"), ppSig: $("#ppSig"), ppTitle: $("#ppTitle"), ppSub: $("#ppSub"),
+  limitList: $("#limitList"), ppAdminName2: $("#ppAdminName2"),
+  siteCheckForm: $("#siteCheckForm"), siteCheckInput: $("#siteCheckInput"), siteCheckResult: $("#siteCheckResult"),
+  // dialogs
+  dlgSettings: $("#dlgSettings"), dlgPrivacy: $("#dlgPrivacy"), dlgGuardrails: $("#dlgGuardrails"),
+  apiKey: $("#apiKey"), btnShowKey: $("#btnShowKey"), modelSel: $("#modelSel"), btnEraseAll: $("#btnEraseAll"),
+  keyPass: $("#keyPass"), btnKeyLock: $("#btnKeyLock"), keyLockState: $("#keyLockState"),
+  btnSettings: $("#btnSettings"), btnPrivacy: $("#btnPrivacy"), btnGuardrails: $("#btnGuardrails"),
+  btnTheme: $("#btnTheme"), btnHome: $("#btnHome"),
+  dlgPass: $("#dlgPass"), passForm: $("#passForm"), passTitle: $("#passTitle"), passLead: $("#passLead"),
+  passLabel: $("#passLabel"), passInput: $("#passInput"), passConfirmField: $("#passConfirmField"),
+  passInput2: $("#passInput2"), passErr: $("#passErr"), passCancel: $("#passCancel"),
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function setStatus(html, tone) {
+  el.status.innerHTML = html;
+  if (tone) el.status.dataset.tone = tone; else delete el.status.dataset.tone;
+}
+
+/* ============================================================
+   Views + the always-visible banner
+   ============================================================ */
+const VIEW_TITLES = {
+  home: "Fit this system to its wearer",
+  mine: "Tailor your own device",
+  manage: "Manage a device you own or guard",
+  managed: "What the managed person sees",
+};
+function show(view) {
+  el.body.dataset.view = view;
+  el.viewHome.hidden = view !== "home";
+  el.viewMine.hidden = view !== "mine";
+  el.viewManage.hidden = view !== "manage";
+  el.viewManaged.hidden = view !== "managed";
+  el.heroTitle.textContent = VIEW_TITLES[view] || VIEW_TITLES.home;
+  if (view === "home") homeStatus();
+  if (view === "mine") mineStatus();
+  if (view === "manage") setStatus("Signed limits for a device you legitimately control — always visible to its user.");
+  if (view === "managed") { setStatus("Everything the policy does, in plain words. This panel cannot be hidden."); renderManagedView(); }
+  renderBanner(); // the banner re-renders on every navigation — never conditionally on the view
+  window.scrollTo({ top: 0 });
+}
+function homeStatus() {
+  setStatus("Two doors: tailor your own device, or set transparent limits on one you own or guard.");
+  const blob = jget(LS.PROFILE);
+  el.homeProfileCard.hidden = !blob;
+  if (blob) {
+    el.homeProfileLine.innerHTML =
+      `<span class="okmark">●</span> <span>A sealed profile is applied on this device (since ${escapeHtml(new Date(blob.meta.applied).toLocaleDateString())}). Its contents — even the persona label — stay ciphertext until you unlock.</span>`;
+  }
+}
+function mineStatus() {
+  if (!getKey()) {
+    if (KeySeal.isLocked()) {
+      setStatus('Your API key is sealed at rest — unlock it in <b>Settings</b> for this session. The switches below work fully offline meanwhile.');
+    } else {
+      setStatus('The switches below work fully offline. For the voice/text configurator, add your Anthropic key in <b>Settings</b> — seal it there to keep it across sessions; it is never stored readable.');
+    }
+    el.btnSettings.dataset.attn = "1";
+  } else {
+    el.btnSettings.removeAttribute("data-attn");
+    setStatus("Describe what you do — hold the mic or type — and review every derived switch before it applies.");
+  }
+}
+
+async function renderBanner() {
+  const signed = jget(LS.POLICY);
+  if (!signed) { el.banner.hidden = true; return; }
+  // A policy exists ⇒ the banner shows. Unconditionally.
+  el.banner.hidden = false;
+  const p = signed.payload;
+  const v = await SRT.verifyPolicy(signed, jget(LS.PIN));
+  el.banner.dataset.sig = v.ok ? "ok" : "bad";
+  el.mbBadge.textContent = v.ok ? "MANAGED DEVICE" : "POLICY TAMPERED";
+  const n = SRT.policyPlainLanguage(p).length;
+  el.mbText.innerHTML = v.ok
+    ? `<b>${escapeHtml(p.device_label)}</b> is managed by <b>${escapeHtml(p.admin.label)}</b> <span class="fpr">${escapeHtml(p.admin.fpr)}</span> · ${p.role} policy · ${n} limit${n === 1 ? "" : "s"} · set ${escapeHtml(new Date(p.set_on).toLocaleDateString())}`
+    : `The installed policy FAILED signature verification: ${escapeHtml(v.reason)}`;
+}
+el.mbDetails.addEventListener("click", () => { setViewAs("managed"); show("managed"); });
+
+$$("[data-nav]").forEach(b => b.addEventListener("click", () => show(b.dataset.nav)));
+el.btnHome.addEventListener("click", () => show("home"));
+el.pathMine.addEventListener("click", () => show("mine"));
+el.pathManage.addEventListener("click", () => show("manage"));
+
+/* ============================================================
+   Passphrase dialog (shared)
+   ============================================================ */
+let passResolve = null;
+function askPass({ title, lead, label, confirm = false, minLen = 0 }) {
+  el.passTitle.textContent = title;
+  el.passLead.textContent = lead || "";
+  el.passLabel.textContent = label || "Passphrase";
+  el.passConfirmField.hidden = !confirm;
+  el.passInput.value = el.passInput2.value = "";
+  el.passErr.textContent = "";
+  el.passForm.dataset.min = String(minLen);
+  el.dlgPass.showModal();
+  el.passInput.focus();
+  return new Promise((resolve) => { passResolve = resolve; });
+}
+el.passForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const min = parseInt(el.passForm.dataset.min || "0", 10);
+  const p = el.passInput.value;
+  if (min && p.length < min) { el.passErr.textContent = `Use at least ${min} characters.`; return; }
+  if (!el.passConfirmField.hidden && p !== el.passInput2.value) { el.passErr.textContent = "The passphrases don't match."; return; }
+  el.dlgPass.close();
+  const r = passResolve; passResolve = null;
+  if (r) r(p);
+});
+el.passCancel.addEventListener("click", () => {
+  el.dlgPass.close();
+  const r = passResolve; passResolve = null;
+  if (r) r(null);
+});
+el.dlgPass.addEventListener("cancel", () => {
+  const r = passResolve; passResolve = null;
+  if (r) r(null);
+});
+
+/* ============================================================
+   PART A — the profile draft + the review panel (the single
+   object all three input paths edit)
+   ============================================================ */
+let draft = SRT.defaultProfile();
+
+const cycleState = (s) => s === "available" ? "foreground" : s === "foreground" ? "hidden" : "available";
+function appState(p, id) {
+  if (p.apps.foreground.includes(id)) return "foreground";
+  if (p.apps.hidden.includes(id)) return "hidden";
+  return "available";
+}
+function setAppState(p, id, state) {
+  p.apps.foreground = p.apps.foreground.filter(x => x !== id);
+  p.apps.hidden = p.apps.hidden.filter(x => x !== id);
+  if (state === "foreground") p.apps.foreground.push(id);
+  if (state === "hidden") p.apps.hidden.push(id);
+}
+
+function renderEditor() {
+  el.personaInput.value = draft.persona;
+  el.rationaleInput.value = draft.rationale;
+  el.appGrid.innerHTML = "";
+  for (const a of SRT.APPS) {
+    const st = appState(draft, a.id);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "appchip";
+    b.dataset.state = st;
+    b.title = a.blurb;
+    b.setAttribute("aria-label", `${a.name}: ${st}. ${a.blurb}. Click to change.`);
+    b.innerHTML = `<span class="ac-name">${escapeHtml(a.name)}</span><span class="ac-state">${st}</span>`;
+    b.addEventListener("click", () => {
+      setAppState(draft, a.id, cycleState(appState(draft, a.id)));
+      renderEditor();
+    });
+    el.appGrid.appendChild(b);
+  }
+  el.pvTor.checked = draft.privacy.tor_by_default;
+  el.pvScrub.checked = draft.privacy.hygiene_autoscrub_on_share;
+  el.pvPanic.checked = draft.privacy.panic_gesture;
+  el.pvCourier.checked = draft.privacy.courier_for_files;
+  el.pvMsgTor.checked = draft.privacy.messenger_over_tor;
+  el.pvAttest.value = draft.privacy.attestation_posture;
+  el.ntPosture.value = draft.notifications.posture;
+  el.ntLock.checked = draft.notifications.lockscreen_content;
+  el.profileJson.textContent = JSON.stringify(draft, null, 2);
+}
+el.personaInput.addEventListener("input", () => { draft.persona = el.personaInput.value.slice(0, 80); el.profileJson.textContent = JSON.stringify(draft, null, 2); });
+el.rationaleInput.addEventListener("input", () => { draft.rationale = el.rationaleInput.value.slice(0, 160); el.profileJson.textContent = JSON.stringify(draft, null, 2); });
+const bindToggle = (input, path) => input.addEventListener("change", () => {
+  const [a, b] = path.split(".");
+  draft[a][b] = input.type === "checkbox" ? input.checked : input.value;
+  renderEditor();
+});
+bindToggle(el.pvTor, "privacy.tor_by_default");
+bindToggle(el.pvScrub, "privacy.hygiene_autoscrub_on_share");
+bindToggle(el.pvPanic, "privacy.panic_gesture");
+bindToggle(el.pvCourier, "privacy.courier_for_files");
+bindToggle(el.pvMsgTor, "privacy.messenger_over_tor");
+bindToggle(el.pvAttest, "privacy.attestation_posture");
+bindToggle(el.ntPosture, "notifications.posture");
+bindToggle(el.ntLock, "notifications.lockscreen_content");
+
+el.btnResetProfile.addEventListener("click", () => {
+  draft = SRT.defaultProfile();
+  renderEditor();
+  flashReview();
+});
+function flashReview() {
+  el.reviewPanel.dataset.flash = "1";
+  el.reviewPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  setTimeout(() => { delete el.reviewPanel.dataset.flash; }, 1200);
+}
+
+/* ---- seal & apply (profile → vault ciphertext) ---- */
+el.btnApplyProfile.addEventListener("click", async () => {
+  el.applyErr.textContent = "";
+  const pass = await askPass({
+    title: "Seal this profile",
+    lead: "The profile is encrypted (AES-256-GCM) under this passphrase before it is stored. Only ciphertext lands in the browser.",
+    label: "Profile passphrase (min 8 characters)",
+    confirm: true, minLen: 8,
+  });
+  if (pass == null) return;
+  try {
+    /* Deliberately NO plaintext persona in the meta: a seized device must not
+       announce "Journalist protecting sources". Only the date is public. */
+    const blob = await SRT.sealBlob(pass, draft, AAD_PROFILE,
+      { applied: new Date().toISOString() });
+    store.set(LS.PROFILE, JSON.stringify(blob));
+    renderSealedCard();
+    homeStatus();
+    setStatus(`Profile "${escapeHtml(draft.persona)}" sealed and applied on this device.`, "ok");
+  } catch (e) {
+    el.applyErr.textContent = "Couldn't seal the profile: " + e.message;
+  }
+});
+function renderSealedCard() {
+  const blob = jget(LS.PROFILE);
+  el.sealedCard.hidden = !blob;
+  if (blob) {
+    el.sealedLine.innerHTML =
+      `<span class="okmark">● sealed</span> <span>applied ${escapeHtml(new Date(blob.meta.applied).toLocaleString())} · AES-256-GCM, ciphertext only — even the persona label is sealed</span>`;
+  }
+}
+async function unlockProfileFlow() {
+  const blob = jget(LS.PROFILE);
+  if (!blob) return;
+  const pass = await askPass({
+    title: "Unlock profile",
+    lead: "Decrypts the sealed profile into the review panel for editing. A wrong passphrase fails the GCM tag — all-or-nothing.",
+    label: "Profile passphrase",
+  });
+  if (pass == null) return;
+  try {
+    const p = await SRT.openBlob(pass, blob, AAD_PROFILE);
+    draft = SRT.normalizeProfile(p);
+    show("mine");
+    renderEditor();
+    flashReview();
+    setStatus("Profile unlocked into the review panel — edit and re-seal when ready.", "ok");
+  } catch {
+    setStatus("Wrong passphrase — the profile stays sealed.", "err");
+  }
+}
+el.btnUnlockProfile.addEventListener("click", unlockProfileFlow);
+el.btnHomeEditProfile.addEventListener("click", unlockProfileFlow);
+el.btnEraseProfile.addEventListener("click", () => {
+  if (!confirm("Erase the sealed profile from this browser? There is no server copy.")) return;
+  store.del(LS.PROFILE);
+  renderSealedCard();
+  homeStatus();
+  setStatus("Profile erased.", "ok");
+});
+
+/* ============================================================
+   PART A — the configurator agent (Claude, user's own key)
+   ============================================================ */
+function getKey() {
+  return (KeySeal.key() || "").trim(); // memory (or unlocked seal); never read plaintext from disk here
+}
+function setKey(v, commit = true) {
+  KeySeal.set(v.trim(), commit); // memory always; persists (as ciphertext) only if a seal exists
+}
+function getModel() { return store.get(LS.MODEL, DEFAULT_MODEL); }
+
+const CATALOG_LINES = SRT.APPS.map(a => `- ${a.id}: ${a.name} — ${a.blurb}`).join("\n");
+const SYSTEM_PROMPT = [
+  "You are Sarto, the Postern Labs onboarding tailor. The user describes their PROFESSION or ACTIVITY; you derive a device preferences profile and MUST call the set_profile tool with it (once per description; again on refinements).",
+  "The profile only lands in an editable review panel — the user confirms before anything applies. Never claim settings are applied; say they are ready to review.",
+  "Your reply text is brief plain prose (1-3 sentences, no markdown, no emoji): name the posture you chose and why, and remind them the panel is theirs to edit.",
+  "App ids you may use (nothing else exists):",
+  CATALOG_LINES,
+  "Guidance, not dogma — reason from the user's actual risk:",
+  "- High-risk confidentiality work (journalist with sources, activist, lawyer with privileged files): tor_by_default true, hygiene_autoscrub_on_share true, panic_gesture true, attestation_posture verify_peers, courier_for_files true, messenger_over_tor true, notifications quiet or silenced, lockscreen_content false; foreground the working set (e.g. courier, hygiene, messenger, panic or vault).",
+  "- Border crossings / device seizure risk: panic_gesture true, lockscreen_content false, attestation self_audit or verify_peers.",
+  "- Ordinary private person: keep it livable — autoscrub true, quiet notifications, no Tor unless asked; foreground messenger, vault, hygiene.",
+  "- Traders/finance: foreground vedetta and vault; privacy per their risk.",
+  "- If they are setting up a CHILD'S or an EMPLOYEE'S device: you may still set a gentle profile, but tell them enforceable limits live in Sarto's 'Manage a device I own or guard' path — signed by their wallet key and ALWAYS visible to the person using the device. There is no covert monitoring in Postern and you must refuse to help conceal management from a device's user.",
+  "Honesty rules: never oversell — Tor hides IPs, not the fact of Tor use; the Matrix homeserver still sees the social graph; hiding an app is a preference, not a lock.",
+].join("\n");
+
+const TOOLS = [{
+  name: "set_profile",
+  description: "Load a derived preferences profile into Sarto's editable review panel. The user sees every field and must confirm before it applies. Call exactly once per user description or refinement.",
+  input_schema: {
+    type: "object",
+    properties: {
+      persona: { type: "string", description: "Short label for who this is tailored to, e.g. 'Journalist protecting sources'. Max 80 chars." },
+      rationale: { type: "string", description: "One plain sentence: why these defaults fit. Max 160 chars." },
+      apps: {
+        type: "object",
+        properties: {
+          foreground: { type: "array", items: { type: "string" }, description: "Up to 6 app ids pinned first on the launcher." },
+          hidden: { type: "array", items: { type: "string" }, description: "App ids hidden from the launcher (user can re-enable; a preference, not a lock)." },
+        },
+      },
+      privacy: {
+        type: "object",
+        properties: {
+          tor_by_default: { type: "boolean" },
+          hygiene_autoscrub_on_share: { type: "boolean", description: "Strip document/photo metadata automatically on every share." },
+          panic_gesture: { type: "boolean", description: "One gesture re-locks everything to ciphertext (locks, never wipes)." },
+          attestation_posture: { type: "string", enum: ["relaxed", "self_audit", "verify_peers"] },
+          courier_for_files: { type: "boolean", description: "Default file sharing = Courier (serverless, over Tor, PQ-sealed)." },
+          messenger_over_tor: { type: "boolean" },
+        },
+      },
+      notifications: {
+        type: "object",
+        properties: {
+          posture: { type: "string", enum: ["full", "quiet", "silenced"] },
+          lockscreen_content: { type: "boolean", description: "false hides message content on the lock screen." },
+        },
+      },
+    },
+    required: ["persona", "privacy"],
+  },
+}];
+
+let history = [];
+let busy = false;
+let abortCtl = null;
+
+function addTurn(role, text) {
+  const li = document.createElement("li");
+  li.className = "turn " + role;
+  const who = document.createElement("div");
+  who.className = "who";
+  who.textContent = role === "user" ? "you" : "sarto";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  li.append(who, bubble);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "nearest" });
+  return { li, bubble };
+}
+function addSystemNote(text) {
+  const li = document.createElement("li");
+  li.className = "turn assistant";
+  const sys = document.createElement("div");
+  sys.className = "sys";
+  sys.textContent = text;
+  li.appendChild(sys);
+  el.transcript.appendChild(li);
+  li.scrollIntoView({ block: "nearest" });
+}
+
+function runTool(name, input) {
+  if (name !== "set_profile") return `Error: unknown tool "${name}".`;
+  draft = SRT.normalizeProfile(input);
+  renderEditor();
+  flashReview();
+  return "Profile loaded into the review panel. The user will inspect and edit it there; nothing is applied yet. Do not claim it is applied.";
+}
+
+async function send(userText) {
+  if (busy) return;
+  const key = getKey();
+  if (!key) { openSettings(); return; }
+  busy = true;
+  syncBusyUI();
+  addTurn("user", userText);
+  const histMark = history.length;
+  history.push({ role: "user", content: userText });
+  el.body.dataset.state = "thinking";
+  setStatus("Tailoring…");
+  abortCtl = new AbortController();
+
+  let bubble = null, fullText = "";
+  const onText = (delta) => {
+    if (!bubble) { bubble = addTurn("assistant", "").bubble; bubble.classList.add("streaming"); }
+    fullText += delta;
+    bubble.textContent = fullText;
+  };
+
+  try {
+    await runTurn(onText, MAX_TOOL_ROUNDS);
+    if (bubble) bubble.classList.remove("streaming");
+    if (!fullText.trim() && bubble) bubble.textContent = "(no reply)";
+    mineStatus();
+  } catch (err) {
+    if (bubble) bubble.classList.remove("streaming");
+    history.length = histMark; // never leave a dangling tool_use in history
+    if (err.name === "AbortError") addSystemNote("Stopped.");
+    else { const msg = friendlyError(err); setStatus(escapeHtml(msg), "err"); addSystemNote(msg); }
+  } finally {
+    busy = false;
+    abortCtl = null;
+    el.body.dataset.state = "idle";
+    syncBusyUI();
+  }
+}
+
+async function runTurn(onText, roundsLeft) {
+  const { content, stopReason } = await streamMessage(onText);
+  history.push({ role: "assistant", content });
+  if (stopReason === "tool_use" && roundsLeft > 0) {
+    const results = content
+      .filter(b => b.type === "tool_use")
+      .map(b => ({ type: "tool_result", tool_use_id: b.id, content: runTool(b.name, b.input) }));
+    if (results.length) {
+      history.push({ role: "user", content: results });
+      return runTurn(onText, roundsLeft - 1);
+    }
+  }
+  if (stopReason === "refusal") onText(" I can't help with that request.");
+}
+
+/* The ONLY network call in this file. */
+async function streamMessage(onText) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    signal: abortCtl.signal,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": getKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: getModel(),
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT,
+      tools: TOOLS,
+      messages: history,
+      stream: true,
+    }),
+  });
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json())?.error?.message || ""; } catch {}
+    const e = new Error(detail || res.statusText);
+    e.status = res.status;
+    e.retryAfter = res.headers.get("retry-after");
+    throw e;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const blocks = [];
+  let stopReason = null;
+  const handleEvent = (ev) => {
+    switch (ev.type) {
+      case "content_block_start":
+        blocks[ev.index] = ev.content_block.type === "tool_use"
+          ? { type: "tool_use", id: ev.content_block.id, name: ev.content_block.name, input: {}, _json: "" }
+          : { type: "text", text: "" };
+        break;
+      case "content_block_delta":
+        if (ev.delta.type === "text_delta") { blocks[ev.index].text += ev.delta.text; onText(ev.delta.text); }
+        else if (ev.delta.type === "input_json_delta") blocks[ev.index]._json += ev.delta.partial_json;
+        break;
+      case "content_block_stop": {
+        const b = blocks[ev.index];
+        if (b && b.type === "tool_use") {
+          try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; }
+          delete b._json;
+        }
+        break;
+      }
+      case "message_delta":
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        break;
+      case "error": {
+        const e = new Error(ev.error?.message || "stream error");
+        e.status = ev.error?.type === "overloaded_error" ? 529 : 500;
+        throw e;
+      }
+    }
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch { continue; }
+        handleEvent(ev);
+      }
+    }
+  }
+  return { content: blocks.filter(Boolean), stopReason };
+}
+
+function friendlyError(err) {
+  if (err.status === 401) return "Anthropic rejected that API key. Check it in Settings (it should start with sk-ant-…).";
+  if (err.status === 403) return "That API key doesn't have permission for this model. Try another model in Settings.";
+  if (err.status === 404) return "Model not found — it may not be enabled for your account. Pick another model in Settings.";
+  if (err.status === 429) return "Rate limited by Anthropic." + (err.retryAfter ? ` Try again in ~${err.retryAfter}s.` : " Give it a moment.");
+  if (err.status === 400) return "Anthropic rejected the request: " + (err.message || "invalid request.");
+  if (err.status === 529 || err.status >= 500) return "Anthropic's API is briefly overloaded. Try again in a few seconds.";
+  if (err instanceof TypeError) return "Couldn't reach api.anthropic.com — check your connection. (Nothing was sent anywhere else.)";
+  return "Something went wrong: " + (err.message || String(err));
+}
+
+el.composer.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = el.textInput.value.trim();
+  if (!text || busy) return;
+  el.textInput.value = "";
+  send(text);
+});
+el.chips.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip && !busy) send(chip.textContent.trim());
+});
+el.btnStop.addEventListener("click", () => { if (abortCtl) abortCtl.abort(); });
+function syncBusyUI() {
+  el.btnStop.disabled = !busy;
+  el.btnSend.disabled = busy;
+}
+
+/* ---------- push-to-talk (Web Speech; push only, never background) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let ptt = false, rec = null, recFinals = "", recInterim = "";
+function pttStart() {
+  if (ptt || busy) return;
+  if (!getKey()) { openSettings(); return; }
+  if (!SR) { setStatus("Voice input isn't available in this browser — typing works fully and is the more private path anyway.", "err"); return; }
+  ptt = true; recFinals = ""; recInterim = "";
+  el.body.dataset.state = "listening";
+  setStatus("Listening… release to send.", "live");
+  rec = new SR();
+  rec.lang = navigator.language || "en-US";
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.onresult = (ev) => {
+    recInterim = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const r = ev.results[i];
+      if (r.isFinal) recFinals += r[0].transcript;
+      else recInterim += r[0].transcript;
+    }
+    if (ptt) setStatus(escapeHtml((recFinals + " " + recInterim).trim()) || "Listening… release to send.", "live");
+  };
+  rec.onerror = (ev) => {
+    if (ev.error === "aborted" || ev.error === "no-speech") return;
+    ptt = false;
+    el.body.dataset.state = "idle";
+    const msgs = {
+      "not-allowed": "Microphone permission denied. Sarto only listens while you hold the button — allow the mic, or keep typing.",
+      "audio-capture": "No microphone found. Typing works fully.",
+      "network": "The browser's speech service couldn't be reached. Typing is fully local and always works.",
+    };
+    setStatus(escapeHtml(msgs[ev.error] || ("Speech error: " + ev.error)), "err");
+  };
+  rec.onend = () => {
+    const text = (recFinals + " " + recInterim).trim();
+    if (el.body.dataset.state === "listening") el.body.dataset.state = "idle";
+    if (text) send(text);
+    else if (!busy) mineStatus();
+  };
+  try { rec.start(); } catch (e) { ptt = false; el.body.dataset.state = "idle"; setStatus("Couldn't start the microphone: " + escapeHtml(e.message), "err"); }
+}
+function pttStop() {
+  if (!ptt) return;
+  ptt = false;
+  if (rec) { try { rec.stop(); } catch {} }
+}
+el.btnMic.addEventListener("pointerdown", (e) => { e.preventDefault(); el.btnMic.setPointerCapture(e.pointerId); pttStart(); });
+el.btnMic.addEventListener("pointerup", pttStop);
+el.btnMic.addEventListener("pointercancel", pttStop);
+el.btnMic.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); pttStart(); } });
+el.btnMic.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); pttStop(); } });
+window.addEventListener("blur", pttStop); // never leave the mic hot
+
+/* ============================================================
+   PART B — admin identity (Chiave pattern)
+   ============================================================ */
+let adminSession = null; // { signer, meta:{alg,pub,fpr,label} }
+
+function renderAdmin() {
+  const blob = jget(LS.ADMIN);
+  el.adminNone.hidden = !!blob;
+  el.adminLocked.hidden = !blob || !!adminSession;
+  el.adminOpen.hidden = !adminSession;
+  if (blob && !adminSession) {
+    el.adminLockedFpr.textContent = blob.meta.fpr + " · " + (blob.meta.label || "");
+  }
+  if (adminSession) {
+    el.adminFpr.textContent = adminSession.meta.fpr;
+    el.adminWho.textContent = `${adminSession.meta.label} · ${adminSession.meta.alg} (stand-in for Falcon-1024 ‖ ML-DSA-65) · unlocked in memory only`;
+  }
+  syncSignButton();
+}
+
+el.btnCreateAdmin.addEventListener("click", async () => {
+  el.adminErr.textContent = "";
+  const label = el.adminLabel.value.trim();
+  if (!label) { el.adminErr.textContent = "Give yourself a name the managed person will recognize."; return; }
+  const pass = el.adminPass1.value;
+  if (pass.length < 8) { el.adminErr.textContent = "Use at least 8 characters — this key answers for the whole policy."; return; }
+  el.btnCreateAdmin.disabled = true;
+  try {
+    const kp = await SRT.genKeypair();
+    const fpr = await SRT.fingerprint(kp.pub);
+    const blob = await SRT.sealBlob(pass, { alg: kp.alg, priv: kp.priv, pub: kp.pub }, AAD_ADMIN,
+      { alg: kp.alg, pub: kp.pub, fpr, label, created: new Date().toISOString() });
+    store.set(LS.ADMIN, JSON.stringify(blob));
+    adminSession = { signer: await SRT.importSigner(kp.alg, kp.priv), meta: blob.meta };
+    el.adminPass1.value = "";
+    renderAdmin();
+    setStatus(`Admin identity ${fpr} created and unlocked.`, "ok");
+  } catch (e) {
+    el.adminErr.textContent = "Couldn't create the identity: " + e.message;
+  } finally {
+    el.btnCreateAdmin.disabled = false;
+  }
+});
+
+el.adminUnlockForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  el.adminUnlockErr.textContent = "";
+  const blob = jget(LS.ADMIN);
+  if (!blob) return;
+  try {
+    const payload = await SRT.openBlob(el.adminPassUnlock.value, blob, AAD_ADMIN);
+    adminSession = { signer: await SRT.importSigner(payload.alg, payload.priv), meta: blob.meta };
+    el.adminPassUnlock.value = "";
+    renderAdmin();
+    setStatus("Admin key unlocked — in this tab's memory only.", "ok");
+  } catch {
+    el.adminUnlockErr.textContent = "Wrong passphrase — the admin key stays sealed.";
+  }
+});
+el.btnAdminLock.addEventListener("click", () => {
+  adminSession = null;
+  renderAdmin();
+  setStatus("Admin key locked back to ciphertext.");
+});
+el.btnAdminReset.addEventListener("click", () => {
+  if (!confirm("Discard this admin identity? Any policy it signed will fail verification against a new key.")) return;
+  store.del(LS.ADMIN);
+  adminSession = null;
+  renderAdmin();
+});
+
+/* ============================================================
+   PART B — the policy form
+   ============================================================ */
+let mgHidden = [];        // app ids hidden by policy
+let windows = [];         // time-window drafts
+
+function renderCatGrid() {
+  el.catGrid.innerHTML = "";
+  for (const [id, c] of Object.entries(SRT.SITE_CATEGORIES)) {
+    const lab = document.createElement("label");
+    lab.className = "catchip";
+    lab.innerHTML = `<input type="checkbox" value="${id}"><div><div class="cc-t">${escapeHtml(c.name)}</div><div class="cc-d">${escapeHtml(c.desc)}</div></div>`;
+    el.catGrid.appendChild(lab);
+  }
+}
+function renderMgApps() {
+  el.mgAppGrid.innerHTML = "";
+  for (const a of SRT.APPS) {
+    const hidden = mgHidden.includes(a.id);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "appchip";
+    b.dataset.state = hidden ? "hidden" : "available";
+    b.title = a.blurb;
+    b.setAttribute("aria-label", `${a.name}: ${hidden ? "hidden by policy" : "available"}. Click to toggle.`);
+    b.innerHTML = `<span class="ac-name">${escapeHtml(a.name)}</span><span class="ac-state">${hidden ? "hidden" : "available"}</span>`;
+    b.addEventListener("click", () => {
+      mgHidden = hidden ? mgHidden.filter(x => x !== a.id) : [...mgHidden, a.id];
+      renderMgApps();
+    });
+    el.mgAppGrid.appendChild(b);
+  }
+}
+function renderWindows() {
+  el.windowList.innerHTML = "";
+  windows.forEach((w, i) => {
+    const row = document.createElement("div");
+    row.className = "window-row";
+    const grid = document.createElement("div");
+    grid.className = "wr-grid";
+    grid.innerHTML = `
+      <div class="field f-label"><label>Window label</label><input type="text" maxlength="48" value="${escapeHtml(w.label)}" data-k="label"></div>
+      <div class="field f-time"><label>From</label><input type="time" value="${escapeHtml(w.start)}" data-k="start"></div>
+      <div class="field f-time"><label>Until</label><input type="time" value="${escapeHtml(w.end)}" data-k="end"></div>
+      <button type="button" class="btn-danger wr-remove" data-remove>remove</button>`;
+    grid.querySelectorAll("input").forEach(inp =>
+      inp.addEventListener("input", () => { w[inp.dataset.k] = inp.value; }));
+    grid.querySelector("[data-remove]").addEventListener("click", () => { windows.splice(i, 1); renderWindows(); });
+    const days = document.createElement("div");
+    days.className = "daytoggles";
+    days.setAttribute("role", "group");
+    days.setAttribute("aria-label", "Days this window applies");
+    SRT.DAY_NAMES.forEach((d, di) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = d;
+      b.setAttribute("aria-pressed", String(w.days.includes(di)));
+      b.addEventListener("click", () => {
+        w.days = w.days.includes(di) ? w.days.filter(x => x !== di) : [...w.days, di].sort();
+        b.setAttribute("aria-pressed", String(w.days.includes(di)));
+      });
+      days.appendChild(b);
+    });
+    const blocks = document.createElement("div");
+    blocks.className = "wr-blocks";
+    for (const [cid, c] of Object.entries(SRT.SITE_CATEGORIES)) {
+      const lab = document.createElement("label");
+      const ck = document.createElement("input");
+      ck.type = "checkbox";
+      ck.checked = w.blocks.includes(cid);
+      ck.addEventListener("change", () => {
+        w.blocks = ck.checked ? [...w.blocks, cid] : w.blocks.filter(x => x !== cid);
+      });
+      lab.append(ck, document.createTextNode(" " + c.name));
+      blocks.appendChild(lab);
+    }
+    row.append(grid, days, blocks);
+    el.windowList.appendChild(row);
+  });
+}
+el.btnAddWindow.addEventListener("click", () => {
+  windows.push({ label: "School hours", days: [1, 2, 3, 4, 5], start: "08:30", end: "15:00", blocks: ["social", "games"] });
+  renderWindows();
+});
+
+function collectLimits() {
+  return SRT.normalizeLimits({
+    categories_blocked: $$("#catGrid input:checked").map(i => i.value),
+    site_allow: el.siteAllow.value.split(/\n+/),
+    site_block: el.siteBlock.value.split(/\n+/),
+    time_windows: windows,
+    apps_hidden: mgHidden,
+  });
+}
+function syncSignButton() {
+  el.btnSignPolicy.disabled = !(adminSession && el.ckLegit.checked);
+  el.btnRemovePolicy.hidden = !jget(LS.POLICY);
+}
+el.ckLegit.addEventListener("change", syncSignButton);
+
+el.btnSignPolicy.addEventListener("click", async () => {
+  el.policyErr.textContent = "";
+  if (!adminSession) { el.policyErr.textContent = "Unlock your admin identity first (step 1)."; return; }
+  if (!el.ckLegit.checked) { el.policyErr.textContent = "Confirm the legitimacy statement first."; return; }
+  try {
+    const role = document.querySelector('input[name="role"]:checked').value;
+    const payload = SRT.buildPolicy({
+      role,
+      admin: adminSession.meta,
+      device_label: el.deviceLabel.value,
+      limits: collectLimits(),
+    });
+    const signed = await SRT.signPolicy(adminSession.signer, payload);
+    /* Pin the admin of record — the enrollment step. In the product this is
+       the OS policy store; here, a separate localStorage record. */
+    store.set(LS.PIN, JSON.stringify({ alg: payload.admin.alg, pub: payload.admin.pub, fpr: payload.admin.fpr }));
+    store.set(LS.POLICY, JSON.stringify(signed));
+    const v = await SRT.verifyPolicy(signed, jget(LS.PIN));
+    if (!v.ok) throw new Error("post-install verification failed: " + v.reason);
+    renderBanner();
+    syncSignButton();
+    setStatus("Policy signed, pinned, and installed. This is what its user sees:", "ok");
+    setViewAs("managed");
+    show("managed");
+  } catch (e) {
+    el.policyErr.textContent = "Couldn't sign the policy: " + e.message;
+  }
+});
+
+el.btnPreviewManaged.addEventListener("click", async () => {
+  setViewAs("managed");
+  show("managed");
+});
+
+el.btnRemovePolicy.addEventListener("click", async () => {
+  const signed = jget(LS.POLICY);
+  if (!signed) return;
+  if (!adminSession || adminSession.meta.fpr !== signed.payload.admin.fpr) {
+    el.policyErr.textContent = "Only the admin of record (" + signed.payload.admin.fpr + ") can remove this policy — unlock that identity first. (Honestly: in a browser, storage can be cleared by anyone technical; on Postern OS removal without this key is a factory-reset-grade event.)";
+    return;
+  }
+  if (!confirm("Remove the installed policy from this device?")) return;
+  store.del(LS.POLICY);
+  store.del(LS.PIN);
+  renderBanner();
+  syncSignButton();
+  setStatus("Policy removed. The device is no longer managed.", "ok");
+});
+
+/* ============================================================
+   MANAGED-USER VIEW — the transparency panel.
+   Renders the FULL policy whenever one exists. There is no
+   flag to suppress it; that absence is a feature.
+   ============================================================ */
+function setViewAs(mode) {
+  el.vaAdmin.setAttribute("aria-pressed", String(mode === "admin"));
+  el.vaManaged.setAttribute("aria-pressed", String(mode === "managed"));
+}
+el.vaAdmin.addEventListener("click", () => { setViewAs("admin"); show("manage"); });
+el.vaManaged.addEventListener("click", () => setViewAs("managed"));
+
+async function renderManagedView() {
+  const signed = jget(LS.POLICY);
+  el.managedEmpty.hidden = !!signed;
+  el.managedFull.hidden = !signed;
+  if (!signed) return;
+  const p = signed.payload;
+  const v = await SRT.verifyPolicy(signed, jget(LS.PIN));
+  el.policyPanel.dataset.sig = v.ok ? "ok" : "bad";
+  el.ppSig.dataset.ok = v.ok ? "1" : "0";
+  el.ppSig.textContent = v.ok ? "✓ signature verified" : "✗ " + v.reason;
+  el.ppTitle.innerHTML =
+    `<b>${escapeHtml(p.device_label)}</b> is managed by <b>${escapeHtml(p.admin.label)}</b> <span class="fpr">${escapeHtml(p.admin.fpr)}</span>`;
+  el.ppSub.textContent =
+    `${p.role === "parental" ? "Parental policy (guardian of the device's user)" : "Corporate policy (company-owned device)"}` +
+    ` · set on ${new Date(p.set_on).toLocaleString()}` +
+    ` · signed ${p.admin.alg} (stand-in for the admin's Falcon-1024 ‖ ML-DSA-65 wallet key)`;
+  el.limitList.innerHTML = "";
+  for (const line of SRT.policyPlainLanguage(p)) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="lm">▸</span><span>${escapeHtml(line)}</span>`;
+    el.limitList.appendChild(li);
+  }
+  const never = document.createElement("li");
+  never.className = "good";
+  never.innerHTML = `<span class="lm">●</span><span><strong>Not in this policy, not possible in Sarto:</strong> watching your browsing, reading your messages, tracking your location, or reporting anything you do to ${escapeHtml(p.admin.label)}. Limits only — never surveillance.</span>`;
+  el.limitList.appendChild(never);
+  el.ppAdminName2.textContent = p.admin.label;
+  el.siteCheckResult.textContent = "";
+  delete el.siteCheckResult.dataset.verdict;
+}
+
+el.siteCheckForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const signed = jget(LS.POLICY);
+  if (!signed) return;
+  const r = SRT.checkSite(signed.payload, el.siteCheckInput.value, new Date());
+  el.siteCheckResult.dataset.verdict = r.allowed ? "allowed" : "blocked";
+  el.siteCheckResult.textContent = (r.allowed ? "ALLOWED — " : "BLOCKED — ") + r.reason;
+});
+
+/* ============================================================
+   Dialogs, settings, theme
+   ============================================================ */
+function openSettings() { syncSettingsUI(); el.dlgSettings.showModal(); el.apiKey.focus(); }
+el.btnSettings.addEventListener("click", openSettings);
+el.modelHint.addEventListener("click", openSettings);
+el.btnPrivacy.addEventListener("click", () => el.dlgPrivacy.showModal());
+el.btnGuardrails.addEventListener("click", () => el.dlgGuardrails.showModal());
+$$("dialog [data-close]").forEach(b => b.addEventListener("click", (e) => e.target.closest("dialog").close()));
+[el.dlgSettings, el.dlgPrivacy, el.dlgGuardrails].forEach(d =>
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+
+/* keystrokes touch memory only; the sealed record (if any) re-seals on commit ("change"),
+   so no key material — not even ciphertext of partial prefixes — is written per keystroke */
+el.apiKey.addEventListener("input", () => { setKey(el.apiKey.value, false); });
+el.apiKey.addEventListener("change", () => {
+  setKey(el.apiKey.value, true);
+  syncKeyLockUI();
+  if (el.body.dataset.view === "mine") mineStatus();
+});
+el.btnShowKey.addEventListener("click", () => {
+  const isPw = el.apiKey.type === "password";
+  el.apiKey.type = isPw ? "text" : "password";
+  el.btnShowKey.textContent = isPw ? "hide" : "show";
+});
+
+/* ---- key at rest: sealed by default ---- */
+function keyLockMsg(text, isErr) {
+  el.keyLockState.textContent = text;
+  el.keyLockState.style.color = isErr ? "#c0392b" : "";
+}
+function syncKeyLockUI() {
+  const sealed = KeySeal.isSealed(), locked = KeySeal.isLocked();
+  el.apiKey.disabled = locked;
+  el.apiKey.value = locked ? "" : getKey();
+  el.apiKey.placeholder = locked ? "sealed — unlock below" : "sk-ant-…";
+  el.keyPass.style.display = (sealed && !locked) ? "none" : "";
+  el.btnKeyLock.textContent = locked ? "unlock" : sealed ? "remove seal" : "seal key";
+  if (locked) keyLockMsg("Sealed. localStorage holds only " + KeySeal.cipherLabel() + " ciphertext — enter your passphrase to unlock for this session.");
+  else if (sealed) keyLockMsg("Sealed at rest and unlocked for this session. Edits re-seal on save; the readable key lives only in this tab's memory.");
+  else if (KeySeal.isLegacyPlain()) keyLockMsg("This key was saved READABLE by an earlier Sarto. Seal it now with a passphrase below — editing or sealing removes the readable copy; new keys are never stored readable.", true);
+  else if (getKey()) keyLockMsg("In this tab's memory only — nothing is on disk, and the key is gone when the tab closes. Seal it with a passphrase to keep it.");
+  else keyLockMsg("Sarto never stores your key readable. It lives in this tab's memory, or sealed (" + (KeySeal.real() ? "XChaCha20-Poly1305 + Argon2id, via postern-sdk" : "AES-256-GCM") + ") under your passphrase.");
+}
+el.btnKeyLock.addEventListener("click", async () => {
+  if (KeySeal.isLocked()) {
+    const ok = await KeySeal.unlock(el.keyPass.value);
+    el.keyPass.value = "";
+    syncKeyLockUI();
+    if (!ok) { keyLockMsg("Wrong passphrase. Decryption is all-or-nothing — nothing was revealed.", true); return; }
+    if (el.body.dataset.view === "mine") mineStatus();
+    return;
+  }
+  if (KeySeal.isSealed()) { // currently unlocked → remove the seal; the key stays in memory, never plaintext-at-rest
+    if (!confirm("Remove the seal? The stored ciphertext is deleted; your key then lives only in this tab's memory and is gone when the tab closes. It will NOT be stored readable.")) return;
+    KeySeal.removeSeal();
+    syncKeyLockUI();
+    return;
+  }
+  const key = el.apiKey.value.trim();
+  if (!key) { keyLockMsg("Add your API key above first — then seal it.", true); return; }
+  if (el.keyPass.value.length < 6) { keyLockMsg("Use at least 6 characters — it protects your key.", true); return; }
+  setKey(key, false);
+  await KeySeal.seal(el.keyPass.value);
+  el.keyPass.value = "";
+  syncKeyLockUI();
+});
+
+el.modelSel.addEventListener("change", () => { store.set(LS.MODEL, el.modelSel.value); syncModelHint(); });
+function syncSettingsUI() { syncKeyLockUI(); el.modelSel.value = getModel(); }
+function syncModelHint() { el.modelHint.textContent = MODELS[getModel()] || getModel(); }
+
+el.btnEraseAll.addEventListener("click", () => {
+  if (!confirm("Erase the API key, sealed profile, admin identity, and any installed policy from this browser?")) return;
+  Object.values(LS).forEach(store.del); // includes the sealed-key ciphertext
+  KeySeal.forget();
+  history = [];
+  draft = SRT.defaultProfile();
+  adminSession = null;
+  mgHidden = [];
+  windows = [];
+  el.transcript.innerHTML = "";
+  renderEditor();
+  renderSealedCard();
+  renderAdmin();
+  renderWindows();
+  renderMgApps();
+  renderBanner();
+  syncSettingsUI();
+  syncModelHint();
+  el.dlgSettings.close();
+  show("home");
+  setStatus("Everything erased. Nothing about you exists anywhere anymore — there was never a server copy.");
+});
+
+el.btnTheme.addEventListener("click", () => {
+  const cur = store.get(LS.THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS.THEME, next);
+  applyTheme();
+});
+function applyTheme() {
+  const t = store.get(LS.THEME, "auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = t;
+  el.btnTheme.textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  el.btnTheme.setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+
+/* Flip the profile at-rest KDF label when the postern-sdk SEAM is live. In a
+   plain browser tab (strict CSP forbids fetching wasm) the seam is absent and
+   the label keeps its honest "classical stand-in" text; inside a Postern host
+   shell that installs globalThis.PosternSDK it names the real Argon2id core. */
+function refreshSealLabels() {
+  const p = document.getElementById("profileSealLabel");
+  if (!p) return;
+  if (SRT.kdfReal()) {
+    p.innerHTML = 'Applying seals the profile with the real <b>XChaCha20-Poly1305 + Argon2id</b> core ' +
+      '(<b>postern-vault</b> / <b>postern-core</b>, wired through <b>postern-sdk</b>) — 64&nbsp;MiB, t=3, memory-hard. ' +
+      'Only ciphertext is stored in this browser; on Postern OS the profile lives in the TEE-wrapped vault.';
+  } else {
+    p.innerHTML = 'Applying seals the profile with <b>AES-256-GCM</b> under a key from ' +
+      '<b>PBKDF2-SHA-256 (310,000 it.)</b> — the WebCrypto stand-in for the product’s ' +
+      '<b>Argon2id</b> vault KDF (<b>postern-vault</b> / <b>postern-core</b>). Only ciphertext is ' +
+      'stored in this browser; on Postern OS the profile lives in the TEE-wrapped vault. ' +
+      '<em>(postern-sdk core not loaded here — honest stand-in.)</em>';
+  }
+}
+
+/* ============================================================
+   boot
+   ============================================================ */
+applyTheme();
+syncModelHint();
+renderEditor();
+renderSealedCard();
+renderAdmin();
+renderCatGrid();
+renderMgApps();
+renderWindows();
+syncBusyUI();
+refreshSealLabels();
+show("home");
+document.documentElement.dataset.booted = "1"; // init completed without throwing
+</script>
+</body>
+</html>

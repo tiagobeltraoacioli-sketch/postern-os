@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Postern Labs — Android Key-Attestation capture APK manifest.
+
+  Deliberately minimal: no resources, no AndroidX, no permissions. The capture
+  activity writes only to this app's OWN external files dir
+  (getExternalFilesDir), which needs no runtime permission on any API level, so
+  the manifest declares nothing beyond a single exported launcher activity the
+  host driver starts with `am start`.
+
+  minSdk 24: Android Key Attestation (setAttestationChallenge) is available from
+  API 24; the capture is run on an API-34 google_apis emulator.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="labs.postern.capture"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+
+    <application
+        android:label="Postern Attestation Capture"
+        android:allowBackup="false"
+        android:hasCode="true">
+        <activity
+            android:name="labs.postern.capture.CaptureActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

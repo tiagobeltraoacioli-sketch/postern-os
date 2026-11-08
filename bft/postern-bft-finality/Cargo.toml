@@ -1,0 +1,62 @@
+# SCAFFOLD — not a secure or deployed system.
+#
+# Standalone, self-contained design-scaffold crate for the Postern FFG-style
+# BFT finality overlay (a hashrate-WEIGHTED `> 2/3` ML-DSA-65 checkpoint gadget
+# anchored to the ownerless Bloch-SIS-PoW base). Spec:
+# `docs/specs/POSTERN-FFG-BFT-FINALITY.md`.
+#
+# By default it now depends on the RustCrypto `ml-dsa` crate and wires a REAL
+# (still UNAUDITED, pre-1.0) FIPS-204 ML-DSA-65 verify/sign into the
+# `CheckpointVerifier` seam; `--no-default-features` restores the fully offline,
+# zero-dependency stub scaffold. The ML-DSA-65 signature-verification primitive
+# is reached through a trait (see
+# `src/quorum.rs::CheckpointVerifier` + `MockVerifier`), the weight-derivation
+# from base blocks is an out-of-scope seam, and the live committee round /
+# networking are OUT OF SCOPE. This crate does the REAL deterministic core
+# (weighted `> 2/3` quorum arithmetic, checkpoint codec, base-anchor codec,
+# chain linkage); real crypto and the live round are honest stubs behind seams.
+#
+# It is NOT wired into any workspace and MUST NOT be treated as production,
+# audited, secure, or deployed software. Detach from any ancestor workspace so
+# this crate stays fully standalone (it is intentionally NOT a member of
+# /Users/tiagoacioli/dev/bloch-protocol).
+[workspace]
+
+[package]
+name = "postern-bft-finality"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — conceptual, unaudited design types for a post-quantum (ML-DSA-65, NO BLS) FFG-style hashrate-weighted (> 2/3 total weight) BFT finality overlay that anchors checkpoints to the ownerless Bloch-SIS-PoW base as ordinary zero-value transactions. Not secure, not deployed, not an offering."
+publish = false
+
+[lib]
+name = "postern_bft_finality"
+path = "src/lib.rs"
+
+[dependencies]
+# The real ML-DSA-65 (FIPS 204) verify/sign primitive is now wired in BY
+# DEFAULT: a plain `cargo test`/`cargo build` (no `--features`) pulls in the
+# RustCrypto `ml-dsa` crate and exercises the `CheckpointVerifier` seam with a
+# genuine FIPS-204 verify. This dependency is the RustCrypto `ml-dsa` crate
+# (Apache-2.0 OR MIT): a real FIPS-204 ML-DSA implementation, but it is
+# **pre-1.0 (0.1.1) and UNAUDITED**. Wiring it in as the default does NOT make
+# this crate secure, audited, operational, or deployed — see
+# `RustCryptoMlDsa65Verifier` in `src/quorum.rs` for the full caveat, and note
+# the base beneath any checkpoint is still k-forgeable today.
+#
+# It stays `optional` only so `--no-default-features` still yields the fully
+# offline, zero-dependency stub scaffold (the `RejectingStubVerifier` posture,
+# for a network-free / crate-free build). The default build is NOT zero-dep.
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc"], optional = true }
+
+[features]
+# ON by default now. A default `cargo test`/`cargo build` (no `--features`)
+# runs the real (still UNAUDITED, pre-1.0) FIPS-204 ML-DSA-65 verify/sign pair
+# (`RustCryptoMlDsa65Verifier` / `RustCryptoMlDsa65Signer`) — the honest default
+# posture is real crypto, not the accept-nothing stub. Build with
+# `--no-default-features` to fall back to the offline zero-dependency stub
+# scaffold (`RejectingStubVerifier`, which asserts nothing).
+default = ["real-mldsa65"]
+real-mldsa65 = ["dep:ml-dsa"]

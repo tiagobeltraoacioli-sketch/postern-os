@@ -1,0 +1,108 @@
+# Maintainer: Tiago Beltrao Acioli <tiagobeltraoacioli@gmail.com>
+#
+# ==========================================================================
+# STATUS: UNBUILT / UNBOOTED. "Postern for postmarketOS" — community edition.
+# This APKBUILD has NEVER been run through abuild/pmbootstrap on a real
+# Alpine/pmOS host. It is lint-reviewed only (sh -n + manual field review).
+# It is NOT reproducible and NOT attestable (see ../HONESTY.md). Do not treat
+# a green CI here as a build result — there is no build result yet.
+# ==========================================================================
+#
+# postern-wallet — the OFFLINE post-quantum wallet CLI. The `postern-wallet`
+# binary is `bloch-crypto`'s `wallet::cli`, gated by the marker feature
+# `wallet-cli` (off by default, so node/workspace builds never compile it).
+#
+# SOURCE REPO NOTE: bloch-crypto is NOT a member of the Postern Labs products
+# workspace (gitlab.com/bloch-sis-group/bloch-sis-project); it is consumed
+# there only as a git dependency. The wallet CLI, the `wallet-cli` feature and
+# the `postern-wallet` [[bin]] all live in the OWNERLESS protocol repo below,
+# so the wallet apk is built from THAT repo (where `-p bloch-crypto` resolves
+# to a real workspace member). Building it from the products workspace is not
+# possible: that workspace exposes bloch-crypto only as a git dep and has no
+# `postern-wallet` bin target.
+#
+# NATIVE DEPS on musl: the wallet island is Rust + PQClean C only. Falcon-1024
+# and ML-DSA-65 come from the pqcrypto-falcon / pqcrypto-mldsa crates, whose
+# PQClean C is compiled by the `cc` crate -> a C toolchain (build-base) is the
+# only non-Rust build requirement. It does NOT pull rocksdb/blst/secp256k1/
+# libp2p/tokio/ring: those are `bloch-crypto` default-feature (node) deps that
+# `--no-default-features` prunes. RocksDB is therefore a NODE concern and is
+# intentionally not packaged for pmOS (this is a light wallet, not a node).
+#
+# HONESTY: software keystore only (Argon2id KDF). There is NO TEE/StrongBox-
+# backed key storage on pmOS — never claim hardware-backed keys (../HONESTY.md).
+pkgname=postern-wallet
+pkgver=0.1.0_alpha1
+# Source anchored to the v0.1.0-alpha1 prerelease tag of BlochSISPoW-project,
+# mirrored (with a stable sha512) to the public R2 bucket because the upstream
+# GitLab repo is private (its archive-by-tag is not publicly fetchable). A
+# prerelease: mainnet-beta, unaudited, coin worthless by design.
+pkgrel=0
+pkgdesc="Postern offline post-quantum wallet CLI (Falcon-1024 + ML-DSA-65), software keystore - community edition, non-attestable"
+url="https://gitlab.com/blochsispow-group/BlochSISPoW-project"
+# Only the arches we intend to CI-build and test. "all" would overclaim
+# (no riscv64/armv7/s390x coverage).
+arch="aarch64 x86_64"
+license="MIT"
+# cargo   : Alpine rustc links musl dynamically (crt-static off) by default —
+#           the apk behaves like any other Alpine package.
+# build-base: gcc + musl-dev + make, for the PQClean C (Falcon/ML-DSA) compiled
+#           by the `cc` crate. This is the ONLY native (C) build requirement.
+# NOTE: not using `cargo-auditable` here. The documented pmOS build path is
+#       pmbootstrap crossdirect, under which `cargo auditable build` is
+#       unsupported (aarch64-build.md pitfall #4 / cross_compiling.html); keep
+#       plain `cargo build` so the same APKBUILD works native and cross.
+makedepends="cargo build-base"
+# TODO(release-artifact) — BLOCKER #1: needs a tagged upstream release. The
+# `vTODO` tag below deliberately does NOT resolve, so no accidental fetch can
+# succeed until a real tag is filled in. GitLab archive-by-tag extracts to
+# <project>-<tag>, hence the builddir override (APKBUILD(5)).
+# Expected final form:
+#   source="$pkgname-$pkgver.tar.gz::https://gitlab.com/blochsispow-group/BlochSISPoW-project/-/archive/v$pkgver/BlochSISPoW-project-v$pkgver.tar.gz"
+source="BlochSISPoW-project-v0.1.0-alpha1.tar.gz::https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/src/BlochSISPoW-project-v0.1.0-alpha1.tar.gz"
+builddir="$srcdir/BlochSISPoW-project-v0.1.0-alpha1"
+
+# !check: the deterministic Falcon/ML-DSA keygen + hybrid-sig round-trip tests
+#   must run once on an aarch64 Alpine chroot/host before enabling; they are
+#   also unreliable under qemu (aarch64-build.md pitfall #5). We cannot run
+#   them from this scaffold. TODO(build-host): replace with
+#   check() { cargo test --frozen --release -p bloch-crypto \
+#             --no-default-features --features wallet-cli; }
+# net: `cargo fetch` in prepare() needs network access.
+options="!check net"
+
+prepare() {
+	default_prepare
+	# Pin exactly to the upstream Cargo.lock; also fails fast here if the
+	# vendored pqcrypto-internals patch (seeded-RNG fork) is missing.
+	# No --target: abuild runs inside the target-arch chroot, so cargo's
+	# default host target already IS <arch>-alpine-linux-musl (passing the
+	# Alpine CHOST triple to --target would be an invalid rustc target).
+	cargo fetch --locked
+}
+
+build() {
+	# Falcon's C uses deep stack frames; musl's default 128 KiB thread stack
+	# can overflow and SIGSEGV only on Alpine/pmOS. musl >= 1.1.21 reads the
+	# default thread-stack size from PT_GNU_STACK, so set it at link time to
+	# 1 MiB for the whole binary (aarch64-build.md pitfall #1).
+	export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,-z,stack-size=0x100000"
+
+	# Wallet island only: --no-default-features drops the `node` feature
+	# (rocksdb/libp2p/blst/secp256k1/tokio/ring); `wallet-cli` enables the
+	# `postern-wallet` [[bin]].
+	# NOTE(qemu): the workspace [profile.release] uses fat LTO +
+	# codegen-units=1; if the emulated build is too slow, export
+	# CARGO_PROFILE_RELEASE_LTO=thin here (aarch64-build.md).
+	cargo build --frozen --release \
+		-p bloch-crypto --no-default-features --features wallet-cli
+}
+
+package() {
+	install -Dm755 target/release/postern-wallet \
+		"$pkgdir"/usr/bin/postern-wallet
+}
+
+# TODO(build-host): populate with `abuild checksum` /
+# `pmbootstrap checksum postern-wallet` once `source=` resolves to a real tag.
+sha512sums="2ba8aa4b7a8671831133909609e44e90fb101c8621126d63a6cb54e1e59cde4bf601f67e65feccec87b924417ee497aaa398c6c5b70c4c1bf0e9217411e7bac8  BlochSISPoW-project-v0.1.0-alpha1.tar.gz"

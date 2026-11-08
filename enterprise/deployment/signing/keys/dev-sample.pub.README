@@ -1,0 +1,18 @@
+DEV / SAMPLE KEY — NOT A PRODUCTION SIGNING KEY
+================================================
+
+`dev-sample.pub` (and, if present locally, `dev-sample.key`) are a throwaway
+minisign keypair generated ONLY so the sign/verify pipeline in this directory
+can be exercised end-to-end without touching any real Postern signing material.
+
+Rules:
+
+  * NEVER sign a real enterprise delivery with this key.
+  * NEVER present anything signed with it to a customer as authentic.
+  * The real enterprise signing key is OPERATOR-held and lives OUTSIDE this
+    repository. It is never committed here.
+  * A secret key (`dev-sample.key`) may exist in your local working copy for
+    testing; it must not be committed and carries no trust.
+
+This mirrors the project's honesty posture: signed != reproducible != attested,
+and a signature only ever proves "the holder of THIS key produced these bytes".

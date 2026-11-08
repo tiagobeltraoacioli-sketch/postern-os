@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# porog-tor-glue — reference-prototype Tor egress glue for the Porog container.
+#
+# "Porog" (Slavic: threshold / soleira — the door between two worlds) is the
+# PROPOSED product name for the stock-Android managed-profile container, pending
+# formal trademark clearance. "Postern" is the suite brand; "Porog" is this app.
+#
+# This crate is GLUE ONLY. It composes two existing crates without editing
+# either's internals:
+#   - postern-tor    — the in-process, CLIENT-ONLY Tor layer (arti wrapper).
+#   - postern-policy — the one shared, fail-closed consent kernel.
+# It turns "is a Tor circuit up?" into a fail-closed egress Decision and hands
+# the container a circuit-isolated Tor identity of its own. UNAUDITED,
+# reference-prototype. Tor is metadata-reduction, NOT anonymity — "hardened,
+# not anonymous."
+
+[package]
+name = "porog-tor-glue"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Reference-prototype, fail-closed Tor-only egress glue for the Porog Android container: composes postern-tor (client-only) with the postern-policy consent kernel. Glue only — does not modify postern-tor internals. UNAUDITED."
+
+# Standalone workspace: this reference shim deliberately does NOT join the root
+# `members` list (owned by other devs). It builds/checks on its own, the same way
+# the integration/* crates carry their own empty [workspace].
+[workspace]
+
+[features]
+default = []
+# The live Tor path pulls arti (heavy) — OFF by default, exactly like
+# postern-tor's own live bootstrap is an ignored test. The pure egress-policy
+# logic (what CI can check fast, and what the honesty rails live in) compiles
+# and tests WITHOUT it.
+live = ["dep:postern-tor", "dep:arti-client", "dep:tokio"]
+
+[dependencies]
+# The consent kernel is light (time + thiserror) and always compiled: the
+# fail-closed egress Decision and the honest EnforcementMode label come from it.
+postern-policy = { path = "../../crates/postern-policy" }
+thiserror = "2"
+
+# Live Tor path — feature-gated so the default check stays fast.
+postern-tor = { path = "../../crates/postern-tor", optional = true }
+arti-client = { version = "0.44", default-features = false, features = ["tokio", "rustls"], optional = true }
+tokio = { version = "1", features = ["io-util", "net", "rt"], optional = true }

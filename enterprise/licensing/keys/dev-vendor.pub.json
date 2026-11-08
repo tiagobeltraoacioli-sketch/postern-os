@@ -1,0 +1,6 @@
+{
+  "_WARNING": "SAMPLE / DEV KEY ONLY. Not a production vendor key. Do NOT use to sign real licenses.",
+  "alg": "ed25519",
+  "kid": "postern-dev-sample",
+  "vendorPublicKey": "DxdIqrRamozQR2V9czDMGI3+gf8qrAkrKulL9PtmAz0="
+}

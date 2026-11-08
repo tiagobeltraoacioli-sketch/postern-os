@@ -1,0 +1,42 @@
+[package]
+name = "bloch-mobile"
+version = "0.1.0"
+edition = "2021"
+description = "Bloch-SIS mobile light-wallet core — shared Rust engine for the Android/iOS apps (wallet, hybrid PQ signing, node RPC, device-attestation challenge). Exposed to Kotlin/Swift via UniFFI."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "bloch_mobile"
+# staticlib/cdylib for the mobile targets (Android .so / iOS .a); rlib for tests.
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[dependencies]
+# Single source of truth: reuse the node's exact crypto/address/tx logic so the
+# mobile wallet is byte-compatible. `default-features = false` gates off the
+# heavy node-only deps (rocksdb/libp2p), keeping this crate light enough to
+# cross-compile for Android/iOS while sharing the node's crypto/address/tx code.
+# The bloch-crypto git-dep. LANDED (R6/R8): Dev-A's consensus bundle (suite-ID
+# envelope + chain-id sighash) is merged and the ONE canonical SHA is pinned by
+# `rev` below. Grep-confirmed identical across every coordinated bloch-protocol
+# Cargo.toml — postern-seal-companion, postern-consiglio-auth (Dev-D's), and THIS
+# file (also desktop/src-tauri, mobile/signer, integration/*) — each carries
+# rev = dd8df3526518ba792057708a6aa0efd5a91d8e40. With the rev applied and the
+# revs confirmed identical, the golden byte-identity vector in src/lib.rs is a
+# LIVE assert-equal (not ignored) and passes under `cargo test` on this host —
+# its literals are Dev-A's PUBLISHED canonical tuple, unchanged (not re-blessed).
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+# Wipe secret material (secret key + seed) from memory on drop — defense in depth
+# against memory scraping / core dumps, matching the node's key handling.
+zeroize = "1"
+
+# UniFFI convergence (Dev-F1): this crate NO LONGER carries a UniFFI surface.
+# `WalletCore` is a pure Rust engine; the single shipped FFI surface for the
+# whole product suite is `crates/postern-sdk` (one `setup_scaffolding!`), which
+# folds this crate's `WalletCore` in. So `uniffi`, the `ffi` feature, and the
+# `uniffi-bindgen` bin have been removed from here to keep exactly ONE
+# scaffolding in the tree (enforced by mobile/ci/check-one-setup-scaffolding.sh).
+
+[dev-dependencies]

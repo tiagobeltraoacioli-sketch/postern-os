@@ -1,0 +1,53 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# GNOME Files / Nautilus Script — "Scrub metadata (Postern Hygiene)".
+#
+# Drop this into ~/.local/share/nautilus/scripts/ (the installer does it for
+# you). It then appears under right-click > Scripts. Nautilus passes the
+# selected paths both as arguments AND, newline-separated, in the env var
+# $NAUTILUS_SCRIPT_SELECTED_FILE_PATHS; we prefer the env var because it is
+# robust to spaces/newlines in names, and fall back to "$@".
+#
+# All it does is call the shared core (postern-scrub.sh), which pipes each file
+# through `postern-hygiene scrub -` to a scrubbed sibling. A desktop
+# notification (best-effort) summarizes the result.
+
+set -eu
+
+# Locate the shared core. Installed layout: this script sits next to a copy of
+# postern-scrub.sh in the same dir; dev layout: it is symlinked from the repo.
+SELF=$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)
+CORE="$SELF_DIR/postern-scrub.sh"
+[ -x "$CORE" ] || CORE="$SELF_DIR/../postern-scrub.sh"
+
+# Collect selection: prefer the env var (one path per line).
+set --  # reset positional
+if [ -n "${NAUTILUS_SCRIPT_SELECTED_FILE_PATHS:-}" ]; then
+    OLDIFS=$IFS
+    IFS='
+'
+    for p in $NAUTILUS_SCRIPT_SELECTED_FILE_PATHS; do
+        [ -n "$p" ] && set -- "$@" "$p"
+    done
+    IFS=$OLDIFS
+fi
+# If the env var was empty, fall back to the original argv the shell was given.
+if [ "$#" -eq 0 ]; then
+    exec "$CORE" "$@"  # no selection -> core prints usage/exits nonzero
+fi
+
+if out=$("$CORE" "$@" 2>&1); then
+    msg="Scrubbed $# file(s). Copies written next to the originals."
+    icon=security-high
+else
+    msg="Some files could not be scrubbed. See details."
+    icon=dialog-warning
+fi
+# Best-effort GUI feedback; never fail the action just because notify is absent.
+if command -v notify-send >/dev/null 2>&1; then
+    notify-send -i "$icon" "Postern Hygiene" "$msg
+$out" || true
+fi
+printf '%s\n' "$out"

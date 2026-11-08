@@ -1,0 +1,2920 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src data:; connect-src https://api.anthropic.com; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Tolmach — interpreter &amp; minutes · Postern Labs</title>
+<style>
+/* ============================================================
+   TOLMACH · Postern Labs
+   The interpreter-secretary of the diplomatic court:
+   interprets, and keeps the minutes — bound to discretion.
+   Graphite/ink instrument panel + one verdigris accent.
+
+   ---- DESIGN-SYSTEM CONTRACT (canonical source) --------------
+   This file is the reference implementation the other Postern
+   single-file apps mirror (named once, prefixed, in
+   apps/_design-system/tokens.css). The contract:
+
+   1. TOKENS — un-prefixed app-local custom properties, same
+      names in every app:
+        neutrals   --bg --bg-glow --surface --surface-2
+                   --surface-3 --border --border-hi
+        text       --text --text-dim --muted
+        accent     one per-app family (here verdigris:
+                   --verd --verd-hi --verd-dim --verd-ink;
+                   maps to --ps-acc/-hi/-dim/-ink)
+        semantic   --live --ok --warn --err
+        chrome     --shadow --radius --font-ui --font-mono
+
+   2. TRI-STATE THEMING — keyed off data-theme on <html>:
+        no attribute          -> auto (OS, via
+                                 prefers-color-scheme +
+                                 :root:not([data-theme]))
+        data-theme="light"    -> forced light
+        data-theme="dark"     -> forced dark (token defaults)
+      The toggle cycles auto -> light -> dark -> auto and
+      persists in localStorage.
+
+   3. ACCESSIBILITY BASELINE — every app ships both:
+        @media (prefers-reduced-motion: reduce) kills all
+        animation/transition (mic-live keeps a static ring);
+        a global :focus-visible ring in the accent color
+        (2px solid, 2px offset).
+
+   4. HONEST PANEL — every app keeps a privacy ledger that
+      never claims "100% private". Tolmach's wording is the
+      canonical phrasing other builds (e.g. the subscription
+      client) quote VERBATIM: the guarantee is "no extra
+      parties" — no Postern servers, no resellers, no
+      analytics — and the Sovereign (own-key) path is the tier
+      where that promise holds. Do not paraphrase it.
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #0d1014;
+  --bg-glow:   #10151a;
+  --surface:   #14181f;
+  --surface-2: #1a2029;
+  --surface-3: #212934;
+  --border:    #29323e;
+  --border-hi: #3a4552;
+  --text:      #e7e6df;
+  --text-dim:  #a8adb5;
+  --muted:     #79818c;
+
+  --verd:      #4fa48d;   /* verdigris — aged copper */
+  --verd-hi:   #6fc4ab;
+  --verd-dim:  #35705f;
+  --verd-ink:  #0a1512;
+
+  --live:      #e4574f;   /* mic hot — unambiguous */
+  --ok:        #63ab7c;
+  --warn:      #d08c2e;
+  --err:       #d96a63;
+
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
+  --radius: 14px;
+}
+
+:root[data-theme="light"] {
+  --bg:        #f0efe9;
+  --bg-glow:   #f6f5f0;
+  --surface:   #fbfaf7;
+  --surface-2: #edece4;
+  --surface-3: #e3e2d7;
+  --border:    #d5d3c6;
+  --border-hi: #bfbdac;
+  --text:      #20242b;
+  --text-dim:  #4f555e;
+  --muted:     #767d87;
+
+  --verd:      #1f7a63;
+  --verd-hi:   #14604d;
+  --verd-dim:  #4f9b86;
+  --verd-ink:  #f4fffb;
+
+  --live:      #bc3b33;
+  --ok:        #2f7a4d;
+  --warn:      #9a6210;
+  --err:       #b1443d;
+
+  --shadow: 0 14px 40px rgba(50,58,52,.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0efe9; --bg-glow:#f6f5f0; --surface:#fbfaf7; --surface-2:#edece4;
+    --surface-3:#e3e2d7; --border:#d5d3c6; --border-hi:#bfbdac;
+    --text:#20242b; --text-dim:#4f555e; --muted:#767d87;
+    --verd:#1f7a63; --verd-hi:#14604d; --verd-dim:#4f9b86; --verd-ink:#f4fffb;
+    --live:#bc3b33; --ok:#2f7a4d; --warn:#9a6210; --err:#b1443d;
+    --shadow: 0 14px 40px rgba(50,58,52,.14);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1200px 540px at 50% -190px, var(--bg-glow), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--verd); color: var(--verd-ink); }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--verd);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- header ---------- */
+header.site {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 20;
+}
+.site-inner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 11px 0;
+}
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 17px; font-weight: 700;
+  letter-spacing: .3em; text-indent: .3em;
+  color: var(--text);
+  user-select: none;
+  white-space: nowrap;
+}
+.wordmark .tick { color: var(--verd); }
+.byline {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.mode-tabs { display: flex; gap: 4px; margin-left: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 3px; background: var(--surface-2); }
+.mode-tab {
+  border: 0; background: transparent; border-radius: 8px;
+  padding: 5px 14px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .14em;
+  color: var(--text-dim);
+  transition: background .15s, color .15s;
+}
+.mode-tab[aria-selected="true"] { background: var(--verd); color: var(--verd-ink); font-weight: 700; }
+.mode-tab:not([aria-selected="true"]):hover { color: var(--text); }
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.hbtn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; padding: 6px 12px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.hbtn:hover { border-color: var(--border-hi); color: var(--text); background: var(--surface-2); }
+.hbtn[data-attn="1"] { border-color: var(--verd); color: var(--verd); }
+
+/* ---------- mic-live banner — prominent + unambiguous ---------- */
+.mic-banner {
+  display: none;
+  align-items: center; justify-content: center; gap: 9px;
+  margin: 14px auto 0; width: fit-content;
+  background: var(--live); color: #fff;
+  font-family: var(--font-mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .16em;
+  padding: 6px 16px; border-radius: 999px;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--live) 50%, transparent);
+}
+.mic-banner .dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: breathe 1s infinite; }
+body[data-mic="1"] .mic-banner { display: flex; }
+
+@keyframes breathe   { 0%,100% { transform: scale(1); opacity:.7 } 50% { transform: scale(1.15); opacity: 1 } }
+@keyframes livepulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 40%, transparent); }
+                       55%     { box-shadow: 0 0 0 12px transparent; } }
+@keyframes sweep     { 0% { background-position: -240px 0 } 100% { background-position: 240px 0 } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  body[data-mic="1"] .ptt.hot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 45%, transparent); }
+}
+
+/* ---------- shared status line ---------- */
+.status-line {
+  min-height: 1.6em;
+  margin: 12px auto 4px;
+  font-size: 14.5px;
+  color: var(--text-dim);
+  text-align: center;
+  max-width: 720px;
+}
+.status-line[data-tone="err"]  { color: var(--err); }
+.status-line[data-tone="live"] { color: var(--live); font-weight: 500; }
+.status-line .hint-key {
+  font-family: var(--font-mono); font-size: 11px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 7px; margin: 0 2px;
+  color: var(--muted); background: var(--surface-2);
+}
+
+/* ---------- panels ---------- */
+.panel { display: none; padding-top: 8px; }
+body[data-mode="interpret"] #interpretPanel { display: block; }
+body[data-mode="minutes"]   #minutesPanel   { display: block; }
+
+/* ---------- interpreting desk ---------- */
+.desk-controls {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; flex-wrap: wrap;
+  padding: 18px 0 4px;
+}
+.lang-pick {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); padding: 8px 12px;
+}
+.lang-pick .lp-side {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--verd);
+}
+.lang-pick select {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 8px; color: var(--text); max-width: 190px;
+}
+.swap-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 50%; width: 38px; height: 38px;
+  display: grid; place-items: center; color: var(--verd); font-size: 17px;
+}
+.swap-btn:hover { border-color: var(--verd); background: var(--surface-2); }
+
+.lag-note {
+  text-align: center; font-size: 12px; color: var(--muted); margin: 4px 0 0;
+}
+
+.ptt-row {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  gap: 12px; align-items: stretch;
+  padding: 14px 0 4px;
+}
+.ptt {
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, var(--surface-3), var(--surface));
+  padding: 16px 14px;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), var(--shadow);
+  transition: border-color .15s, transform .1s;
+  -webkit-user-select: none; user-select: none;
+  touch-action: none;
+}
+.ptt:active { transform: scale(.99); }
+.ptt .ptt-kicker {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;
+}
+.ptt .ptt-lang { font-size: 17px; font-weight: 600; color: var(--text); }
+.ptt .ptt-sub { font-size: 11.5px; color: var(--muted); display: block; margin-top: 4px; }
+.ptt:hover { border-color: var(--verd); }
+.ptt.hot {
+  border-color: var(--live);
+  animation: livepulse 1.3s ease-out infinite;
+}
+.ptt.hot .ptt-lang { color: var(--live); }
+.ptt-mid { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.tool-btn {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 11px; width: 46px; height: 46px;
+  display: grid; place-items: center; color: var(--text-dim);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.tool-btn:hover { color: var(--text); border-color: var(--border-hi); }
+.tool-btn svg { width: 19px; height: 19px; }
+.tool-btn[aria-pressed="true"] { color: var(--live); border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+.tool-btn.listening-on { color: var(--verd-ink); background: var(--verd); border-color: var(--verd); }
+.tool-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* exchange transcript — the two-pane desk */
+.desk-head {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 20px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted);
+}
+.desk-head span { padding: 0 8px; }
+.xlist { list-style: none; margin: 8px 0 0; padding: 0 0 12px; display: flex; flex-direction: column; gap: 10px; }
+.xrow {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface);
+  padding: 11px 12px;
+}
+.xcell { min-width: 0; }
+.xcell .xlang {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+}
+.xcell.dst .xlang { color: var(--verd); }
+.xcell .xtext { font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.xcell.dst .xtext.streaming::after { content: "▍"; color: var(--verd); animation: breathe 1s infinite; }
+.xrow .lag {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+  color: var(--muted); border: 1px solid var(--border); border-radius: 999px;
+  padding: 1px 8px; text-transform: none;
+}
+.xrow .xerr { color: var(--err); font-size: 12.5px; margin-top: 4px; }
+.empty-hint { text-align: center; color: var(--muted); font-size: 13.5px; padding: 22px 0 8px; }
+
+/* composer */
+.composer-dock {
+  position: sticky; bottom: 0; z-index: 15;
+  padding: 12px 0 18px;
+  background: linear-gradient(transparent, var(--bg) 34%);
+}
+.composer {
+  display: flex; gap: 8px; align-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--verd) 60%, var(--border)); }
+.composer input[type="text"] {
+  flex: 1; background: none; border: 0; outline: none;
+  padding: 8px 10px; font-size: 15px; color: var(--text); min-width: 0;
+}
+.composer input::placeholder { color: var(--muted); }
+.cbtn {
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 11px; height: 40px; min-width: 40px; flex: none;
+  display: grid; place-items: center; padding: 0 8px;
+  color: var(--text-dim);
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.cbtn:hover { color: var(--text); border-color: var(--border-hi); }
+.cbtn svg { width: 18px; height: 18px; }
+.cbtn.primary { background: var(--verd); border-color: var(--verd); color: var(--verd-ink); }
+.cbtn.primary:hover { background: var(--verd-hi); border-color: var(--verd-hi); color: var(--verd-ink); }
+.cbtn:disabled { opacity: .45; cursor: not-allowed; }
+.composer-foot {
+  display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--muted); padding: 8px 6px 0;
+  font-family: var(--font-mono); letter-spacing: .02em;
+}
+.composer-foot .lock { color: var(--verd); }
+.composer-foot button.linkish {
+  background: none; border: none; padding: 0;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+  font: inherit;
+}
+.composer-foot button.linkish:hover { color: var(--text-dim); }
+
+/* ---------- minutes desk ---------- */
+.m-controls {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 18px 0 6px; justify-content: center;
+}
+.btn-verd {
+  background: var(--verd); border: 1px solid var(--verd); color: var(--verd-ink);
+  border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 600;
+}
+.btn-verd:hover { background: var(--verd-hi); border-color: var(--verd-hi); }
+.btn-verd:disabled { opacity: .5; cursor: not-allowed; }
+.btn-quiet {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-quiet:hover { border-color: var(--border-hi); color: var(--text); }
+.btn-quiet:disabled { opacity: .45; cursor: not-allowed; }
+.m-meta {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+}
+.m-chipstat {
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px;
+  background: var(--surface);
+}
+.m-chipstat b { color: var(--verd); font-weight: 700; }
+
+.speakers {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  justify-content: center; padding: 8px 0 4px;
+}
+.speakers .flabel-inline {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.spk-chip {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--text-dim);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.spk-chip:hover { border-color: var(--verd); color: var(--text); }
+.spk-chip[aria-pressed="true"] { background: var(--verd); border-color: var(--verd); color: var(--verd-ink); font-weight: 600; }
+.spk-add { display: flex; gap: 6px; }
+.spk-add input {
+  width: 130px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px 12px; font-size: 13px;
+}
+.spk-add button {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
+  width: 30px; height: 30px; color: var(--text-dim);
+}
+.spk-note { text-align: center; font-size: 11.5px; color: var(--muted); margin: 2px 0 0; }
+
+.m-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.m-col {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.m-col-head {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding: 9px 14px;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2);
+}
+.m-col-head .upd {
+  margin-left: auto; color: var(--verd); letter-spacing: .04em; text-transform: none;
+}
+.steno {
+  font-family: var(--font-mono); font-size: 12.5px;
+  padding: 12px 14px; overflow-y: auto; max-height: 480px; min-height: 220px;
+  flex: 1;
+}
+.steno .seg { margin-bottom: 7px; overflow-wrap: anywhere; }
+.steno .ts { color: var(--muted); }
+.steno .spk { color: var(--verd); font-weight: 700; }
+.steno .typed-tag { color: var(--warn); }
+.steno .interim { color: var(--muted); font-style: italic; }
+.minutes-out {
+  padding: 12px 16px; overflow-y: auto; max-height: 480px; min-height: 220px;
+  font-size: 14px; flex: 1;
+}
+.minutes-out h1 { font-size: 17px; margin: 2px 0 8px; color: var(--text); }
+.minutes-out h2 {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--verd); margin: 14px 0 5px;
+  border-bottom: 1px solid var(--border); padding-bottom: 3px;
+}
+.minutes-out h3 { font-size: 13.5px; margin: 10px 0 4px; }
+.minutes-out ul { margin: 4px 0; padding-left: 20px; }
+.minutes-out li { margin: 2px 0; }
+.minutes-out p { margin: 5px 0; }
+.minutes-out blockquote {
+  margin: 6px 0; padding: 4px 12px; border-left: 2px solid var(--verd);
+  color: var(--text-dim); font-style: italic;
+}
+.minutes-out code { font-family: var(--font-mono); font-size: 12px; color: var(--verd); }
+.minutes-out .m-empty { color: var(--muted); font-size: 13px; }
+
+.m-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 14px 0 24px; }
+.m-typed { padding: 10px 0 0; }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  width: min(620px, calc(100vw - 36px));
+  max-height: min(86vh, 800px);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(6,8,10,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+.dlg-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--verd);
+  font-weight: 700;
+}
+.dlg-head .x {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; width: 30px; height: 30px; color: var(--muted);
+}
+.dlg-head .x:hover { color: var(--text); border-color: var(--border-hi); }
+.dlg-body { padding: 18px 20px 22px; overflow-y: auto; }
+
+.field { margin-bottom: 18px; }
+.field > label, .field > .flabel {
+  display: block; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 7px;
+}
+.field .fhelp { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.field input[type="password"], .field input[type="text"], .field input[type="number"], .field select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+}
+.field input:focus, .field select:focus { border-color: var(--verd); outline: none; }
+.keyrow { display: flex; gap: 8px; }
+.keyrow input { flex: 1; font-family: var(--font-mono); font-size: 13px; }
+.keyrow .hbtn { flex: none; }
+.field input[type="range"] { width: 100%; accent-color: var(--verd); }
+.radio-card { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; }
+.radio-card:has(input:checked) { border-color: var(--verd); background: color-mix(in srgb, var(--verd) 6%, transparent); }
+.radio-card input { margin-top: 3px; accent-color: var(--verd); }
+.radio-card .rc-t { font-size: 14px; }
+.radio-card .rc-d { font-size: 12px; color: var(--muted); }
+.radio-card input:disabled ~ div { opacity: .55; }
+
+.danger-zone { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 16px; }
+.btn-danger {
+  background: transparent; border: 1px solid var(--err); color: var(--err);
+  border-radius: 10px; padding: 9px 16px; font-size: 14px;
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
+
+/* privacy ledger */
+.ledger { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 10px 0 16px; }
+.ledger-row { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row .mark { font-size: 15px; text-align: center; line-height: 1.4; }
+.ledger-row.local .mark { color: var(--ok); }
+.ledger-row.leaves .mark { color: var(--warn); }
+.ledger-row h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.ledger-row p { margin: 0; color: var(--text-dim); font-size: 12.8px; line-height: 1.55; }
+.ledger-row code { font-family: var(--font-mono); font-size: 11.5px; color: var(--verd); }
+.pv-note { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.pv-note strong { color: var(--text-dim); }
+
+/* vault */
+.v-status {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--muted); margin-bottom: 14px;
+}
+.v-status .v-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.v-status.unlocked .v-dot { background: var(--ok); }
+.v-status.locked .v-dot { background: var(--warn); }
+.v-list { list-style: none; margin: 0 0 14px; padding: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.v-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 13px; border-bottom: 1px solid var(--border); font-size: 13.5px;
+}
+.v-list li:last-child { border-bottom: 0; }
+.v-list .v-mode {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--verd);
+  border: 1px solid color-mix(in srgb, var(--verd) 40%, var(--border));
+  border-radius: 999px; padding: 1px 9px; flex: none;
+}
+.v-list .v-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-list .v-title.enc { color: var(--muted); font-style: italic; }
+.v-list .v-date { font-family: var(--font-mono); font-size: 11px; color: var(--muted); flex: none; }
+.v-list .v-open { flex: none; }
+.v-empty { color: var(--muted); font-size: 13px; padding: 14px; text-align: center; border: 1px dashed var(--border); border-radius: 12px; margin-bottom: 14px; }
+.v-row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.rec-view { border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; background: var(--surface-2); }
+.rec-view h3 { margin: 0 0 8px; font-size: 15px; }
+.rec-view pre {
+  white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono);
+  font-size: 12px; max-height: 300px; overflow-y: auto; margin: 0 0 10px;
+  color: var(--text-dim);
+}
+.v-msg { font-size: 12.5px; margin: 8px 0 0; min-height: 1.2em; }
+.v-msg[data-tone="err"] { color: var(--err); }
+.v-msg[data-tone="ok"] { color: var(--ok); }
+
+/* footer */
+footer.site {
+  padding: 8px 0 26px; text-align: center;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .byline { display: none; }
+  .xrow, .m-cols, .desk-head { grid-template-columns: 1fr; }
+  .desk-head span:last-child { display: none; }
+  .ptt-row { grid-template-columns: 1fr 1fr; }
+  .ptt-mid { flex-direction: row; grid-column: 1 / -1; order: 3; justify-content: center; }
+  .composer-foot { flex-direction: column; gap: 4px; }
+}
+</style>
+</head>
+<body data-state="idle" data-mode="interpret">
+
+<header class="site">
+  <div class="wrap site-inner">
+    <div class="wordmark" aria-label="Tolmach">T<span class="tick">·</span>OLMACH</div>
+    <div class="byline">Postern Labs · interpreter &amp; scribe</div>
+    <div class="mode-tabs" role="tablist" aria-label="Mode">
+      <button class="mode-tab" id="tabInterpret" role="tab" aria-selected="true">INTERPRET</button>
+      <button class="mode-tab" id="tabMinutes" role="tab" aria-selected="false">MINUTES</button>
+    </div>
+    <div class="site-actions">
+      <button class="hbtn" id="btnVault">Vault</button>
+      <button class="hbtn" id="btnPrivacy">Privacy</button>
+      <button class="hbtn" id="btnSettings">Settings</button>
+      <button class="hbtn" id="btnTheme" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<div class="mic-banner" role="status" aria-live="polite"><span class="dot"></span><span id="micBannerText">MIC LIVE — CONTINUOUS CAPTURE</span></div>
+
+<main class="wrap">
+
+  <!-- ================= INTERPRET ================= -->
+  <section class="panel" id="interpretPanel" aria-label="Interpreter">
+    <div class="desk-controls">
+      <div class="lang-pick">
+        <span class="lp-side" id="lblSideA">I speak</span>
+        <select id="langA" aria-label="Language A — the language you speak"></select>
+      </div>
+      <button class="swap-btn" id="btnSwap" aria-label="Swap languages" title="Swap languages">⇄</button>
+      <div class="lang-pick">
+        <span class="lp-side">They speak</span>
+        <select id="langB" aria-label="Language B — the language they speak"></select>
+      </div>
+    </div>
+    <p class="lag-note">Consecutive interpretation — each utterance lands ~1–3&nbsp;s behind the speaker. This is not simultaneous interpreting, and we won’t pretend it is.</p>
+
+    <div class="ptt-row">
+      <button class="ptt" id="pttA" aria-label="Hold to speak in your language; released speech is translated for them and spoken aloud.">
+        <span class="ptt-kicker">Hold to talk · side A</span>
+        <span class="ptt-lang" id="pttALang">English</span>
+        <span class="ptt-sub">translated → <span id="pttATarget">Spanish</span></span>
+      </button>
+      <div class="ptt-mid">
+        <button class="tool-btn" id="btnListen" aria-pressed="false" aria-label="Toggle Listen mode: continuous one-way interpretation from language A to language B. The microphone stays hot until you turn it off." title="Listen mode — continuous A → B (mic stays hot)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        </button>
+        <button class="tool-btn" id="btnMute" aria-pressed="false" aria-label="Mute spoken translations" title="Mute spoken translations">
+          <svg id="icoSpeaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="spkWaves" d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/><line id="spkSlash" x1="22" y1="3" x2="14" y2="21" style="display:none"/></svg>
+        </button>
+        <button class="tool-btn" id="btnStopX" disabled aria-label="Stop translating and speaking" title="Stop">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+      </div>
+      <button class="ptt" id="pttB" aria-label="Hold while they speak in their language; released speech is translated for you and spoken aloud.">
+        <span class="ptt-kicker">Hold to talk · side B</span>
+        <span class="ptt-lang" id="pttBLang">Spanish</span>
+        <span class="ptt-sub">translated → <span id="pttBTarget">English</span></span>
+      </button>
+    </div>
+
+    <p class="status-line" id="xStatus" aria-live="polite"></p>
+
+    <div class="desk-head" aria-hidden="true"><span>SOURCE — as heard</span><span>TRANSLATION</span></div>
+    <ol class="xlist" id="xlist" aria-label="Interpretation transcript" aria-live="off"></ol>
+    <p class="empty-hint" id="xEmpty">Nothing interpreted yet. Hold a side and speak — or type below (the fully local input path).<br>The source transcript always stays visible so you can spot mis-hearings.</p>
+
+    <div class="composer-dock">
+      <form class="composer" id="xComposer">
+        <button type="button" class="cbtn" id="btnDir" aria-label="Toggle typed-text translation direction" title="Typed-text direction">EN→ES</button>
+        <input type="text" id="xInput" autocomplete="off"
+               placeholder="Type instead of speaking — nothing leaves this tab until you hit send"
+               aria-label="Text to translate">
+        <button type="submit" class="cbtn primary" id="btnXSend" aria-label="Translate typed text">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+      <div class="composer-foot">
+        <span><span class="lock">●</span> no server · no account · key stays in this browser</span>
+        <span>translator: <button class="linkish" id="xModelHint" type="button">—</button> · <span id="xCost">$0.0000</span> · <button class="linkish" id="btnXSave" type="button">save session to vault</button></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MINUTES ================= -->
+  <section class="panel" id="minutesPanel" aria-label="Meeting minutes">
+    <div class="m-controls">
+      <button class="btn-verd" id="btnMeeting">Start meeting</button>
+      <button class="btn-quiet" id="btnUpdateNow" disabled>Update minutes now</button>
+      <div class="m-meta">
+        <span class="m-chipstat">elapsed <b id="mElapsed">00:00</b></span>
+        <span class="m-chipstat" title="Estimated cost of this session's Claude calls, billed to your own key. Estimate from streamed token counts at current list rates.">≈ <b id="mCost">$0.0000</b> · <span id="mTok">0 in / 0 out tok</span></span>
+      </div>
+    </div>
+    <p class="status-line" id="mStatus" aria-live="polite"></p>
+
+    <div class="speakers" id="speakersRow">
+      <span class="flabel-inline">Speaker — tap to tag what’s said next</span>
+      <div id="spkChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <form class="spk-add" id="spkForm">
+        <input type="text" id="spkName" placeholder="add speaker" aria-label="Add a speaker name" maxlength="40">
+        <button type="submit" aria-label="Add speaker">＋</button>
+      </form>
+    </div>
+    <p class="spk-note">Speaker labels are manual or content-inferred <code style="font-family:var(--font-mono)">(inferred)</code> — the browser cannot identify voices.</p>
+
+    <div class="m-cols">
+      <div class="m-col">
+        <div class="m-col-head">Steno — raw transcript (stays in this tab)</div>
+        <div class="steno" id="steno" aria-label="Raw transcript"></div>
+      </div>
+      <div class="m-col">
+        <div class="m-col-head">Structured minutes <span class="upd" id="mUpdating"></span></div>
+        <div class="minutes-out" id="minutesOut" aria-label="Structured minutes"><p class="m-empty">Minutes will build here — updated automatically every ~2 minutes while the meeting runs, and on demand.</p></div>
+      </div>
+    </div>
+
+    <div class="m-typed">
+      <form class="composer" id="mComposer">
+        <input type="text" id="mInput" autocomplete="off"
+               placeholder="Type a note into the record — the fully local capture path (no mic needed)"
+               aria-label="Typed note for the transcript" disabled>
+        <button type="submit" class="cbtn primary" id="btnMSend" aria-label="Add typed note" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+    </div>
+
+    <div class="m-actions">
+      <button class="btn-quiet" id="btnMCopy" disabled>Copy minutes</button>
+      <button class="btn-quiet" id="btnMDownload" disabled>Download .md</button>
+      <button class="btn-quiet" id="btnMSave" disabled>Save to vault</button>
+      <button class="btn-quiet" id="btnSeal" disabled
+        title="Planned: hash + post-quantum-sign the final minutes and anchor the digest so you can later prove they existed unchanged at time T (Postern Seal). Opt-in, not built in this prototype — nothing is anchored anywhere today.">Seal minutes — planned</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site wrap">Tolmach · a Postern Labs instrument · your key, your words, your machine</footer>
+
+<!-- ================= SETTINGS ================= -->
+<dialog id="dlgSettings" aria-labelledby="settingsTitle">
+  <div class="dlg-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <button class="x" data-close aria-label="Close settings">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="field">
+      <label for="apiKey">Your Anthropic API key</label>
+      <div class="keyrow">
+        <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button type="button" class="hbtn" id="btnShowKey">show</button>
+      </div>
+      <p class="fhelp">Stored only in this browser’s localStorage and sent only to <code>api.anthropic.com</code> — Tolmach has no server that could ever see it. Get a key at console.anthropic.com.</p>
+    </div>
+
+    <div class="field">
+      <label for="modelXlate">Translation model</label>
+      <select id="modelXlate">
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest, best for live interpreting (default)</option>
+        <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable, slower</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="modelNotes">Minutes model</label>
+      <select id="modelNotes">
+        <option value="claude-sonnet-5">Claude Sonnet 5 — balanced (default)</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable, slower</option>
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — cheapest</option>
+      </select>
+      <p class="fhelp">Both billed to your own Anthropic account at your account’s rates. The cost readout in Minutes mode counts the actual streamed tokens.</p>
+    </div>
+
+    <div class="field">
+      <span class="flabel" id="sttLabel">Speech-to-text engine</span>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="webspeech" id="sttWeb">
+        <div>
+          <div class="rc-t">Browser speech recognition (Web Speech API)</div>
+          <div class="rc-d">Works now in Chrome/Edge. Honest caveat: the browser may send your audio to its vendor’s servers for transcription — see the Privacy panel. In Listen and Minutes modes the mic stays continuously hot while the mode runs.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="stt" value="ondevice" id="sttLocal">
+        <div>
+          <div class="rc-t">On-device Whisper (planned)</div>
+          <div class="rc-d">A whisper.cpp-WASM engine that never lets audio leave this machine. The engine slot is wired; the model isn’t bundled in this prototype. Until then, typing is the fully local path.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Translation engine</span>
+      <label class="radio-card">
+        <input type="radio" name="mt" value="claude" id="mtClaude">
+        <div>
+          <div class="rc-t">Claude (your own key)</div>
+          <div class="rc-d">Best quality across major language pairs; each segment goes directly to <code>api.anthropic.com</code> under your key.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="mt" value="bergamot" id="mtLocal">
+        <div>
+          <div class="rc-t">On-device translation (Bergamot / OPUS-MT — planned)</div>
+          <div class="rc-d">WASM machine translation that keeps every word on this machine. The engine slot is wired; the 20–40&nbsp;MB-per-pair models aren’t bundled in this prototype, and we won’t pretend they are.</div>
+        </div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="dia" value="ondevice" id="diaLocal" disabled>
+        <div>
+          <div class="rc-t">On-device speaker diarization (planned)</div>
+          <div class="rc-d">Would tell voices apart locally for Minutes mode. Not built; today speaker labels are manual taps or content-inference marked <code>(inferred)</code>.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="field">
+      <label for="voiceSel">Preferred voice for spoken translations (on-device)</label>
+      <select id="voiceSel"></select>
+      <p class="fhelp">Tolmach auto-picks a voice matching the target language; your preference wins when its language matches. Voices marked “⚠ network voice” are synthesized by the OS vendor’s servers, not on-device.</p>
+    </div>
+
+    <div class="field">
+      <label for="rate">Speaking rate <span id="rateVal" style="color:var(--muted)"></span></label>
+      <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
+    </div>
+
+    <div class="field">
+      <label for="autolock">Vault auto-lock after idle (minutes, 0 = never)</label>
+      <input type="number" id="autolock" min="0" max="240" step="1" value="5">
+      <p class="fhelp">The vault also locks when this page is hidden or closed. The decryption key exists only in this tab’s memory while unlocked.</p>
+    </div>
+
+    <div class="danger-zone">
+      <span class="flabel">Erase everything</span>
+      <p class="fhelp" style="margin:0 0 10px">Wipes your API key, all settings, this session’s transcripts and minutes, and the encrypted vault from this browser. Nothing else exists to erase — there is no server copy. Exported vault files on your disk are yours to delete.</p>
+      <button type="button" class="btn-danger" id="btnErase">Erase key, settings, session &amp; vault</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= PRIVACY ================= -->
+<dialog id="dlgPrivacy" aria-labelledby="privacyTitle">
+  <div class="dlg-head">
+    <h2 id="privacyTitle">Privacy — who sees what</h2>
+    <button class="x" data-close aria-label="Close privacy panel">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="pv-note" style="margin-top:0">
+      Tolmach is a static page. <strong>There is no Postern server, no account, no telemetry, and no analytics.</strong>
+      Your API key and settings live in this browser’s localStorage; transcripts and minutes live in this tab’s memory
+      unless you save them to the encrypted vault. The honest ledger:
+    </p>
+
+    <div class="ledger">
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Your voice → your browser’s vendor (whenever the mic is on)</h3>
+          <p>Voice input uses the browser’s Web Speech API. In Chrome and most browsers this
+          <strong>sends your audio to the browser vendor’s servers (Google in Chrome/Chromium)</strong> for transcription, under that vendor’s
+          terms — so speech input is <em>not</em> fully private. In conversation mode the mic is push-to-talk only.
+          In <strong>Listen and Minutes modes the microphone is continuously hot</strong> for as long as the mode runs —
+          the red MIC LIVE banner stays up the whole time, and stopping the mode kills the recognizer immediately.
+          Want zero audio leaving the machine? <strong>Type instead</strong> — typed input is fully local until you send
+          it to Claude. The real fix is the on-device Whisper engine slot, wired but not bundled here.</p>
+        </div>
+      </div>
+      <div class="ledger-row leaves">
+        <div class="mark">◮</div>
+        <div>
+          <h3>Transcript &amp; minutes text → Anthropic (when a segment is sent)</h3>
+          <p>Each translation segment and each minutes update is sent from your browser directly to
+          <code>api.anthropic.com</code>, authenticated with <em>your</em> key — no middleman relays or logs it.
+          Anthropic processes it under <em>your</em> agreement with them (their usage and data-retention terms apply).
+          If you never send, nothing is ever transmitted.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>Spoken translations — on-device</h3>
+          <p>Text-to-speech uses your operating system’s voices via <code>speechSynthesis</code>; audio is generated
+          locally and does not leave the device. Exception: some OS voices are network voices — the voice picker
+          marks those “⚠ network voice” so you can avoid them.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>No speaker identification happens anywhere</h3>
+          <p>The browser has no speaker diarization. Speaker labels in the minutes are either your manual taps or the
+          model’s content inference, and every inferred label is marked <code>(inferred)</code>. Tolmach never
+          records or stores audio — transcripts only; less data is the default.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>API key &amp; settings — this browser only</h3>
+          <p>localStorage of this browser, sent only to <code>api.anthropic.com</code>. “Erase everything” in
+          Settings wipes all of it instantly.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">●</div>
+        <div>
+          <h3>The vault — encrypted, local, and honestly limited</h3>
+          <p>Saved sessions are encrypted with AES-256-GCM in this browser’s IndexedDB; the key is derived from a
+          passphrase <strong>we never see and never store</strong> (PBKDF2-SHA-256, 600,000 iterations — weaker than
+          Argon2id against offline GPU attacks on weak passphrases, so pick a strong one). Anyone holding the exported
+          vault file or the disk sees ciphertext only. Honest limits: a browser origin is not a hardware vault —
+          whoever controls this browser profile <em>while the vault is unlocked</em> (malware, a malicious extension,
+          someone at your unlocked machine) can read notes and capture the passphrase as you type it. A forgotten
+          passphrase means the data is unrecoverable <em>by design</em>. The real-product fix is Postern Vault’s
+          TEE key-wrap.</p>
+        </div>
+      </div>
+      <div class="ledger-row local">
+        <div class="mark">—</div>
+        <div>
+          <h3>Postern sees nothing</h3>
+          <p>Static page, no server, no account, no telemetry, no analytics. The only network destinations in this
+          page’s code: <code>api.anthropic.com</code>, plus the browser’s own speech service when voice input is used.
+          One readable HTML file — verify it yourself.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="pv-note">
+      <strong>What we won’t claim:</strong> Tolmach is not “100% private.” Anything you send to a model necessarily
+      reaches Anthropic, and spoken input may reach your browser vendor. What Tolmach guarantees is <em>no extra
+      parties</em>: no Postern servers, no resellers, no analytics. And it won’t call itself a simultaneous
+      interpreter either — it is consecutive, ~1–3&nbsp;s behind the speaker.
+    </p>
+    <p style="text-align:right; margin: 14px 0 0">
+      <button class="btn-verd" data-close>Understood</button>
+    </p>
+  </div>
+</dialog>
+
+<!-- ================= VAULT ================= -->
+<dialog id="dlgVault" aria-labelledby="vaultTitle">
+  <div class="dlg-head">
+    <h2 id="vaultTitle">Vault — encrypted archive</h2>
+    <button class="x" data-close aria-label="Close vault">✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="v-status" id="vStatus"><span class="v-dot"></span><span id="vStatusText">checking…</span></div>
+
+    <!-- create -->
+    <div id="vCreate" style="display:none">
+      <p class="pv-note" style="margin-top:0">No vault exists in this browser yet. Create one to archive minutes and
+      interpretation sessions encrypted at rest (AES-256-GCM; key derived from your passphrase with PBKDF2-SHA-256 ×
+      600,000). <strong>The passphrase is never stored anywhere. If you forget it, the archive is unrecoverable by
+      design.</strong></p>
+      <div class="field">
+        <label for="vNewPass">Choose a strong passphrase</label>
+        <input type="password" id="vNewPass" autocomplete="new-password" placeholder="a long phrase beats a short password">
+      </div>
+      <div class="field">
+        <label for="vNewPass2">Repeat passphrase</label>
+        <input type="password" id="vNewPass2" autocomplete="new-password">
+      </div>
+      <button class="btn-verd" id="btnVCreate">Create vault</button>
+    </div>
+
+    <!-- unlock -->
+    <div id="vUnlock" style="display:none">
+      <div class="field">
+        <label for="vPass">Passphrase</label>
+        <input type="password" id="vPass" autocomplete="current-password">
+      </div>
+      <button class="btn-verd" id="btnVUnlock">Unlock</button>
+    </div>
+
+    <!-- unlocked main -->
+    <div id="vMain" style="display:none">
+      <div class="v-row-btns">
+        <button class="btn-quiet" id="btnVLock">Lock now</button>
+      </div>
+      <ul class="v-list" id="vList"></ul>
+      <p class="v-empty" id="vEmpty" style="display:none">Nothing archived yet. Use “Save to vault” in Minutes mode, or save an interpretation session from here once you have one.</p>
+      <div class="rec-view" id="recView" style="display:none">
+        <h3 id="recTitle"></h3>
+        <pre id="recBody"></pre>
+        <div class="v-row-btns" style="margin-bottom:0">
+          <button class="btn-quiet" id="btnRecCopy">Copy</button>
+          <button class="btn-quiet" id="btnRecDownload">Download .md</button>
+          <button class="btn-danger" id="btnRecDelete">Delete record</button>
+          <button class="btn-quiet" id="btnRecClose">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- import / export — always available; export is ciphertext-only -->
+    <div id="vTransfer" style="display:none; border-top:1px solid var(--border); margin-top:14px; padding-top:14px">
+      <span class="flabel" style="display:block; font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim); margin-bottom:7px">Backup &amp; transfer (ciphertext only)</span>
+      <div class="v-row-btns">
+        <button class="btn-quiet" id="btnVExport">Export vault (.json)</button>
+        <button class="btn-quiet" id="btnVImportPick">Import vault…</button>
+        <input type="file" id="vImportFile" accept="application/json,.json" class="visually-hidden" aria-label="Vault file to import">
+      </div>
+      <div id="vImportForm" style="display:none">
+        <div class="field" style="margin-bottom:10px">
+          <label for="vImportPass">Passphrase of the imported vault file</label>
+          <input type="password" id="vImportPass" autocomplete="off">
+        </div>
+        <button class="btn-verd" id="btnVImportGo">Verify &amp; import</button>
+      </div>
+      <p class="fhelp" id="vPersistNote" style="margin-top:10px"></p>
+      <div class="danger-zone">
+        <button class="btn-danger" id="btnVErase">Erase vault (delete all ciphertext)</button>
+      </div>
+    </div>
+
+    <p class="v-msg" id="vMsg" aria-live="polite"></p>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ============================================================
+   TOLMACH — application logic
+   Zero dependencies. Only network destination: api.anthropic.com
+   ============================================================ */
+
+/* ---------- tiny helpers ---------- */
+const $ = (sel) => document.querySelector(sel);
+const LS = {
+  KEY:      "tolmach.apiKey",
+  MODEL_X:  "tolmach.modelXlate",
+  MODEL_N:  "tolmach.modelNotes",
+  LANG_A:   "tolmach.langA",
+  LANG_B:   "tolmach.langB",
+  VOICE:    "tolmach.voiceURI",
+  RATE:     "tolmach.rate",
+  MUTE:     "tolmach.muted",
+  STT:      "tolmach.stt",
+  MT:       "tolmach.mt",
+  THEME:    "tolmach.theme",
+  AUTOLOCK: "tolmach.autolock",
+  MODE:     "tolmach.mode",
+};
+const store = {
+  get: (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function downloadText(filename, text, type) {
+  const blob = new Blob([text], { type: type || "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { return false; }
+}
+function fmtClock(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return (h ? String(h).padStart(2, "0") + ":" : "") + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+}
+
+/* ---------- constants ---------- */
+const API_URL = "https://api.anthropic.com/v1/messages";
+const MODELS = {
+  "claude-haiku-4-5-20251001": { label: "Haiku 4.5",  in: 1, out: 5 },   // $/MTok, list rates — estimate only
+  "claude-sonnet-5":           { label: "Sonnet 5",   in: 3, out: 15 },
+  "claude-opus-4-8":           { label: "Opus 4.8",   in: 5, out: 25 },
+};
+const DEFAULT_MODEL_XLATE = "claude-haiku-4-5-20251001";
+const DEFAULT_MODEL_NOTES = "claude-sonnet-5";
+const XLATE_MAX_TOKENS = 512;
+const NOTES_MAX_TOKENS = 2048;
+const NOTES_FINAL_MAX_TOKENS = 4096;
+const CTX_PAIRS = 6;                    // rolling translation context window
+const MINUTES_INTERVAL_MS = 120000;     // auto-update cadence
+const MINUTES_MIN_SEGMENTS = 1;
+
+const LANGS = [
+  ["en-US", "English"], ["es-ES", "Spanish"], ["fr-FR", "French"], ["de-DE", "German"],
+  ["it-IT", "Italian"], ["pt-BR", "Portuguese (Brazil)"], ["pt-PT", "Portuguese (Portugal)"],
+  ["nl-NL", "Dutch"], ["pl-PL", "Polish"], ["ru-RU", "Russian"], ["uk-UA", "Ukrainian"],
+  ["tr-TR", "Turkish"], ["ar-SA", "Arabic"], ["he-IL", "Hebrew"], ["hi-IN", "Hindi"],
+  ["ja-JP", "Japanese"], ["ko-KR", "Korean"], ["zh-CN", "Chinese (Mandarin, Simplified)"],
+  ["zh-TW", "Chinese (Mandarin, Traditional)"], ["vi-VN", "Vietnamese"], ["th-TH", "Thai"],
+  ["id-ID", "Indonesian"], ["sv-SE", "Swedish"], ["da-DK", "Danish"], ["nb-NO", "Norwegian"],
+  ["fi-FI", "Finnish"], ["cs-CZ", "Czech"], ["el-GR", "Greek"], ["ro-RO", "Romanian"], ["hu-HU", "Hungarian"],
+];
+function langName(code) {
+  const hit = LANGS.find(l => l[0] === code);
+  return hit ? hit[1] : code;
+}
+function langShort(code) { return (code || "").split("-")[0].toUpperCase(); }
+
+/* ---------- elements ---------- */
+const el = {
+  body: document.body,
+  // header
+  tabInterpret: $("#tabInterpret"), tabMinutes: $("#tabMinutes"),
+  btnVault: $("#btnVault"), btnPrivacy: $("#btnPrivacy"), btnSettings: $("#btnSettings"), btnTheme: $("#btnTheme"),
+  micBannerText: $("#micBannerText"),
+  // interpret
+  langA: $("#langA"), langB: $("#langB"), btnSwap: $("#btnSwap"),
+  pttA: $("#pttA"), pttB: $("#pttB"),
+  pttALang: $("#pttALang"), pttBLang: $("#pttBLang"), pttATarget: $("#pttATarget"), pttBTarget: $("#pttBTarget"),
+  btnListen: $("#btnListen"), btnMute: $("#btnMute"), btnStopX: $("#btnStopX"),
+  spkWaves: $("#spkWaves"), spkSlash: $("#spkSlash"),
+  xStatus: $("#xStatus"), xlist: $("#xlist"), xEmpty: $("#xEmpty"),
+  xComposer: $("#xComposer"), xInput: $("#xInput"), btnDir: $("#btnDir"),
+  xModelHint: $("#xModelHint"), xCost: $("#xCost"), btnXSave: $("#btnXSave"),
+  // minutes
+  btnMeeting: $("#btnMeeting"), btnUpdateNow: $("#btnUpdateNow"),
+  mElapsed: $("#mElapsed"), mCost: $("#mCost"), mTok: $("#mTok"), mStatus: $("#mStatus"),
+  spkChips: $("#spkChips"), spkForm: $("#spkForm"), spkName: $("#spkName"),
+  steno: $("#steno"), minutesOut: $("#minutesOut"), mUpdating: $("#mUpdating"),
+  mComposer: $("#mComposer"), mInput: $("#mInput"), btnMSend: $("#btnMSend"),
+  btnMCopy: $("#btnMCopy"), btnMDownload: $("#btnMDownload"), btnMSave: $("#btnMSave"), btnSeal: $("#btnSeal"),
+  // settings
+  dlgSettings: $("#dlgSettings"), apiKey: $("#apiKey"), btnShowKey: $("#btnShowKey"),
+  modelXlate: $("#modelXlate"), modelNotes: $("#modelNotes"),
+  sttWeb: $("#sttWeb"), sttLocal: $("#sttLocal"), mtClaude: $("#mtClaude"), mtLocal: $("#mtLocal"),
+  voiceSel: $("#voiceSel"), rate: $("#rate"), rateVal: $("#rateVal"),
+  diaLocal: $("#diaLocal"),
+  autolock: $("#autolock"), btnErase: $("#btnErase"),
+  // privacy
+  dlgPrivacy: $("#dlgPrivacy"),
+  // vault
+  dlgVault: $("#dlgVault"), vStatus: $("#vStatus"), vStatusText: $("#vStatusText"),
+  vCreate: $("#vCreate"), vNewPass: $("#vNewPass"), vNewPass2: $("#vNewPass2"), btnVCreate: $("#btnVCreate"),
+  vUnlock: $("#vUnlock"), vPass: $("#vPass"), btnVUnlock: $("#btnVUnlock"),
+  vMain: $("#vMain"), btnVLock: $("#btnVLock"), vList: $("#vList"), vEmpty: $("#vEmpty"),
+  recView: $("#recView"), recTitle: $("#recTitle"), recBody: $("#recBody"),
+  btnRecCopy: $("#btnRecCopy"), btnRecDownload: $("#btnRecDownload"), btnRecDelete: $("#btnRecDelete"), btnRecClose: $("#btnRecClose"),
+  vTransfer: $("#vTransfer"), btnVExport: $("#btnVExport"), btnVImportPick: $("#btnVImportPick"),
+  vImportFile: $("#vImportFile"), vImportForm: $("#vImportForm"), vImportPass: $("#vImportPass"), btnVImportGo: $("#btnVImportGo"),
+  vPersistNote: $("#vPersistNote"), btnVErase: $("#btnVErase"), vMsg: $("#vMsg"),
+};
+
+/* ---------- state machine ---------- */
+function setState(state) {
+  el.body.dataset.state = state; // idle | listening | translating | speaking | minuting
+}
+function setMic(on, label) {
+  if (on) {
+    el.body.dataset.mic = "1";
+    el.micBannerText.textContent = label || "MIC LIVE — CONTINUOUS CAPTURE";
+  } else {
+    delete el.body.dataset.mic;
+  }
+}
+function setXStatus(html, tone) {
+  el.xStatus.innerHTML = html;
+  if (tone) el.xStatus.dataset.tone = tone; else delete el.xStatus.dataset.tone;
+}
+function setMStatus(html, tone) {
+  el.mStatus.innerHTML = html;
+  if (tone) el.mStatus.dataset.tone = tone; else delete el.mStatus.dataset.tone;
+}
+function getKey() { return (store.get(LS.KEY, "") || "").trim(); }
+function getModelXlate() { return store.get(LS.MODEL_X, DEFAULT_MODEL_XLATE); }
+function getModelNotes() { return store.get(LS.MODEL_N, DEFAULT_MODEL_NOTES); }
+function getLangA() { return store.get(LS.LANG_A, "en-US"); }
+function getLangB() { return store.get(LS.LANG_B, "es-ES"); }
+
+function idleXStatus() {
+  if (!getKey()) {
+    setXStatus('Add your Anthropic API key in <b>Settings</b> to begin — it never leaves this browser except to reach Anthropic.');
+    el.btnSettings.dataset.attn = "1";
+    return;
+  }
+  el.btnSettings.removeAttribute("data-attn");
+  if (stt.available()) {
+    setXStatus('Hold a side and speak — release to translate. Or toggle Listen for continuous one-way interpreting. Typing works too.');
+  } else {
+    setXStatus("Voice input isn’t available in this browser, but typing works fully — and it’s the most private path anyway.");
+  }
+}
+function idleMStatus() {
+  if (!getKey()) {
+    setMStatus('Add your Anthropic API key in <b>Settings</b> to begin — it never leaves this browser except to reach Anthropic.');
+    return;
+  }
+  if (meeting.active) return;
+  if (stt.available()) {
+    setMStatus("Start a meeting to transcribe continuously. The mic stays hot for the whole meeting — the red banner will say so.");
+  } else {
+    setMStatus("No speech recognition in this browser — start a meeting anyway and add typed notes; they’re structured the same way.");
+  }
+}
+
+/* ============================================================
+   Cost tracker — actual streamed token counts × list rates
+   ============================================================ */
+const cost = {
+  in: 0, out: 0, usd: 0,
+  add(model, usage) {
+    const p = MODELS[model] || { in: 3, out: 15 };
+    this.in += usage.input || 0;
+    this.out += usage.output || 0;
+    this.usd += (usage.input || 0) / 1e6 * p.in + (usage.output || 0) / 1e6 * p.out;
+    this.render();
+  },
+  reset() { this.in = 0; this.out = 0; this.usd = 0; this.render(); },
+  render() {
+    const usd = "$" + this.usd.toFixed(4);
+    el.mCost.textContent = usd;
+    el.xCost.textContent = usd;
+    el.mTok.textContent = `${this.in.toLocaleString()} in / ${this.out.toLocaleString()} out tok`;
+  },
+};
+
+/* ============================================================
+   Claude — direct browser → api.anthropic.com, streaming SSE.
+   The ONLY network call in this file.
+   ============================================================ */
+async function streamClaude({ model, maxTokens, system, messages, signal, onText }) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    signal,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": getKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages, stream: true }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json())?.error?.message || ""; } catch {}
+    const e = new Error(detail || res.statusText);
+    e.status = res.status;
+    e.retryAfter = res.headers.get("retry-after");
+    throw e;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let text = "";
+  const usage = { input: 0, output: 0 };
+
+  const handleEvent = (ev) => {
+    switch (ev.type) {
+      case "message_start":
+        if (ev.message && ev.message.usage) usage.input = ev.message.usage.input_tokens || 0;
+        break;
+      case "content_block_delta":
+        if (ev.delta && ev.delta.type === "text_delta") {
+          text += ev.delta.text;
+          if (onText) onText(ev.delta.text);
+        }
+        break;
+      case "message_delta":
+        if (ev.usage && typeof ev.usage.output_tokens === "number") usage.output = ev.usage.output_tokens;
+        break;
+      case "error": {
+        const e = new Error(ev.error?.message || "stream error");
+        e.status = ev.error?.type === "overloaded_error" ? 529 : 500;
+        throw e;
+      }
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch { continue; }
+        handleEvent(ev);
+      }
+    }
+  }
+
+  return { text, usage };
+}
+
+/* Sotto's friendlyError map, verbatim */
+function friendlyError(err) {
+  if (err.status === 401) return "Anthropic rejected that API key. Check it in Settings (it should start with sk-ant-…).";
+  if (err.status === 403) return "That API key doesn’t have permission for this model. Try another model in Settings.";
+  if (err.status === 404) return "Model not found — it may not be enabled for your account. Pick another model in Settings.";
+  if (err.status === 429) return "Rate limited by Anthropic." + (err.retryAfter ? ` Try again in ~${err.retryAfter}s.` : " Give it a moment and try again.");
+  if (err.status === 400) return "Anthropic rejected the request: " + (err.message || "invalid request.");
+  if (err.status === 529 || err.status >= 500) return "Anthropic’s API is briefly overloaded. Try again in a few seconds.";
+  if (err instanceof TypeError) return "Couldn’t reach api.anthropic.com — check your connection. (Nothing was sent anywhere else.)";
+  return "Something went wrong: " + (err.message || String(err));
+}
+
+/* ============================================================
+   Speech OUT — on-device TTS with per-language voice matching
+   ============================================================ */
+let ttsQueue = [];       // { text, lang }
+let ttsSpeaking = false;
+
+const tts = {
+  voices: [],
+  loadVoices() {
+    this.voices = (window.speechSynthesis ? speechSynthesis.getVoices() : []) || [];
+    const sel = el.voiceSel;
+    sel.innerHTML = "";
+    if (!window.speechSynthesis) {
+      sel.appendChild(new Option("Speech synthesis unavailable in this browser", ""));
+      sel.disabled = true;
+      return;
+    }
+    const saved = store.get(LS.VOICE, "");
+    sel.appendChild(new Option("Auto — match the target language", ""));
+    this.voices.forEach(v => {
+      const o = new Option(`${v.name} (${v.lang})${v.localService ? "" : " ⚠ network voice"}`, v.voiceURI);
+      if (v.voiceURI === saved) o.selected = true;
+      sel.appendChild(o);
+    });
+  },
+  pickForLang(lang) {
+    const primary = (lang || "").split("-")[0].toLowerCase();
+    const norm = (l) => (l || "").toLowerCase().replace("_", "-");
+    const preferredURI = store.get(LS.VOICE, "");
+    const preferred = this.voices.find(v => v.voiceURI === preferredURI);
+    if (preferred && norm(preferred.lang).startsWith(primary)) return preferred;
+    const candidates = this.voices.filter(v => norm(v.lang).startsWith(primary));
+    if (!candidates.length) return preferred || null;
+    const exact = candidates.filter(v => norm(v.lang) === norm(lang));
+    const pool = exact.length ? exact : candidates;
+    return pool.find(v => v.localService) || pool[0];
+  },
+  muted() { return store.get(LS.MUTE, "0") === "1"; },
+  speak(text, lang) {
+    if (!window.speechSynthesis || this.muted()) return;
+    const clean = String(text).replace(/\s+/g, " ").trim();
+    if (!clean) return;
+    ttsQueue.push({ text: clean, lang });
+    this.pump();
+  },
+  pump() {
+    if (ttsSpeaking || ttsQueue.length === 0 || !window.speechSynthesis) return;
+    const item = ttsQueue.shift();
+    const u = new SpeechSynthesisUtterance(item.text);
+    u.lang = item.lang || "";
+    const v = this.pickForLang(item.lang);
+    if (v) u.voice = v;
+    u.rate = parseFloat(store.get(LS.RATE, "1")) || 1;
+    ttsSpeaking = true;
+    if (el.body.dataset.state === "idle") setState("speaking");
+    u.onend = u.onerror = () => {
+      ttsSpeaking = false;
+      if (ttsQueue.length) this.pump();
+      else { if (el.body.dataset.state === "speaking") setState("idle"); syncStopX(); }
+    };
+    speechSynthesis.speak(u);
+  },
+  stop() {
+    ttsQueue = [];
+    ttsSpeaking = false;
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  },
+};
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = () => tts.loadVoices();
+}
+
+/* ============================================================
+   Speech IN — swappable STT engines behind one interface.
+   Engine contract: { id, label, available():bool,
+     start({lang, mode:"ptt"|"continuous", onInterim, onFinal, onError}),
+     stop(),   // graceful: ptt delivers accumulated text via onFinal
+     abort() } // immediate kill, no further callbacks
+   ============================================================ */
+
+/* Engine 1: browser Web Speech API (may send audio to the browser vendor) */
+const WebSpeechEngine = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  let rec = null, cb = null, active = false, mode = "ptt", curLang = "en-US";
+  let finals = "", interim = "", restartT = null;
+
+  function build() {
+    rec = new SR();
+    rec.lang = curLang;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (ev) => {
+      if (!cb) return;
+      interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) {
+          if (mode === "continuous") {
+            const t = (r[0].transcript || "").trim();
+            if (t) cb.onFinal(t);
+          } else {
+            finals += r[0].transcript;
+          }
+        } else {
+          interim += r[0].transcript;
+        }
+      }
+      cb.onInterim(mode === "continuous" ? interim.trim() : (finals + " " + interim).trim());
+    };
+    rec.onerror = (ev) => {
+      if (!cb) return;
+      if (ev.error === "aborted" || ev.error === "no-speech") return; // benign; onend handles flow
+      const msgs = {
+        "not-allowed": "Microphone permission was denied. Allow the mic to use voice — or keep typing, which is the most private path anyway.",
+        "service-not-allowed": "The browser’s speech service refused to start. Typing is fully local and always works.",
+        "audio-capture": "No microphone found. Typing works fully.",
+        "network": "The browser’s speech service couldn’t be reached. Typing is fully local and always works.",
+      };
+      const fatal = ev.error === "not-allowed" || ev.error === "audio-capture" || ev.error === "service-not-allowed";
+      if (fatal) active = false;
+      cb.onError(msgs[ev.error] || ("Speech recognition error: " + ev.error), fatal);
+    };
+    rec.onend = () => {
+      if (mode === "continuous") {
+        if (active && cb) {
+          // Chrome ends recognition after silence — auto-restart while the mode is on
+          restartT = setTimeout(() => {
+            if (!active || !cb) return;
+            try { rec.start(); }
+            catch {
+              try { build(); rec.start(); }
+              catch (e) { active = false; cb && cb.onError("Couldn’t restart the microphone: " + e.message, true); }
+            }
+          }, 250);
+        }
+      } else {
+        if (!cb) return;
+        const text = (finals + " " + interim).trim();
+        const done = cb.onFinal; cb = null; active = false;
+        done(text);
+      }
+    };
+  }
+
+  return {
+    id: "webspeech",
+    label: "Browser (Web Speech API)",
+    available: () => !!SR,
+    start({ lang, mode: m = "ptt", onInterim, onFinal, onError }) {
+      if (!SR) { onError("Speech recognition is not available in this browser.", true); return; }
+      this.abort(); // safety: never two recognizers
+      cb = { onInterim, onFinal, onError };
+      mode = m; curLang = lang || "en-US";
+      finals = ""; interim = ""; active = true;
+      build();
+      try { rec.start(); }
+      catch (e) { active = false; const c = cb; cb = null; c.onError("Couldn’t start the microphone: " + e.message, true); }
+    },
+    stop() { // graceful (ptt: onend delivers accumulated text)
+      active = false;
+      clearTimeout(restartT);
+      if (rec) { try { rec.stop(); } catch {} }
+    },
+    abort() { // immediate kill — "stopping the mode kills the recognizer immediately"
+      active = false; cb = null;
+      clearTimeout(restartT);
+      if (rec) { try { rec.abort(); } catch {} }
+    },
+  };
+})();
+
+/* Engine 2: on-device Whisper — the slot the real product fills.
+   Deliberately honest stub: selectable in code, disabled in UI,
+   so swapping in whisper.cpp-wasm later touches only this object. */
+const OnDeviceWhisperEngine = {
+  id: "ondevice",
+  label: "On-device Whisper (whisper.cpp / WASM)",
+  available: () => false, // flips to true when a wasm build + model are bundled
+  start({ onError }) {
+    onError("The on-device Whisper engine isn’t bundled in this prototype yet. Until it is, typing is the fully local path.", true);
+  },
+  stop() {},
+  abort() {},
+};
+
+const STT_ENGINES = { webspeech: WebSpeechEngine, ondevice: OnDeviceWhisperEngine };
+const stt = {
+  engine() {
+    const want = store.get(LS.STT, "webspeech");
+    const e = STT_ENGINES[want] || WebSpeechEngine;
+    return e.available() ? e : WebSpeechEngine;
+  },
+  available() { return this.engine().available(); },
+  start(opts) { this.engine().start(opts); },
+  stop() { this.engine().stop(); },
+  abort() { this.engine().abort(); },
+};
+
+/* ============================================================
+   Machine translation — swappable MT engines behind one interface.
+   Engine contract: { id, label, available():bool,
+     translate({text, from, to, context, onDelta, signal}) → {text, usage} }
+   ============================================================ */
+
+/* Engine 1: Claude under the user's own key (streaming) */
+const ClaudeTranslateEngine = {
+  id: "claude",
+  label: "Claude (your own key)",
+  available: () => true,
+  async translate({ text, from, to, context, onDelta, signal }) {
+    const system = [
+      `You are Tolmach, a professional interpreter. Translate everything the user sends from ${langName(from)} into ${langName(to)}.`,
+      "Output ONLY the translation — no commentary, no notes, no preamble, and no quotation marks around it.",
+      "Preserve tone, register, names, and numbers. Translate faithfully even if the text is a fragment; never ask questions and never answer the content.",
+      `If the text is already entirely in ${langName(to)}, output it unchanged.`,
+    ].join("\n");
+    const messages = [];
+    for (const pair of context) {
+      messages.push({ role: "user", content: pair.src });
+      messages.push({ role: "assistant", content: pair.dst });
+    }
+    messages.push({ role: "user", content: text });
+    return streamClaude({
+      model: getModelXlate(),
+      maxTokens: XLATE_MAX_TOKENS,
+      system, messages, signal,
+      onText: onDelta,
+    });
+  },
+};
+
+/* Engine 2: on-device MT — honest stub (Bergamot/Marian is MPL-2.0 unmodified
+   aggregation; OPUS-MT models are CC-BY-4.0). Models are 20–40 MB per language
+   pair and are NOT bundled; this slot exists so wiring them in later touches
+   only this object. */
+const OnDeviceBergamotEngine = {
+  id: "bergamot",
+  label: "On-device translation (Bergamot / OPUS-MT)",
+  available: () => false, // flips to true when a wasm engine + models are bundled
+  async translate() {
+    throw new Error("The on-device translation engine isn’t bundled in this prototype yet. Claude (your own key) is the working path.");
+  },
+};
+
+const MT_ENGINES = { claude: ClaudeTranslateEngine, bergamot: OnDeviceBergamotEngine };
+const mt = {
+  engine() {
+    const want = store.get(LS.MT, "claude");
+    const e = MT_ENGINES[want] || ClaudeTranslateEngine;
+    return e.available() ? e : ClaudeTranslateEngine;
+  },
+};
+
+/* On-device speaker diarization — honest stub. The browser platform cannot
+   identify voices; until a WASM diarization engine (e.g. sherpa-onnx,
+   Apache-2.0) is bundled, speaker labels are manual taps or content-inference
+   marked "(inferred)". */
+const DiarizationEngine = {
+  id: "diarization",
+  label: "On-device speaker diarization",
+  available: () => false,
+};
+
+/* ============================================================
+   INTERPRET — consecutive interpretation desk
+   ============================================================ */
+let xQueue = [];          // pending exchange jobs
+let xBusy = false;        // an exchange is translating
+let xAbort = null;
+let listenOn = false;     // continuous Listen mode (A → B)
+let pttSide = null;       // "A" | "B" while holding
+const xCtx = {};          // rolling context per direction: {"en-US>es-ES": [{src,dst}]}
+const xLog = [];          // saved transcript entries {from,to,src,dst,at}
+
+function ctxFor(from, to) {
+  const k = from + ">" + to;
+  if (!xCtx[k]) xCtx[k] = [];
+  return xCtx[k];
+}
+function pushCtx(from, to, src, dst) {
+  const c = ctxFor(from, to);
+  c.push({ src, dst });
+  while (c.length > CTX_PAIRS) c.shift();
+}
+
+function addExchangeRow(from, to, srcText) {
+  el.xEmpty.style.display = "none";
+  const li = document.createElement("li");
+  li.className = "xrow";
+  const src = document.createElement("div");
+  src.className = "xcell src";
+  const srcLang = document.createElement("div");
+  srcLang.className = "xlang";
+  srcLang.textContent = langName(from);
+  const srcT = document.createElement("div");
+  srcT.className = "xtext";
+  srcT.textContent = srcText;
+  src.append(srcLang, srcT);
+
+  const dst = document.createElement("div");
+  dst.className = "xcell dst";
+  const dstLang = document.createElement("div");
+  dstLang.className = "xlang";
+  const dstName = document.createElement("span");
+  dstName.textContent = langName(to);
+  const lag = document.createElement("span");
+  lag.className = "lag";
+  lag.textContent = "…";
+  dstLang.append(dstName, lag);
+  const dstT = document.createElement("div");
+  dstT.className = "xtext streaming";
+  dst.append(dstLang, dstT);
+
+  li.append(src, dst);
+  el.xlist.appendChild(li);
+  li.scrollIntoView({ block: "end", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  return { li, dstT, lag };
+}
+
+function enqueueExchange(job) { // {text, from, to}
+  if (!getKey()) { openSettings(); return; }
+  xQueue.push(job);
+  processXQueue();
+}
+
+async function processXQueue() {
+  if (xBusy || xQueue.length === 0) return;
+  xBusy = true;
+  syncStopX();
+  const job = xQueue.shift();
+  const { text, from, to } = job;
+  const row = addExchangeRow(from, to, text);
+  const t0 = performance.now();
+  let firstTokenMs = null;
+  let out = "";
+  if (!listenOn && !pttSide) setState("translating");
+  xAbort = new AbortController();
+
+  try {
+    const res = await mt.engine().translate({
+      text, from, to,
+      context: ctxFor(from, to),
+      signal: xAbort.signal,
+      onDelta: (delta) => {
+        if (firstTokenMs === null) {
+          firstTokenMs = performance.now() - t0;
+          row.lag.textContent = (firstTokenMs / 1000).toFixed(1) + " s lag";
+        }
+        out += delta;
+        row.dstT.textContent = out;
+      },
+    });
+    out = res.text || out;
+    row.dstT.textContent = out || "(no translation)";
+    row.dstT.classList.remove("streaming");
+    if (res.usage) cost.add(getModelXlate(), res.usage);
+    if (out.trim()) {
+      pushCtx(from, to, text, out.trim());
+      xLog.push({ from, to, src: text, dst: out.trim(), at: new Date().toISOString() });
+      tts.speak(out, to);
+    }
+  } catch (err) {
+    row.dstT.classList.remove("streaming");
+    if (err.name === "AbortError") {
+      row.dstT.textContent = out ? out + " …(stopped)" : "(stopped)";
+    } else {
+      row.dstT.textContent = out || "";
+      const note = document.createElement("div");
+      note.className = "xerr";
+      note.textContent = friendlyError(err);
+      row.li.querySelector(".xcell.dst").appendChild(note);
+      setXStatus(escapeHtml(friendlyError(err)), "err");
+      setTimeout(idleXStatus, 6000);
+    }
+  } finally {
+    xBusy = false;
+    xAbort = null;
+    if (!listenOn && !pttSide) setState(ttsSpeaking ? "speaking" : "idle");
+    syncStopX();
+    processXQueue();
+  }
+}
+
+function stopInterpret() {
+  xQueue = [];
+  if (xAbort) xAbort.abort();
+  tts.stop();
+  syncStopX();
+}
+function syncStopX() {
+  el.btnStopX.disabled = !xBusy && xQueue.length === 0 && !ttsSpeaking && ttsQueue.length === 0;
+}
+setInterval(syncStopX, 400);
+
+/* ---------- push-to-talk sides ---------- */
+function pttStart(side) {
+  if (pttSide || listenOn) return;
+  if (!getKey()) { openSettings(); return; }
+  if (!stt.available()) {
+    setXStatus("Voice input isn’t available here — type below instead (it’s the most private path).", "err");
+    setTimeout(idleXStatus, 5000);
+    return;
+  }
+  pttSide = side;
+  tts.stop(); // barge-in
+  const from = side === "A" ? getLangA() : getLangB();
+  const to   = side === "A" ? getLangB() : getLangA();
+  (side === "A" ? el.pttA : el.pttB).classList.add("hot");
+  setState("listening");
+  setMic(true, "MIC LIVE — HOLD TO TALK");
+  setXStatus(`Listening in ${escapeHtml(langName(from))}… release to translate into ${escapeHtml(langName(to))}.`, "live");
+  stt.start({
+    lang: from,
+    mode: "ptt",
+    onInterim: (text) => { if (pttSide) setXStatus(escapeHtml(text) || "Listening… release to translate.", "live"); },
+    onFinal: (text) => {
+      pttEndUI();
+      if (text) { enqueueExchange({ text, from, to }); setXStatus(""); }
+      else { setXStatus("Didn’t catch that — hold and try again, or type below.", "err"); setTimeout(idleXStatus, 3500); }
+    },
+    onError: (msg) => {
+      pttEndUI();
+      setXStatus(escapeHtml(msg), "err");
+      setTimeout(idleXStatus, 5000);
+    },
+  });
+}
+function pttEndUI() {
+  pttSide = null;
+  el.pttA.classList.remove("hot");
+  el.pttB.classList.remove("hot");
+  if (!listenOn && !meeting.micOn) setMic(false);
+  if (!xBusy) setState("idle");
+}
+function pttStop() {
+  if (!pttSide) return;
+  setXStatus("…");
+  stt.stop(); // onFinal fires from engine's end event
+}
+
+function bindPtt(btn, side) {
+  btn.addEventListener("pointerdown", (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); pttStart(side); });
+  btn.addEventListener("pointerup", () => pttStop());
+  btn.addEventListener("pointercancel", () => pttStop());
+  btn.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); pttStart(side); } });
+  btn.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); pttStop(); } });
+}
+bindPtt(el.pttA, "A");
+bindPtt(el.pttB, "B");
+window.addEventListener("blur", () => { if (pttSide) pttStop(); }); // never leave a held mic hot
+
+/* ---------- Listen mode — continuous A → B ---------- */
+function toggleListen() {
+  if (listenOn) { endListen(); return; }
+  if (pttSide) return;
+  if (!getKey()) { openSettings(); return; }
+  if (!stt.available()) {
+    setXStatus("Voice input isn’t available here — type below instead.", "err");
+    setTimeout(idleXStatus, 5000);
+    return;
+  }
+  listenOn = true;
+  el.btnListen.classList.add("listening-on");
+  el.btnListen.setAttribute("aria-pressed", "true");
+  setState("listening");
+  setMic(true, "MIC LIVE — CONTINUOUS CAPTURE (LISTEN MODE)");
+  setXStatus(`Listen mode: continuously interpreting ${escapeHtml(langName(getLangA()))} → ${escapeHtml(langName(getLangB()))}. The mic stays hot until you toggle it off.`, "live");
+  stt.start({
+    lang: getLangA(),
+    mode: "continuous",
+    onInterim: () => {},
+    onFinal: (segment) => {
+      if (listenOn && segment) enqueueExchange({ text: segment, from: getLangA(), to: getLangB() });
+    },
+    onError: (msg, fatal) => {
+      setXStatus(escapeHtml(msg), "err");
+      if (fatal) { endListen(); setTimeout(idleXStatus, 6000); }
+    },
+  });
+}
+function endListen() {
+  listenOn = false;
+  stt.abort(); // stopping the mode kills the recognizer immediately
+  el.btnListen.classList.remove("listening-on");
+  el.btnListen.setAttribute("aria-pressed", "false");
+  if (!meeting.micOn) setMic(false);
+  setState(xBusy ? "translating" : "idle");
+  idleXStatus();
+}
+el.btnListen.addEventListener("click", toggleListen);
+el.btnStopX.addEventListener("click", stopInterpret);
+
+/* ---------- typed translation path (fully local input) ---------- */
+let xDir = "AB";
+function syncDirBtn() {
+  const a = langShort(getLangA()), b = langShort(getLangB());
+  el.btnDir.textContent = xDir === "AB" ? `${a}→${b}` : `${b}→${a}`;
+  el.btnDir.title = xDir === "AB"
+    ? `Typed text: ${langName(getLangA())} → ${langName(getLangB())}`
+    : `Typed text: ${langName(getLangB())} → ${langName(getLangA())}`;
+}
+el.btnDir.addEventListener("click", () => { xDir = xDir === "AB" ? "BA" : "AB"; syncDirBtn(); });
+el.xComposer.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = el.xInput.value.trim();
+  if (!text) return;
+  el.xInput.value = "";
+  const from = xDir === "AB" ? getLangA() : getLangB();
+  const to   = xDir === "AB" ? getLangB() : getLangA();
+  enqueueExchange({ text, from, to });
+});
+
+/* ---------- language pickers ---------- */
+function fillLangSelect(sel, saved) {
+  sel.innerHTML = "";
+  for (const [code, name] of LANGS) {
+    const o = new Option(`${name} (${code})`, code);
+    if (code === saved) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+function syncLangUI() {
+  el.pttALang.textContent = langName(getLangA());
+  el.pttBLang.textContent = langName(getLangB());
+  el.pttATarget.textContent = langName(getLangB());
+  el.pttBTarget.textContent = langName(getLangA());
+  syncDirBtn();
+}
+el.langA.addEventListener("change", () => { store.set(LS.LANG_A, el.langA.value); syncLangUI(); });
+el.langB.addEventListener("change", () => { store.set(LS.LANG_B, el.langB.value); syncLangUI(); });
+el.btnSwap.addEventListener("click", () => {
+  const a = getLangA(), b = getLangB();
+  store.set(LS.LANG_A, b); store.set(LS.LANG_B, a);
+  el.langA.value = b; el.langB.value = a;
+  syncLangUI();
+});
+
+function interpretTranscriptMarkdown() {
+  const lines = [`# Interpretation session — ${new Date().toLocaleString()}`, ""];
+  for (const x of xLog) {
+    lines.push(`**${langName(x.from)}:** ${x.src}`);
+    lines.push(`**${langName(x.to)}:** ${x.dst}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/* ============================================================
+   MINUTES — stenographic meeting notes
+   ============================================================ */
+const MINUTES_SYSTEM = [
+  "You are Tolmach’s minutes secretary — court-stenographer register: terse, factual, complete.",
+  "You maintain the running minutes of a live meeting. Each request gives you the CURRENT MINUTES (possibly “(none yet)”) and NEW SEGMENTS — timestamped transcript lines, some tagged with a speaker name in parentheses.",
+  "Respond with the FULL updated minutes and nothing else, in exactly this Markdown schema:",
+  "",
+  "# <short descriptive meeting title>",
+  "**Attendees (as heard):** <names actually heard or tagged, or “unknown”>",
+  "",
+  "## Topics",
+  "- terse notes per topic",
+  "",
+  "## Decisions",
+  "- decisions actually made (write “- none yet” if none)",
+  "",
+  "## Action items",
+  "- [ ] action — owner: <name or unattributed>, due: <only if explicitly stated>",
+  "",
+  "## Open questions",
+  "- unresolved questions raised",
+  "",
+  "## Notable quotes",
+  "> “short verbatim quote” — speaker",
+  "",
+  "Hard rules:",
+  "- Never invent facts, names, decisions, owners, or dates that are not in the transcript.",
+  "- Speaker attribution: use a name only when the segment is explicitly tagged with it, or when the content makes it unmistakable — and mark every content-inferred attribution “(inferred)”. Otherwise write “unattributed”. The browser cannot identify voices; do not pretend otherwise.",
+  "- Keep the minutes bounded: condense older material instead of growing without limit. Preserve every schema heading even when its section is empty.",
+  "- Transcript segments come from speech recognition and may contain mis-hearings; prefer conservative wording where the transcript is garbled.",
+].join("\n");
+
+const meeting = {
+  active: false,
+  micOn: false,
+  startedAt: 0,
+  segments: [],       // {t: ms-since-start, speaker, text, typed}
+  pending: [],        // segments not yet folded into the minutes
+  minutes: "",        // current structured minutes (markdown)
+  speakers: [],
+  activeSpeaker: null,
+  busy: false,        // a minutes update is in flight
+  abort: null,
+  tick: null,
+  lastUpdate: 0,
+};
+
+function meetingElapsed() { return meeting.active ? Date.now() - meeting.startedAt : 0; }
+
+function addSegment(text, typed) {
+  const seg = {
+    t: meetingElapsed(),
+    speaker: meeting.activeSpeaker,
+    text: text.trim(),
+    typed: !!typed,
+  };
+  if (!seg.text) return;
+  meeting.segments.push(seg);
+  meeting.pending.push(seg);
+  renderSegment(seg);
+}
+function renderSegment(seg) {
+  const d = document.createElement("div");
+  d.className = "seg";
+  const ts = document.createElement("span");
+  ts.className = "ts";
+  ts.textContent = "[" + fmtClock(seg.t) + "] ";
+  d.appendChild(ts);
+  if (seg.speaker) {
+    const s = document.createElement("span");
+    s.className = "spk";
+    s.textContent = seg.speaker + ": ";
+    d.appendChild(s);
+  }
+  if (seg.typed) {
+    const t = document.createElement("span");
+    t.className = "typed-tag";
+    t.textContent = "(typed) ";
+    d.appendChild(t);
+  }
+  d.appendChild(document.createTextNode(seg.text));
+  const interim = el.steno.querySelector(".interim");
+  if (interim) el.steno.insertBefore(d, interim);
+  else el.steno.appendChild(d);
+  el.steno.scrollTop = el.steno.scrollHeight;
+}
+function renderInterim(text) {
+  let node = el.steno.querySelector(".interim");
+  if (!text) { if (node) node.remove(); return; }
+  if (!node) {
+    node = document.createElement("div");
+    node.className = "seg interim";
+    el.steno.appendChild(node);
+  }
+  node.textContent = "… " + text;
+  el.steno.scrollTop = el.steno.scrollHeight;
+}
+
+/* speakers */
+function renderSpeakers() {
+  el.spkChips.innerHTML = "";
+  for (const name of meeting.speakers) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "spk-chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", String(meeting.activeSpeaker === name));
+    b.addEventListener("click", () => {
+      meeting.activeSpeaker = meeting.activeSpeaker === name ? null : name;
+      renderSpeakers();
+    });
+    el.spkChips.appendChild(b);
+  }
+}
+el.spkForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = el.spkName.value.trim();
+  if (!name || meeting.speakers.includes(name)) { el.spkName.value = ""; return; }
+  meeting.speakers.push(name);
+  meeting.activeSpeaker = name;
+  el.spkName.value = "";
+  renderSpeakers();
+});
+
+/* meeting lifecycle */
+function startMeeting() {
+  if (meeting.active) return;
+  if (!getKey()) { openSettings(); return; }
+  meeting.active = true;
+  meeting.startedAt = Date.now();
+  meeting.segments = [];
+  meeting.pending = [];
+  meeting.minutes = "";
+  meeting.lastUpdate = Date.now();
+  el.steno.innerHTML = "";
+  el.minutesOut.innerHTML = '<p class="m-empty">Listening. Minutes will appear after the first update (~2 minutes in, or press “Update minutes now”).</p>';
+  el.btnMeeting.textContent = "End meeting";
+  el.btnUpdateNow.disabled = false;
+  el.mInput.disabled = false;
+  el.btnMSend.disabled = false;
+  el.btnMCopy.disabled = true;
+  el.btnMDownload.disabled = true;
+  el.btnMSave.disabled = true;
+  setState("minuting");
+
+  if (stt.available()) {
+    meeting.micOn = true;
+    setMic(true, "MIC LIVE — CONTINUOUS CAPTURE (MINUTES)");
+    setMStatus("Meeting running — the microphone is continuously hot until you end the meeting. Tap a speaker chip to tag who’s talking.", "live");
+    stt.start({
+      lang: getLangA(),
+      mode: "continuous",
+      onInterim: (text) => renderInterim(text),
+      onFinal: (segment) => { if (meeting.active) { renderInterim(""); addSegment(segment, false); } },
+      onError: (msg, fatal) => {
+        setMStatus(escapeHtml(msg), "err");
+        if (fatal) {
+          meeting.micOn = false;
+          setMic(false);
+          setTimeout(() => { if (meeting.active) setMStatus("Mic unavailable — the meeting continues on typed notes only.", "err"); }, 5000);
+        }
+      },
+    });
+  } else {
+    meeting.micOn = false;
+    setMStatus("No speech recognition in this browser — meeting running on typed notes only (fully local capture).");
+  }
+
+  meeting.tick = setInterval(() => {
+    el.mElapsed.textContent = fmtClock(meetingElapsed());
+    if (meeting.active && !meeting.busy &&
+        meeting.pending.length >= MINUTES_MIN_SEGMENTS &&
+        Date.now() - meeting.lastUpdate >= MINUTES_INTERVAL_MS) {
+      updateMinutes(false);
+    }
+  }, 1000);
+}
+
+async function endMeeting() {
+  if (!meeting.active) return;
+  meeting.active = false;
+  if (meeting.micOn) { stt.abort(); meeting.micOn = false; }
+  setMic(false);
+  renderInterim("");
+  clearInterval(meeting.tick);
+  meeting.tick = null;
+  el.btnMeeting.textContent = "Start meeting";
+  el.btnUpdateNow.disabled = true;
+  el.mInput.disabled = true;
+  el.btnMSend.disabled = true;
+  setState("idle");
+  if (meeting.segments.length || meeting.minutes) {
+    setMStatus("Meeting ended — producing the final minutes…");
+    await updateMinutes(true);
+    setMStatus("Final minutes ready. Copy, download, or save them to the encrypted vault.");
+  } else {
+    setMStatus("Meeting ended — nothing was said or typed, so there are no minutes.");
+  }
+  el.btnMCopy.disabled = !meeting.minutes;
+  el.btnMDownload.disabled = !meeting.minutes;
+  el.btnMSave.disabled = !meeting.minutes;
+}
+
+el.btnMeeting.addEventListener("click", () => { if (meeting.active) endMeeting(); else startMeeting(); });
+el.btnUpdateNow.addEventListener("click", () => { if (meeting.active && !meeting.busy) updateMinutes(false); });
+
+function segmentsBlock(segs) {
+  return segs.map(s =>
+    "[" + fmtClock(s.t) + "]" +
+    (s.speaker ? " (" + s.speaker + ")" : "") +
+    (s.typed ? " (typed note)" : "") +
+    " " + s.text
+  ).join("\n");
+}
+
+async function updateMinutes(finalPass) {
+  if (meeting.busy) return;
+  const batch = meeting.pending.splice(0, meeting.pending.length);
+  if (!batch.length && !finalPass) return;
+  if (!batch.length && finalPass && !meeting.minutes) return;
+  meeting.busy = true;
+  meeting.abort = new AbortController();
+  el.mUpdating.textContent = finalPass ? "final pass…" : "updating…";
+  el.btnUpdateNow.disabled = true;
+
+  const known = meeting.speakers.length
+    ? "Known speakers (manually tagged by the user): " + meeting.speakers.join(", ") + "."
+    : "No speakers have been manually tagged.";
+  const userContent = [
+    finalPass
+      ? "The meeting has ENDED. Produce the final, polished minutes — complete, terse, publication-ready."
+      : "The meeting is in progress. Fold the new segments into the minutes.",
+    known,
+    "",
+    "CURRENT MINUTES:",
+    meeting.minutes || "(none yet)",
+    "",
+    "NEW SEGMENTS:",
+    batch.length ? segmentsBlock(batch) : "(no new segments)",
+  ].join("\n");
+
+  let out = "";
+  try {
+    const res = await streamClaude({
+      model: getModelNotes(),
+      maxTokens: finalPass ? NOTES_FINAL_MAX_TOKENS : NOTES_MAX_TOKENS,
+      system: MINUTES_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      signal: meeting.abort.signal,
+      onText: (delta) => {
+        out += delta;
+        el.minutesOut.innerHTML = renderMarkdown(out);
+      },
+    });
+    meeting.minutes = (res.text || out).trim();
+    el.minutesOut.innerHTML = renderMarkdown(meeting.minutes);
+    if (res.usage) cost.add(getModelNotes(), res.usage);
+    meeting.lastUpdate = Date.now();
+    el.btnMCopy.disabled = false;
+    el.btnMDownload.disabled = false;
+    el.btnMSave.disabled = false;
+  } catch (err) {
+    // put the batch back so no transcript is lost
+    meeting.pending = batch.concat(meeting.pending);
+    if (err.name !== "AbortError") {
+      setMStatus(escapeHtml(friendlyError(err)), "err");
+      setTimeout(() => { if (meeting.active) setMStatus("Meeting still running — will retry the minutes update.", "live"); }, 6000);
+    }
+    if (meeting.minutes) el.minutesOut.innerHTML = renderMarkdown(meeting.minutes);
+  } finally {
+    meeting.busy = false;
+    meeting.abort = null;
+    el.mUpdating.textContent = "";
+    el.btnUpdateNow.disabled = !meeting.active;
+  }
+}
+
+/* typed note path */
+el.mComposer.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = el.mInput.value.trim();
+  if (!text || !meeting.active) return;
+  el.mInput.value = "";
+  addSegment(text, true);
+});
+
+/* minutes deliverable */
+function minutesMarkdown() {
+  const head = meeting.minutes || "# Minutes";
+  const raw = meeting.segments.length
+    ? "\n\n---\n\n## Raw transcript (steno)\n\n```\n" + segmentsBlock(meeting.segments) + "\n```\n" +
+      "\n*Speaker labels are manual or `(inferred)` — the browser cannot identify voices. Transcript from speech recognition; may contain mis-hearings.*\n"
+    : "";
+  return head + raw;
+}
+function minutesTitle() {
+  const m = (meeting.minutes || "").match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : "Minutes — " + new Date().toLocaleString();
+}
+el.btnMCopy.addEventListener("click", async () => {
+  const ok = await copyText(minutesMarkdown());
+  setMStatus(ok ? "Minutes copied to the clipboard." : "Couldn’t access the clipboard — use Download instead.", ok ? null : "err");
+});
+el.btnMDownload.addEventListener("click", () => {
+  downloadText("tolmach-minutes-" + new Date().toISOString().slice(0, 10) + ".md", minutesMarkdown(), "text/markdown");
+});
+el.btnMSave.addEventListener("click", async () => {
+  await saveToVaultFlow("minutes", minutesTitle(), minutesMarkdown());
+});
+
+/* minimal markdown renderer (input is escaped first — output is safe) */
+function renderMarkdown(md) {
+  const out = [];
+  let inList = false, inQuote = false;
+  const closeAll = () => {
+    if (inList) { out.push("</ul>"); inList = false; }
+    if (inQuote) { out.push("</blockquote>"); inQuote = false; }
+  };
+  const inline = (s) => s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+  for (const raw of escapeHtml(md).split("\n")) {
+    const line = raw.replace(/\s+$/, "");
+    if (/^###\s+/.test(line))      { closeAll(); out.push("<h3>" + inline(line.replace(/^###\s+/, "")) + "</h3>"); }
+    else if (/^##\s+/.test(line))  { closeAll(); out.push("<h2>" + inline(line.replace(/^##\s+/, "")) + "</h2>"); }
+    else if (/^#\s+/.test(line))   { closeAll(); out.push("<h1>" + inline(line.replace(/^#\s+/, "")) + "</h1>"); }
+    else if (/^&gt;\s?/.test(line)) {
+      if (!inQuote) { if (inList) { out.push("</ul>"); inList = false; } out.push("<blockquote>"); inQuote = true; }
+      out.push("<p>" + inline(line.replace(/^&gt;\s?/, "")) + "</p>");
+    }
+    else if (/^[-*]\s+/.test(line)) {
+      if (inQuote) { out.push("</blockquote>"); inQuote = false; }
+      if (!inList) { out.push("<ul>"); inList = true; }
+      out.push("<li>" + inline(line.replace(/^[-*]\s+/, "")) + "</li>");
+    }
+    else if (!line.trim()) { closeAll(); }
+    else { closeAll(); out.push("<p>" + inline(line) + "</p>"); }
+  }
+  closeAll();
+  return out.join("");
+}
+
+/* ============================================================
+   VAULT — WebCrypto AES-256-GCM · PBKDF2-SHA-256 × 600,000
+   Zero dependencies. Ciphertext at rest in IndexedDB.
+   ============================================================ */
+const VAULT_DB = "tolmach-vault";
+const VAULT_V = 1;
+const KDF_ID = "PBKDF2-SHA256/600000";   // stored in the header so a future
+const KDF_ITER = 600000;                 // Argon2id upgrade is a versioned
+                                         // migration, not a redesign. PBKDF2 was
+                                         // chosen because WebCrypto ships it
+                                         // natively — zero dependencies; Argon2id
+                                         // would require a WASM dependency.
+const VERIFIER_PLAINTEXT = "tolmach-vault-check";
+const te = new TextEncoder();
+const td = new TextDecoder();
+
+function b64(buf) {
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function unb64(s) {
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/* The ONE postern-sdk wiring seam (globalThis.PosternSDK): when a Postern host
+   shell has installed the wasm core, records are sealed with the REAL
+   Argon2id(64 MiB, t=3) + XChaCha20-Poly1305 from postern-core — killing
+   stand-in S2. In a plain browser tab (this page's strict CSP forbids fetching
+   wasm) the seam is absent and we keep the honest classical stand-in:
+   PBKDF2-SHA-256 (600,000 it.) → AES-256-GCM. Never silently weaker — meta.kdf
+   and each cipher carry the primitive that produced them, and a real-sealed
+   vault refuses to open without the core (fail-closed). */
+const VSDK = {
+  get() { return (globalThis.PosternSDK && globalThis.PosternSDK.__postern) ? globalThis.PosternSDK : null; },
+  real() { const s = this.get(); return !!(s && s.kdf && s.kdf.available); },
+};
+const KDF_REAL = "Argon2id-postern-sdk";   // meta.kdf tag for real-core vaults
+
+/* Derive an at-rest key wrapper: { real, key, label }. `useReal` picks the
+   primitive — VSDK.real() when sealing fresh, or the vault's own meta tag when
+   opening, so the key type always matches the ciphertext. */
+async function deriveVaultKey(passphrase, saltBytes, iterations, useReal) {
+  if (useReal) {
+    const s = VSDK.get();
+    return { real: true, label: (s.kdf.label || "Argon2id"), key: s.kdf.deriveKey(te.encode(passphrase), saltBytes) };
+  }
+  const base = await crypto.subtle.importKey("raw", te.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,                      // non-extractable: the key can't be exported from memory
+    ["encrypt", "decrypt"],
+  );
+  return { real: false, key };
+}
+/* Seal → a self-describing cipher object tagged with the AEAD used. */
+async function aeadEncrypt(keyWrap, plaintext, aad) {
+  if (keyWrap.real) {
+    const blob = VSDK.get().kdf.seal(keyWrap.key, te.encode(aad), te.encode(plaintext));
+    return { algo: "XChaCha20-Poly1305", blob: b64(blob) };
+  }
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // fresh IV per record, always
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: te.encode(aad) },
+    keyWrap.key, te.encode(plaintext),
+  );
+  return { algo: "AES-256-GCM", iv: b64(iv), ct: b64(ct) };
+}
+/* Normalize a stored cipher: new tagged object, an object carrying a cipher, or
+   a legacy record with top-level {iv, ct} (untagged = AES-256-GCM). */
+function cipherOf(o) {
+  if (!o) return null;
+  if (o.cipher) return o.cipher;
+  if (o.algo) return o;
+  if (o.iv && o.ct) return { algo: "AES-256-GCM", iv: o.iv, ct: o.ct };
+  return null;
+}
+/* Open a cipher; dispatch on its stored algo. Throws on auth failure (zero
+   partial plaintext) or if a real-sealed blob is opened without the core. */
+async function aeadDecrypt(keyWrap, cipher, aad) {
+  const c = cipherOf(cipher);
+  if (!c) throw new Error("no ciphertext");
+  if (c.algo === "XChaCha20-Poly1305") {
+    if (!keyWrap.real) throw new Error("sealed with the real postern-sdk core — open it in the Postern shell");
+    return td.decode(VSDK.get().kdf.open(keyWrap.key, te.encode(aad), unb64(c.blob)));
+  }
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: unb64(c.iv), additionalData: te.encode(aad) },
+    keyWrap.key, unb64(c.ct),
+  );
+  return td.decode(pt); // throws OperationError on auth failure — zero partial plaintext
+}
+
+/* IndexedDB plumbing */
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(VAULT_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+      if (!db.objectStoreNames.contains("records")) db.createObjectStore("records", { keyPath: "id" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("Vault database is blocked by another tab."));
+  });
+}
+function idbReq(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbRun(storeName, modeRW, fn) {
+  const db = await idbOpen();
+  try {
+    const tx = db.transaction(storeName, modeRW);
+    const result = await fn(tx.objectStore(storeName));
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("transaction aborted"));
+    });
+    return result;
+  } finally { db.close(); }
+}
+function idbDeleteDatabase() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(VAULT_DB);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => resolve(); // best effort; will complete when other tabs close
+  });
+}
+
+const vault = {
+  key: null,        // non-extractable CryptoKey, memory only while unlocked
+  meta: null,
+  persistGranted: null,
+  unlocked() { return !!this.key; },
+
+  async loadMeta() {
+    try {
+      this.meta = (await idbRun("meta", "readonly", s => idbReq(s.get("meta")))) || null;
+    } catch { this.meta = null; }
+    return this.meta;
+  },
+
+  async create(passphrase) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const useReal = VSDK.real();
+    const key = await deriveVaultKey(passphrase, salt, KDF_ITER, useReal);
+    const verifier = await aeadEncrypt(key, VERIFIER_PLAINTEXT, "meta|" + VAULT_V);
+    const meta = { v: VAULT_V, kdf: useReal ? KDF_REAL : KDF_ID, iter: KDF_ITER, salt: b64(salt), label: key.label, verifier, createdAt: new Date().toISOString() };
+    await idbRun("meta", "readwrite", s => idbReq(s.put(meta, "meta")));
+    this.meta = meta;
+    this.key = key;
+    // ask the browser not to evict the origin's storage; surface the answer honestly
+    if (navigator.storage && navigator.storage.persist) {
+      try { this.persistGranted = await navigator.storage.persist(); } catch { this.persistGranted = null; }
+    }
+    bumpAutoLock();
+  },
+
+  async unlockWith(passphrase, meta) {
+    const wantReal = meta.kdf === KDF_REAL;
+    if (wantReal && !VSDK.real()) throw new Error("This vault was sealed by the real postern-sdk core, which isn't loaded here — open it inside the Postern host shell.");
+    const key = await deriveVaultKey(passphrase, unb64(meta.salt), meta.iter || KDF_ITER, wantReal);
+    const check = await aeadDecrypt(key, meta.verifier, "meta|" + meta.v);
+    if (check !== VERIFIER_PLAINTEXT) throw new Error("verifier mismatch");
+    return key;
+  },
+  async unlock(passphrase) {
+    if (!this.meta) throw new Error("no vault");
+    this.key = await this.unlockWith(passphrase, this.meta);
+    bumpAutoLock();
+  },
+
+  lock() { if (this.key && this.key.real && this.key.key) { try { this.key.key.free(); } catch {} } this.key = null; },
+
+  async saveRecord(mode, title, body) {
+    if (!this.unlocked()) throw new Error("vault locked");
+    const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const aad = id + "|" + this.meta.v;   // AAD binds ciphertext to its record id —
+    const payload = JSON.stringify({ title, body, savedAt: new Date().toISOString() });
+    const cipher = await aeadEncrypt(this.key, payload, aad);
+    // title and body live INSIDE the ciphertext; createdAt + mode are the only plaintext fields (disclosed)
+    const rec = { id, cipher, aad, createdAt: new Date().toISOString(), mode };
+    await idbRun("records", "readwrite", s => idbReq(s.put(rec)));
+    return id;
+  },
+
+  async listRecords() {
+    const all = (await idbRun("records", "readonly", s => idbReq(s.getAll()))) || [];
+    all.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    return all;
+  },
+
+  async openRecord(rec) {
+    if (!this.unlocked()) throw new Error("vault locked");
+    const json = await aeadDecrypt(this.key, rec, rec.aad || (rec.id + "|" + this.meta.v));
+    return JSON.parse(json);
+  },
+
+  async deleteRecord(id) {
+    await idbRun("records", "readwrite", s => idbReq(s.delete(id)));
+  },
+
+  async exportVault() {
+    const meta = this.meta || await this.loadMeta();
+    if (!meta) throw new Error("No vault exists to export.");
+    const records = await this.listRecords();
+    return JSON.stringify({ app: "tolmach-vault", v: meta.v, exportedAt: new Date().toISOString(), meta, records }, null, 2);
+  },
+
+  /* Import: verify the file's own verifier with the entered passphrase first.
+     - No local vault → adopt the imported vault wholesale.
+     - Local vault exists → local vault must be unlocked; each imported record
+       is decrypted with the import key and re-encrypted under the local key,
+       merged by id (existing ids are skipped). */
+  async importVault(parsed, passphrase) {
+    if (!parsed || parsed.app !== "tolmach-vault" || !parsed.meta || !Array.isArray(parsed.records)) {
+      throw new Error("That file isn’t a Tolmach vault export.");
+    }
+    let importKey;
+    try { importKey = await this.unlockWith(passphrase, parsed.meta); }
+    catch { const e = new Error("wrong-pass"); e.code = "wrong-pass"; throw e; }
+
+    const localMeta = await this.loadMeta();
+    if (!localMeta) {
+      await idbRun("meta", "readwrite", s => idbReq(s.put(parsed.meta, "meta")));
+      this.meta = parsed.meta;
+      this.key = importKey;
+      let added = 0;
+      for (const rec of parsed.records) {
+        if (!rec || !rec.id || !cipherOf(rec)) continue;
+        await idbRun("records", "readwrite", s => idbReq(s.put(rec)));
+        added++;
+      }
+      bumpAutoLock();
+      return { adopted: true, added, skipped: 0 };
+    }
+
+    if (!this.unlocked()) { const e = new Error("locked"); e.code = "locked"; throw e; }
+    const existing = new Set((await this.listRecords()).map(r => r.id));
+    let added = 0, skipped = 0;
+    for (const rec of parsed.records) {
+      if (!rec || !rec.id || !cipherOf(rec)) { skipped++; continue; }
+      if (existing.has(rec.id)) { skipped++; continue; }
+      const aadIn = rec.aad || (rec.id + "|" + parsed.meta.v);
+      let plaintext;
+      try { plaintext = await aeadDecrypt(importKey, rec, aadIn); }
+      catch { skipped++; continue; } // AAD/auth failure — record doesn't verify; never partially imported
+      const aadOut = rec.id + "|" + this.meta.v;
+      const cipher = await aeadEncrypt(this.key, plaintext, aadOut);
+      await idbRun("records", "readwrite", s =>
+        idbReq(s.put({ id: rec.id, cipher, aad: aadOut, createdAt: rec.createdAt || new Date().toISOString(), mode: rec.mode || "minutes" })));
+      added++;
+    }
+    return { adopted: false, added, skipped };
+  },
+
+  async erase() {
+    this.lock();
+    this.meta = null;
+    await idbDeleteDatabase();
+  },
+};
+
+/* auto-lock: idle timer + page hide */
+let lockTimer = null;
+function bumpAutoLock() {
+  clearTimeout(lockTimer);
+  if (!vault.unlocked()) return;
+  const mins = parseFloat(store.get(LS.AUTOLOCK, "5"));
+  if (!mins || mins <= 0) return;
+  lockTimer = setTimeout(() => {
+    vault.lock();
+    if (el.dlgVault.open) { renderVaultUI(); vMsg("Auto-locked after idle. The decryption key is gone from memory.", "ok"); }
+  }, mins * 60000);
+}
+document.addEventListener("pointerdown", bumpAutoLock, { passive: true });
+document.addEventListener("keydown", bumpAutoLock);
+window.addEventListener("pagehide", () => vault.lock());
+document.addEventListener("visibilitychange", () => { if (document.hidden) vault.lock(); });
+
+/* ---------- vault UI ---------- */
+let openRecId = null;
+let importPending = null;
+
+function vMsg(text, tone) {
+  el.vMsg.textContent = text || "";
+  if (tone) el.vMsg.dataset.tone = tone; else delete el.vMsg.dataset.tone;
+}
+
+async function renderVaultUI() {
+  await vault.loadMeta();
+  const hasVault = !!vault.meta;
+  const unlocked = vault.unlocked();
+
+  el.vCreate.style.display = hasVault ? "none" : "";
+  el.vUnlock.style.display = hasVault && !unlocked ? "" : "none";
+  el.vMain.style.display = hasVault && unlocked ? "" : "none";
+  el.vTransfer.style.display = "";
+  el.recView.style.display = "none";
+  openRecId = null;
+
+  el.vStatus.className = "v-status " + (unlocked ? "unlocked" : hasVault ? "locked" : "");
+  el.vStatusText.textContent = !hasVault
+    ? "no vault in this browser"
+    : unlocked
+      ? "unlocked — key held in memory only; auto-locks on idle and when the page is hidden"
+      : "locked — records are ciphertext at rest (" + ((vault.meta && vault.meta.kdf === KDF_REAL) ? "XChaCha20-Poly1305 · Argon2id, via postern-sdk" : ("AES-256-GCM · " + ((vault.meta && vault.meta.kdf) || KDF_ID))) + ")";
+
+  el.vPersistNote.textContent =
+    vault.persistGranted === true
+      ? "This browser granted persistent storage — the vault is less likely to be evicted. The export file is still the real backup."
+      : "Browsers may evict site storage under disk pressure. Export the vault to a file — that file is the real backup (it is ciphertext only, safe to keep anywhere).";
+
+  if (hasVault && unlocked) {
+    const records = await vault.listRecords();
+    el.vList.innerHTML = "";
+    el.vEmpty.style.display = records.length ? "none" : "";
+    for (const rec of records) {
+      const li = document.createElement("li");
+      const mode = document.createElement("span");
+      mode.className = "v-mode";
+      mode.textContent = rec.mode || "note";
+      const title = document.createElement("span");
+      title.className = "v-title";
+      try {
+        const payload = await vault.openRecord(rec);
+        title.textContent = payload.title || "(untitled)";
+      } catch {
+        title.textContent = "(cannot decrypt — corrupted or foreign record)";
+        title.classList.add("enc");
+      }
+      const date = document.createElement("span");
+      date.className = "v-date";
+      date.textContent = (rec.createdAt || "").slice(0, 10);
+      const open = document.createElement("button");
+      open.className = "hbtn v-open";
+      open.textContent = "open";
+      open.addEventListener("click", () => openRecordView(rec));
+      li.append(mode, title, date, open);
+      el.vList.appendChild(li);
+    }
+  }
+}
+
+async function openRecordView(rec) {
+  try {
+    const payload = await vault.openRecord(rec);
+    openRecId = rec.id;
+    el.recTitle.textContent = payload.title || "(untitled)";
+    el.recBody.textContent = payload.body || "";
+    el.recView.style.display = "";
+    vMsg("");
+  } catch {
+    vMsg("Couldn’t decrypt that record — wrong key or corrupted data. No partial plaintext was produced.", "err");
+  }
+}
+
+el.btnVCreate.addEventListener("click", async () => {
+  const p1 = el.vNewPass.value, p2 = el.vNewPass2.value;
+  if (p1.length < 8) { vMsg("Use at least 8 characters — a long phrase beats a short password.", "err"); return; }
+  if (p1 !== p2) { vMsg("Passphrases don’t match.", "err"); return; }
+  el.btnVCreate.disabled = true;
+  vMsg(VSDK.real() ? "Deriving key with Argon2id (postern-sdk core — a moment)…" : "Deriving key (600,000 PBKDF2 iterations — a moment)…");
+  try {
+    await vault.create(p1);
+    el.vNewPass.value = ""; el.vNewPass2.value = "";
+    await renderVaultUI();
+    vMsg("Vault created and unlocked. Remember: a forgotten passphrase is unrecoverable by design.", "ok");
+  } catch (e) {
+    vMsg("Couldn’t create the vault: " + e.message, "err");
+  } finally { el.btnVCreate.disabled = false; }
+});
+
+el.btnVUnlock.addEventListener("click", async () => {
+  const p = el.vPass.value;
+  if (!p) return;
+  el.btnVUnlock.disabled = true;
+  vMsg("Deriving key…");
+  try {
+    await vault.unlock(p);
+    el.vPass.value = "";
+    await renderVaultUI();
+    vMsg("Unlocked.", "ok");
+  } catch {
+    // GCM auth failure on the verifier — clean error, zero partial plaintext
+    vMsg("Wrong passphrase or corrupted vault. (AEAD can’t tell those apart — that’s by design.)", "err");
+  } finally { el.btnVUnlock.disabled = false; }
+});
+el.vPass.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.btnVUnlock.click(); } });
+
+el.btnVLock.addEventListener("click", async () => {
+  vault.lock();
+  await renderVaultUI();
+  vMsg("Locked. The key is gone from memory; the records remain as ciphertext.", "ok");
+});
+
+el.btnRecClose.addEventListener("click", () => { el.recView.style.display = "none"; openRecId = null; });
+el.btnRecCopy.addEventListener("click", async () => {
+  const ok = await copyText(el.recBody.textContent);
+  vMsg(ok ? "Copied." : "Clipboard unavailable — select and copy manually.", ok ? "ok" : "err");
+});
+el.btnRecDownload.addEventListener("click", () => {
+  const name = (el.recTitle.textContent || "record").replace(/[^\w-]+/g, "-").slice(0, 60);
+  downloadText("tolmach-" + name + ".md", el.recBody.textContent, "text/markdown");
+});
+el.btnRecDelete.addEventListener("click", async () => {
+  if (!openRecId) return;
+  if (!confirm("Delete this record’s ciphertext from the vault? This cannot be undone.")) return;
+  await vault.deleteRecord(openRecId);
+  el.recView.style.display = "none";
+  openRecId = null;
+  await renderVaultUI();
+  vMsg("Record deleted.", "ok");
+});
+
+el.btnVExport.addEventListener("click", async () => {
+  try {
+    const json = await vault.exportVault();
+    downloadText("tolmach-vault-" + new Date().toISOString().slice(0, 10) + ".json", json, "application/json");
+    vMsg("Exported. The file contains ciphertext and KDF parameters only — safe to store anywhere; useless without the passphrase.", "ok");
+  } catch (e) {
+    vMsg(e.message, "err");
+  }
+});
+
+el.btnVImportPick.addEventListener("click", () => el.vImportFile.click());
+el.vImportFile.addEventListener("change", async () => {
+  const file = el.vImportFile.files && el.vImportFile.files[0];
+  el.vImportFile.value = "";
+  if (!file) return;
+  try {
+    importPending = JSON.parse(await file.text());
+    el.vImportForm.style.display = "";
+    el.vImportPass.focus();
+    vMsg("Enter the passphrase that protects the imported file, then confirm.");
+  } catch {
+    importPending = null;
+    vMsg("That file isn’t valid JSON.", "err");
+  }
+});
+el.btnVImportGo.addEventListener("click", async () => {
+  if (!importPending) return;
+  const pass = el.vImportPass.value;
+  if (!pass) { vMsg("Enter the imported vault’s passphrase.", "err"); return; }
+  el.btnVImportGo.disabled = true;
+  vMsg("Verifying the imported vault…");
+  try {
+    const r = await vault.importVault(importPending, pass);
+    el.vImportPass.value = "";
+    el.vImportForm.style.display = "none";
+    importPending = null;
+    await renderVaultUI();
+    vMsg(r.adopted
+      ? `Imported vault adopted (${r.added} records) and unlocked.`
+      : `Merged: ${r.added} added, ${r.skipped} skipped (already present or failed verification).`, "ok");
+  } catch (e) {
+    if (e.code === "wrong-pass") vMsg("Wrong passphrase for that file, or the file is corrupted — nothing was imported.", "err");
+    else if (e.code === "locked") vMsg("Unlock this browser’s vault first — merging re-encrypts imported records under your local key.", "err");
+    else vMsg("Import failed: " + e.message, "err");
+  } finally { el.btnVImportGo.disabled = false; }
+});
+
+el.btnVErase.addEventListener("click", async () => {
+  if (!confirm("Erase the entire vault from this browser? All ciphertext is deleted. Exported vault files on your disk are unaffected.")) return;
+  await vault.erase();
+  await renderVaultUI();
+  vMsg("Vault erased from this browser.", "ok");
+});
+
+async function saveToVaultFlow(mode, title, body, statusFn) {
+  const say = statusFn || setMStatus;
+  await vault.loadMeta();
+  if (!vault.meta || !vault.unlocked()) {
+    openVault();
+    vMsg(vault.meta
+      ? "Unlock the vault, then press “Save to vault” again."
+      : "Create a vault first, then press “Save to vault” again.", "err");
+    return;
+  }
+  try {
+    await vault.saveRecord(mode, title, body);
+    say("Saved to the encrypted vault.", null);
+    if (el.dlgVault.open) await renderVaultUI();
+  } catch (e) {
+    say("Couldn’t save to the vault: " + escapeHtml(e.message), "err");
+  }
+}
+
+el.btnXSave.addEventListener("click", async () => {
+  if (!xLog.length) {
+    setXStatus("Nothing to save yet — interpret something first.", "err");
+    setTimeout(idleXStatus, 3500);
+    return;
+  }
+  await saveToVaultFlow("interpret",
+    "Interpretation — " + new Date().toLocaleString(),
+    interpretTranscriptMarkdown(),
+    setXStatus);
+});
+
+function openVault() {
+  renderVaultUI().then(() => {
+    if (!el.dlgVault.open) el.dlgVault.showModal();
+  });
+}
+el.btnVault.addEventListener("click", openVault);
+
+/* ============================================================
+   Mode tabs, dialogs, settings, theme
+   ============================================================ */
+function setMode(mode) {
+  el.body.dataset.mode = mode;
+  store.set(LS.MODE, mode);
+  el.tabInterpret.setAttribute("aria-selected", String(mode === "interpret"));
+  el.tabMinutes.setAttribute("aria-selected", String(mode === "minutes"));
+  if (mode === "interpret") idleXStatus(); else idleMStatus();
+}
+el.tabInterpret.addEventListener("click", () => setMode("interpret"));
+el.tabMinutes.addEventListener("click", () => setMode("minutes"));
+
+function openSettings() { syncSettingsUI(); el.dlgSettings.showModal(); el.apiKey.focus(); }
+el.btnSettings.addEventListener("click", openSettings);
+el.xModelHint.addEventListener("click", openSettings);
+el.btnPrivacy.addEventListener("click", () => el.dlgPrivacy.showModal());
+document.querySelectorAll("dialog [data-close]").forEach(b =>
+  b.addEventListener("click", (e) => e.target.closest("dialog").close()));
+[el.dlgSettings, el.dlgPrivacy, el.dlgVault].forEach(d =>
+  d.addEventListener("click", (e) => { if (e.target === d) d.close(); })); // click backdrop to close
+
+el.apiKey.addEventListener("change", () => { store.set(LS.KEY, el.apiKey.value.trim()); idleXStatus(); idleMStatus(); });
+el.apiKey.addEventListener("input", () => { store.set(LS.KEY, el.apiKey.value.trim()); });
+el.btnShowKey.addEventListener("click", () => {
+  const isPw = el.apiKey.type === "password";
+  el.apiKey.type = isPw ? "text" : "password";
+  el.btnShowKey.textContent = isPw ? "hide" : "show";
+});
+el.modelXlate.addEventListener("change", () => { store.set(LS.MODEL_X, el.modelXlate.value); syncModelHint(); });
+el.modelNotes.addEventListener("change", () => { store.set(LS.MODEL_N, el.modelNotes.value); });
+el.voiceSel.addEventListener("change", () => store.set(LS.VOICE, el.voiceSel.value));
+el.rate.addEventListener("input", () => {
+  store.set(LS.RATE, el.rate.value);
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+});
+el.autolock.addEventListener("change", () => {
+  const v = Math.max(0, Math.min(240, parseInt(el.autolock.value, 10) || 0));
+  el.autolock.value = String(v);
+  store.set(LS.AUTOLOCK, String(v));
+  bumpAutoLock();
+});
+document.querySelectorAll('input[name="stt"]').forEach(r =>
+  r.addEventListener("change", () => { store.set(LS.STT, r.value); idleXStatus(); idleMStatus(); }));
+document.querySelectorAll('input[name="mt"]').forEach(r =>
+  r.addEventListener("change", () => { store.set(LS.MT, r.value); }));
+
+el.btnMute.addEventListener("click", () => {
+  const muted = !(store.get(LS.MUTE, "0") === "1");
+  store.set(LS.MUTE, muted ? "1" : "0");
+  applyMuteUI();
+  if (muted) tts.stop();
+});
+function applyMuteUI() {
+  const muted = store.get(LS.MUTE, "0") === "1";
+  el.btnMute.setAttribute("aria-pressed", String(muted));
+  el.btnMute.setAttribute("aria-label", muted ? "Unmute spoken translations" : "Mute spoken translations");
+  el.btnMute.title = muted ? "Unmute spoken translations" : "Mute spoken translations";
+  el.spkWaves.style.display = muted ? "none" : "";
+  el.spkSlash.style.display = muted ? "" : "none";
+}
+
+el.btnErase.addEventListener("click", async () => {
+  if (!confirm("Erase your API key, settings, this session’s transcripts and minutes, AND the encrypted vault from this browser?")) return;
+  // stop everything live
+  if (listenOn) endListen();
+  if (pttSide) { stt.abort(); pttEndUI(); }
+  if (meeting.active) { meeting.active = false; stt.abort(); clearInterval(meeting.tick); meeting.tick = null; }
+  if (meeting.abort) meeting.abort.abort();
+  if (xAbort) xAbort.abort();
+  xQueue = [];
+  tts.stop();
+  setMic(false);
+  // wipe storage
+  Object.values(LS).forEach(store.del);
+  try { await vault.erase(); } catch {}
+  // wipe memory + UI
+  xLog.length = 0;
+  Object.keys(xCtx).forEach(k => delete xCtx[k]);
+  meeting.segments = []; meeting.pending = []; meeting.minutes = "";
+  meeting.speakers = []; meeting.activeSpeaker = null; meeting.micOn = false;
+  cost.reset();
+  el.xlist.innerHTML = "";
+  el.xEmpty.style.display = "";
+  el.steno.innerHTML = "";
+  el.minutesOut.innerHTML = '<p class="m-empty">Minutes will build here.</p>';
+  el.btnMeeting.textContent = "Start meeting";
+  el.btnUpdateNow.disabled = true;
+  el.mInput.disabled = true; el.btnMSend.disabled = true;
+  el.btnMCopy.disabled = true; el.btnMDownload.disabled = true; el.btnMSave.disabled = true;
+  el.mElapsed.textContent = "00:00";
+  renderSpeakers();
+  syncSettingsUI();
+  syncModelHint();
+  applyMuteUI();
+  applyTheme();
+  syncLangUI();
+  el.dlgSettings.close();
+  setState("idle");
+  setXStatus("Everything erased — key, settings, session, and vault ciphertext. There was never a server copy. Exported vault files on your disk are yours to delete.");
+  setMStatus("Everything erased.");
+});
+
+function syncSettingsUI() {
+  el.apiKey.value = getKey();
+  el.modelXlate.value = getModelXlate();
+  el.modelNotes.value = getModelNotes();
+  el.rate.value = store.get(LS.RATE, "1");
+  el.rateVal.textContent = "× " + parseFloat(el.rate.value).toFixed(2);
+  el.autolock.value = store.get(LS.AUTOLOCK, "5");
+  const sttPref = store.get(LS.STT, "webspeech");
+  el.sttWeb.checked = sttPref === "webspeech";
+  el.sttLocal.checked = sttPref === "ondevice";
+  el.sttLocal.disabled = !OnDeviceWhisperEngine.available();
+  el.sttWeb.disabled = !WebSpeechEngine.available();
+  const mtPref = store.get(LS.MT, "claude");
+  el.mtClaude.checked = mtPref === "claude" || !OnDeviceBergamotEngine.available();
+  el.mtLocal.checked = mtPref === "bergamot" && OnDeviceBergamotEngine.available();
+  el.mtLocal.disabled = !OnDeviceBergamotEngine.available();
+  if (el.diaLocal) el.diaLocal.disabled = !DiarizationEngine.available();
+  tts.loadVoices();
+}
+function syncModelHint() {
+  const m = MODELS[getModelXlate()];
+  el.xModelHint.textContent = m ? m.label : getModelXlate();
+}
+
+/* ---------- theme ---------- */
+el.btnTheme.addEventListener("click", () => {
+  const cur = store.get(LS.THEME, "auto");
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  store.set(LS.THEME, next);
+  applyTheme();
+});
+function applyTheme() {
+  const t = store.get(LS.THEME, "auto");
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = t;
+  el.btnTheme.textContent = t === "auto" ? "◐" : t === "light" ? "○" : "●";
+  el.btnTheme.setAttribute("aria-label", "Color theme: " + t + " (click to change)");
+}
+
+/* ============================================================
+   boot
+   ============================================================ */
+fillLangSelect(el.langA, getLangA());
+fillLangSelect(el.langB, getLangB());
+applyTheme();
+applyMuteUI();
+syncModelHint();
+syncLangUI();
+tts.loadVoices();
+renderSpeakers();
+cost.render();
+setMode(store.get(LS.MODE, "interpret"));
+idleXStatus();
+idleMStatus();
+syncStopX();
+vault.loadMeta().then(() => { /* vault meta cached for the dialog */ }).catch(() => {});
+document.documentElement.dataset.booted = "1"; // init completed without throwing
+</script>
+</body>
+</html>

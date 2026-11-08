@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# postern-interop-test — the PROOF that the desktop terminal and the phone signer
+# interoperate on ONE wire.
+#
+# The desktop requester (desktop/src-tauri/src/pairing.rs) and the phone signer
+# (mobile/signer, postern-mobile-signer) now both CONSUME the same two shipped
+# crates — postern-pairing (QR + KEM-bound SAS + the encrypted Channel) and
+# postern-signer-protocol (SignRequest/Approval + the DesktopRequester/PhoneApprover
+# roles). This crate exercises BOTH ends against each other and asserts:
+#
+#   (a) the desktop-composed SignRequest bytes are byte-identical to what
+#       postern-mobile-signer decodes (same wire types, same serde encoding, same
+#       login digest — which is also byte-identical to a postern-consiglio-auth
+#       Challenge::transcript()); and
+#   (b) a full loopback round-trip over postern-pairing's transport: desktop pairs
+#       (real ML-KEM-1024‖X25519 handshake + agreed SAS) → requests a login
+#       signature → postern-mobile-signer (real WalletCore, hybrid Falcon‖ML-DSA)
+#       approves + signs → the desktop VERIFIES the signature with the same
+#       bloch-crypto verifier the node/consiglio server runs.
+#
+# RAILS (carried, not rounded off): the desktop holds NO key; the wallet key never
+# crosses the wire (only the approval/signature does); QR + KEM-SAS are mandatory
+# and fail-closed; software signing in RAM is NOT a hardware wallet; UNAUDITED
+# scaffold; the coin (BLCH) is not a security. Community mobile edition is "Postern
+# for postmarketOS — community edition", never "Postern OS"; assurance name is
+# never "BABA YAGA".
+#
+# STANDALONE WORKSPACE: its own (empty) [workspace] detaches it from the root
+# virtual workspace (whose members list is frozen/off-limits), and the
+# [patch.crates-io] mirrors the repo root so bloch-crypto's seeded PQ keygen
+# (pqcrypto-internals fork) resolves — same pattern as mobile/signer.
+[package]
+name = "postern-interop-test"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-crate byte-identity + end-to-end loopback interop proof: the Postern desktop terminal (postern-pairing + postern-signer-protocol) and the phone signer (postern-mobile-signer, real WalletCore) sign the SAME bytes over ONE wire, and the desktop verifies the hybrid Falcon‖ML-DSA signature. Unaudited scaffold."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "postern_interop_test"
+
+[dependencies]
+# The two shipped integration crates the desktop now consumes (path deps; each
+# carries its own empty [workspace]).
+postern-pairing = { path = "../pairing" }
+postern-signer-protocol = { path = "../signer-protocol" }
+# The phone side: the real WalletCore signer + the paired-channel bridge.
+postern-mobile-signer = { path = "../../mobile/signer" }
+# The consiglio-auth login transcript, to prove the login digest is byte-identical
+# to what a wallet-as-login server verifies. Challenge/transcript only.
+postern-consiglio-auth = { path = "../../crates/postern-consiglio-auth", default-features = false }
+# The hybrid Falcon‖ML-DSA verifier — the desktop's F-3 signature check. Same
+# pinned rev as bloch-mobile / postern-mobile-signer, so all ends run identical crypto.
+bloch-crypto = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+serde_json = "1"
+
+# Detach from the root virtual workspace (its members list is frozen/off-limits).
+[workspace]
+
+# Mirror the repo root: bloch-crypto's PQ keygen needs the seeded-RNG fork of
+# pqcrypto-internals; a [patch] only applies from a workspace root, so replicate it.
+[patch.crates-io]
+pqcrypto-internals = { git = "https://gitlab.com/blochsispow-group/BlochSISPoW-project.git", rev = "dd8df3526518ba792057708a6aa0efd5a91d8e40" }
+
+# Keep Argon2id (pulled transitively by bloch-crypto) optimized in dev/test so the
+# suite is not unusably slow, matching the root profile intent.
+[profile.dev.package.argon2]
+opt-level = 3

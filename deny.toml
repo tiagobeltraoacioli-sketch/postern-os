@@ -1,0 +1,111 @@
+# cargo-deny — supply-chain policy for the Postern Labs PRODUCTS monorepo.
+# Run: cargo deny check   (advisories, bans, licenses, sources)
+#
+# This is a virtual workspace of product crates (`crates/postern-*`,
+# `mobile/core`, `desktop/src-tauri`). The Bloch-SIS-PoW PROTOCOL is NOT in
+# this repo: it is consumed as a git dependency (`bloch`, `bloch-crypto`, and
+# the seeded-RNG `pqcrypto-internals` fork via the root `[patch.crates-io]`)
+# from gitlab.com/blochsispow-group/BlochSISPoW-project, rev-pinned through the
+# committed Cargo.lock. That one git source is therefore explicitly ALLOWED
+# below; every other git/unknown-registry source stays denied.
+#
+# Policy: no known-vulnerable or yanked deps (BLOCKING); permissive licenses
+# only, with MPL-2.0 tolerated for unmodified aggregation (file-level copyleft
+# — linking unmodified MPL code does not infect the work; AGPL/GPL/LGPL remain
+# excluded).
+
+[advisories]
+version = 2
+yanked = "deny"
+# Unmaintained advisories: error only for DIRECT workspace dependencies (a dep
+# we chose must be maintained); transitive ones (gtk3 via tauri, pqcrypto-* via
+# the `bloch` protocol dep, ttf-parser via lopdf, …) are warnings — tracked,
+# not a permanently-red gate we cannot fix from this repo. Real vulnerabilities
+# always fail regardless of depth.
+unmaintained = "workspace"
+# Explicitly-accepted, transitive-only advisories with no fix reachable from this
+# repo (rationale below; each is via the arti/`bloch` dependency graph, none via a
+# direct workspace dep we could bump). Re-audit on every arti/bloch bump.
+ignore = [
+  # rsa "Marvin Attack" timing sidechannel — NO fix upstream. Transitive via
+  # ssh-key-fork-arti ← tor-key-forge ← arti. A second path via `sev`
+  # (postern-seal-companion optional `sev-snp`) only VERIFIES RSA-PSS ARK/ASK
+  # signatures — Marvin leaks a private key during decrypt/sign and the verifier
+  # holds no RSA private key, so that use is not exposed.
+  "RUSTSEC-2023-0071",
+  # hickory-proto DoS (NSEC3 unbounded loop; O(n²) name-compression CPU) — both
+  # transitive via libp2p ← the `bloch` protocol git dep; no fix reachable here.
+  "RUSTSEC-2026-0118",
+  "RUSTSEC-2026-0119",
+]
+# BLOCKING by design: `cargo deny check advisories` pulls the RUSTSEC DB and
+# fails on unfixed vulnerabilities; add explicit `ignore = ["RUSTSEC-XXXX-YYYY"]`
+# entries only with a written rationale. Known-open advisories at the time of
+# writing (all transitive via the `bloch` git dep / arti; tracked, not ignored):
+# RUSTSEC-2026-0119 + RUSTSEC-2026-0118 (hickory-proto, via libp2p ← bloch),
+# RUSTSEC-2023-0071 (rsa Marvin timing, via ssh-key-fork-arti ← tor-key-forge
+# ← arti; no fix upstream). A second path to the same rsa advisory exists via
+# `sev` (postern-seal-companion's optional `sev-snp` feature) — there rsa only
+# VERIFIES the RSA-PSS ARK/ASK signatures; Marvin leaks private-key timing
+# during decrypt/sign, and the verifier holds no RSA private key, so that use
+# is not exposed. No NEW advisory was introduced by the sev-snp stack.
+# RESOLVED 2026-07 by the arti 0.28 → 0.44 upgrade: RUSTSEC-2025-0009
+# (ring 0.16 via x509-signature — no longer in the graph).
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"          # avoid `*` version reqs
+allow-wildcard-paths = true # path deps in the workspace are fine
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# KNOWN-RED (first-party, honest): `bloch-desktop` (desktop/src-tauri) has no
+# `license` field yet (diagnostic D8) — this check fails on it until that
+# one-line metadata fix lands alongside the Bloch→Postern rename.
+# Permissive only, plus MPL-2.0 tolerated for UNMODIFIED aggregation (its
+# copyleft is file-scoped; we do not modify MPL-licensed files — in this tree
+# that is the uniffi family, attohttpc, and the cssparser/selectors group).
+# Deliberately excludes AGPL/GPL/LGPL copyleft.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CC0-1.0",
+    "0BSD",
+    # Additional permissive licenses actually present in this workspace's graph:
+    "MITNFA",              # hex_lit (MIT +no-false-attribs; permissive)
+    "CDLA-Permissive-2.0", # webpki-roots (root-store data; permissive)
+    "Unlicense",           # async_executors (public-domain equivalent)
+    "OpenSSL",             # ring 0.16 (see clarify below; ISC/MIT/OpenSSL-style)
+    # Boost Software License (NOT the "Business Source" BUSL): OSI-approved,
+    # MIT-class permissive. In this graph: xxhash-rust, via matrix-sdk
+    # (postern-messenger's optional `matrix` feature).
+    "BSL-1.0",
+]
+
+# ring < 0.17 ships a composite LICENSE file that SPDX cannot express; the
+# accepted community clarification (per cargo-deny docs) is ISC-and-MIT-and-
+# OpenSSL. ring 0.16 reaches this workspace only transitively via arti's
+# x509-signature.
+[[licenses.clarify]]
+crate = "ring"
+expression = "ISC AND MIT AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# The ONE sanctioned git source: the ownerless Bloch-SIS-PoW protocol repo,
+# rev-pinned via the committed Cargo.lock (`bloch`, `bloch-crypto`, and the
+# `pqcrypto-internals` seeded-RNG fork via [patch.crates-io]). Nothing is
+# vendored in `crates/`; this allow entry is the policy, matching reality.
+allow-git = [
+    "https://gitlab.com/blochsispow-group/BlochSISPoW-project",
+]

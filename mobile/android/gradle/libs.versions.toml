@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Bloch / Postern Android version catalog — the SINGLE source of build-tool and
+# dependency versions for the Gradle/Kotlin scaffolds. Pinned per the A1/A10
+# infra spec (docs/design/bridge-build-test-infra.md §0):
+#   AGP 8.5.0 · Kotlin 1.9.24 · Compose compiler 1.5.14 · compileSdk 34 · minSdk 30 · JDK 17
+#
+# SCAFFOLD · DESIGN ONLY · UNAUDITED · reference-prototype. These projects have
+# NEVER been built (no Android SDK/NDK on the macOS build host); the catalog +
+# the committed gradlew wrapper are the toolchain PREREQUISITES that let the
+# incoming Linux+Nix VM run `./gradlew :app:assembleDebug` for the first time.
+# Nothing here is proven to compile until that VM runs it (honesty gate G1).
+#
+# Auto-discovered by Gradle as the `libs` catalog (default path gradle/libs.versions.toml).
+
+[versions]
+# --- build tools (the pins the infra spec names) ---
+agp = "8.5.0"                 # Android Gradle Plugin — floor requires Gradle 8.7+
+kotlin = "1.9.24"
+composeCompiler = "1.5.14"    # Kotlin-compiler extension; matches Kotlin 1.9.24 compat table
+
+# --- SDK levels (Int settings in AGP, recorded here as the one source of truth;
+#     read in build.gradle.kts via libs.versions.compileSdk.get().toInt()) ---
+compileSdk = "34"
+minSdk = "30"                 # wallet app overrides to 28 (first StrongBox release) in its own module
+targetSdk = "34"
+
+# --- androidx / kotlinx / third-party libraries ---
+composeBom = "2024.06.00"
+activity = "1.9.1"
+activityCompose = "1.9.1"
+lifecycle = "2.8.4"
+annotation = "1.8.0"
+coroutines = "1.8.1"
+okhttp = "4.12.0"
+jna = "5.14.0"
+junit = "4.13.2"
+
+[libraries]
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+jna-aar = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Containerfile — self-hosting skeleton for the Postern Enterprise edition.
+#
+# REPRODUCIBLE-BY-DESIGN, NOT REPRODUCED. This image is written to be rebuilt
+# deterministically (pinned base digest, pinned toolchain, no network at run
+# assembly, SOURCE_DATE_EPOCH honored), but no independent bit-for-bit
+# reproduction has been performed or attested here. Treat "reproducible" as a
+# design goal you can verify yourself, not a claim we have discharged.
+#
+# This is a SKELETON: it shows the shape of a self-hosted enterprise deployment.
+# Fill in the real build stage for your artifacts. Nothing here is production-
+# ready, hardened, or audited.
+#
+# Build (operator-run):
+#   podman build \
+#     --build-arg SOURCE_DATE_EPOCH="$(git log -1 --format=%ct 2>/dev/null || echo 0)" \
+#     -t postern-enterprise:local -f Containerfile .
+# (docker works too; podman/buildah are preferred for rootless + reproducible builds.)
+
+# Pin the base by DIGEST, not a floating tag, so the base is deterministic.
+# Replace with the digest you actually vet. Example placeholder digest below.
+ARG BASE_DIGEST=sha256:0000000000000000000000000000000000000000000000000000000000000000
+FROM debian:bookworm-slim@${BASE_DIGEST} AS runtime
+
+# Reproducibility knobs: a fixed timestamp for any files the build stamps.
+ARG SOURCE_DATE_EPOCH=0
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+ENV TZ=UTC LANG=C.UTF-8
+
+# Non-root by construction. No secrets baked in; config is injected at runtime
+# via a mounted, operator-owned config (see compose.yaml).
+RUN groupadd --system --gid 10001 postern \
+ && useradd  --system --uid 10001 --gid postern --home /var/lib/postern \
+             --shell /usr/sbin/nologin postern \
+ && mkdir -p /var/lib/postern /etc/postern \
+ && chown -R postern:postern /var/lib/postern /etc/postern
+
+# --- Build/copy your verified enterprise artifact here -----------------------
+# The artifact SHOULD be one you (or the operator) verified with
+# ../signing/verify-build.sh before it enters the image. Placeholder:
+#   COPY --chown=postern:postern ./dist/postern-enterprise /usr/local/bin/postern-enterprise
+#   RUN chmod 0755 /usr/local/bin/postern-enterprise
+# -----------------------------------------------------------------------------
+
+USER postern
+WORKDIR /var/lib/postern
+
+# No telemetry, no analytics, no phone-home. If your artifact needs outbound
+# network, declare it explicitly in your deployment — the default posture is
+# egress-closed.
+ENV POSTERN_TELEMETRY=off
+
+# Config path is read-only mounted at runtime (compose.yaml). Data persists in
+# the named volume mounted at /var/lib/postern.
+VOLUME ["/var/lib/postern"]
+
+# Adjust to your service's real port; documented here, not privileged.
+EXPOSE 8080
+
+# Replace with the real entrypoint once the artifact is added.
+ENTRYPOINT ["/bin/sh", "-c", "echo 'postern-enterprise: replace ENTRYPOINT with the real service binary'; exit 1"]

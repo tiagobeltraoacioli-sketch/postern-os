@@ -1,0 +1,153 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Tiago Beltrao de Azevedo Tenorio Acioli / Postern Labs -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Postern bridge apps — consent & persona UX prototypes</title>
+<!--
+  Hub for the three bridge-app consent/persona UX PROTOTYPES. Surface design only,
+  UNAUDITED. Self-contained: no network, no telemetry. These pages design the
+  USER-FACING consent + persona experience; the bridge devs own the functional
+  plumbing. Deny-by-default is the visual default across all three.
+-->
+<style>
+  :root{
+    --bg:#0d1014; --panel:#161b21; --panel2:#1e242c; --line:#2b333d;
+    --ink:#e7edf3; --dim:#95a2af; --faint:#69737e;
+    --near:#3fb27f; --door:#5aa9e6; --haz:#e08a3a; --haz-ink:#f4c88a;
+    --haz-bg:#2a1d0e; --haz-line:#7a4f1c;
+    --focus:#5aa9e6; --shadow:0 10px 40px rgba(0,0,0,.5);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#e9edf2; --panel:#ffffff; --panel2:#f1f4f8; --line:#d3dbe4;
+      --ink:#14202b; --dim:#54606e; --faint:#8593a1;
+      --near:#1d8a5c; --door:#2b6cb0; --haz:#b56612; --haz-ink:#8a5410;
+      --haz-bg:#fdf1df; --haz-line:#e6bd7c;
+      --focus:#2b6cb0; --shadow:0 10px 40px rgba(20,40,60,.15);
+    }
+  }
+  :root[data-theme="dark"]{color-scheme:dark;} :root[data-theme="light"]{color-scheme:light;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:640px;margin:0 auto;padding:26px 16px 64px;}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  h1{font-size:22px;margin:0 0 3px;}
+  .sub{color:var(--dim);margin:0 0 18px;font-size:14px;}
+  .themebtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel2);color:var(--dim);border-radius:8px;padding:6px 10px;}
+  .honesty{background:var(--haz-bg);border:1px solid var(--haz-line);color:var(--haz-ink);
+    border-radius:10px;padding:12px 14px;margin:0 0 20px;font-size:13px;line-height:1.5;}
+  .honesty b{color:var(--haz-ink);}
+  .cards{display:flex;flex-direction:column;gap:12px;}
+  a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px 17px;box-shadow:var(--shadow);transition:.15s;}
+  a.card:hover{border-color:var(--faint);}
+  a.card:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  .ch{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .ch .mk{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .ch h2{font-size:16px;margin:0;}
+  .ch .role{font-size:11.5px;color:var(--dim);margin-top:1px;}
+  .card p{font-size:13px;color:var(--ink);margin:6px 0 0;}
+  .tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    border-radius:5px;padding:2px 7px;margin-top:9px;}
+  .tag.less{color:#1a1206;background:var(--haz);}
+  .tag.dev{color:var(--door);border:1px solid var(--door);}
+  .mk.near{background:color-mix(in srgb,var(--near) 16%,transparent);color:var(--near);}
+  .mk.door{background:color-mix(in srgb,var(--door) 16%,transparent);color:var(--door);}
+  .mk.haz{background:var(--haz-bg);color:var(--haz);border:1px solid var(--haz-line);}
+  .principles{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:20px 0 0;}
+  .principles h3{font-size:14px;margin:0 0 8px;}
+  .principles li{font-size:13px;color:var(--ink);margin:5px 0;}
+  .principles li b{color:var(--ink);}
+  .foot{color:var(--faint);font-size:11.5px;margin:20px 2px 0;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Bridge apps — consent &amp; persona UX</h1>
+      <p class="sub">Reference prototypes for the user-facing consent and persona experience</p>
+    </div>
+    <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle theme">◐ theme</button>
+  </div>
+
+  <div class="honesty" role="note">
+    <b>These prototypes are designed to SHOW hard truths, not hide them.</b> The NoporIS Google side is the
+    <b>less-private, non-attestable</b> side. Porog attests the <b>phone, not the workspace</b> — it is a
+    key-attested device, <b>not a measured-boot workspace</b>. Sloboda is <b>never Seal-covered</b> and Play
+    Integrity STRONG fails there. <b>Deny-by-default</b> is the visual default everywhere; refusing and closing
+    are the safe, obvious actions. Surface design only — UNAUDITED, nothing here booted on a device.
+  </div>
+
+  <div class="cards">
+    <a class="card" href="noporis-persona-switch.html">
+      <div class="ch">
+        <span class="mk near"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M12 3v18M7 7l10 10M17 7L7 17"/></svg></span>
+        <div><h2>NoporIS — persona switch</h2><div class="role">the guarded bridge · one keyring, two worlds</div></div>
+      </div>
+      <p>Switch the single keyring between the clean side and the Google-Play side, hand a single capability
+        across with a per-crossing consent screen (what data · which direction · once/session/persist), sign it
+        with a deliberate hold (WYSIWYS), and drop the whole span with the kill-switch.</p>
+      <span class="tag less">Google side · less private</span>
+    </a>
+
+    <a class="card" href="porog-onboarding.html">
+      <div class="ch">
+        <span class="mk door"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M4 21h16M14 12h.5"/></svg></span>
+        <div><h2>Porog — onboarding</h2><div class="role">the guarded door · key-attested device</div></div>
+      </div>
+      <p>Enroll a managed work profile on stock Android, then meet the honest attestation posture: what Key
+        Attestation proves about the <b>phone</b> versus what it never proves about the <b>workspace</b>, the
+        StrongBox/TEE tier you actually got, and the real Play Integrity verdict — STRONG included when it fails.</p>
+      <span class="tag dev">Attests the phone, not the workspace</span>
+    </a>
+
+    <a class="card" href="sloboda-entry.html">
+      <div class="ch">
+        <span class="mk haz"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+        <div><h2>Sloboda — container entry</h2><div class="role">the settlement beyond the wall · escape hatch</div></div>
+      </div>
+      <p>The non-attestable escape hatch. An unmistakable warning that <b>data leaves the sealed base</b>, that
+        Play Integrity STRONG fails and nothing is Seal-covered — acknowledged truth-by-truth before a deliberate
+        hold enters the Waydroid container. Staying in the sealed base is the default, safe action.</p>
+      <span class="tag less">Non-attestable · data leaves the base</span>
+    </a>
+  </div>
+
+  <div class="principles">
+    <h3>The shared consent-UX principles these prototypes encode</h3>
+    <ul>
+      <li><b>Deny-by-default is the visual default.</b> The resting state is closed/denied, shown calmly — safety is not alarming.</li>
+      <li><b>Refusing is one calm tap; opening carries friction.</b> Leave, cancel, stay, and kill are always reachable; the affirmative "hand across / enter" action needs a deliberate press-and-hold.</li>
+      <li><b>The less-private side is visually unmistakable.</b> Amber hazard chrome that never hides, on every surface that names the Google-Play / escape-hatch side.</li>
+      <li><b>The signed-consent moment shows exactly what will be signed</b> (WYSIWYS): the world badge, the capability, the scope, the peer — derived from the pairing, so the far side can't spoof the clean side.</li>
+      <li><b>No padlock theater.</b> Attestation appears only where it's true, and the honest qualifier travels with it.</li>
+      <li><b>The kill-switch never destroys the sealed base.</b> It drops the span; the wallet, keys and image are preserved.</li>
+    </ul>
+  </div>
+
+  <p class="foot">
+    Surface layer of the bridge apps — the functional plumbing (pairing, signer, DPC, Waydroid) is the bridge
+    devs'. The canonical deny-by-default UX logic lives in <code>consent-kernel.mjs</code> (node-checkable); each
+    page inlines a copy to stay a single self-contained file. Products named are proposed marks pending trademark
+    clearance. Google / Android / Play Integrity used nominatively; no affiliation, no fake attestation. The coin
+    is not a security; personal use is free; not legal advice. Reference-prototype, UNAUDITED.
+  </p>
+</div>
+
+<script type="module">
+document.getElementById("themeBtn").onclick = ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Postern OS — x86_64 NixOS live-ISO boot success/failure markers (NODE ISO).
+#
+# The x86_64 analogue of os/boot-harness/success-markers.txt (aarch64/mobile).
+# Graded by os/boot-harness/check-boot-log.sh (Dev O4's SHARED grader, consumed
+# READ-ONLY by this x86 harness — same file format, so "booted" means the same
+# thing on both architectures).
+#
+# This file is the ladder for `.#iso` — the node appliance ISO
+# (os/configuration.nix on the live installer CD). The desktop ISO's graphical
+# login rung lives in the sibling file success-markers-x86-desktop.txt, which
+# reuses this base and adds the GDM/GNOME rung.
+#
+# HONESTY: first run 2026-07-14 on postern-os-build (TCG) — see evidence/.
+# Graded PASS (check-boot-log.sh rc 0) against a real serial capture from the
+# Fly `postern-os-build` Linux+Nix host running qemu-system-x86_64 — see
+# evidence/README.md and evidence/x86-boot-node.{log,evidence} for the full
+# record (ISO store path, sha256, git rev, grader output). This proves only
+# the x86_64 SOFTWARE boot chain under TCG emulation, once, for this NODE
+# ladder:
+#   built != booted . QEMU != hardware . reproducible-by-design != reproduced.
+# The dev workstation is still macOS with no Nix/QEMU/KVM. The DESKTOP ladder
+# (success-markers-x86-desktop.txt) is WRITTEN, NOT RUN — this PASS does not
+# extend to it.
+#
+# FORMAT (consumed by check-boot-log.sh):
+#   '+ <extended-regex>'  a REQUIRED success marker (must appear, in this order)
+#   '- <extended-regex>'  a FAILURE marker (must NOT appear anywhere)
+#   '~ <extended-regex>'  an OPTIONAL/informational marker (logged, never gates)
+#   '#' or blank          comment
+#
+# Regexes are POSIX ERE, matched case-sensitively with `grep -E`.
+
+# -- Required success ladder (kernel -> stage-1 -> stage-2/systemd -> getty) ----
+# The x86 kernel start line (mirrors aarch64's "Booting Linux on physical CPU").
++ Linux version [0-9]
+# NixOS initrd / stage-1. Both the classic and the systemd-initrd installer
+# print one of these; the alternation tolerates either boot.initrd.systemd path.
++ (<<< NixOS Stage 1 >>>|Reached target .*Initrd|systemd\[1\]: Startup finished, in the initrd)
+# systemd (PID 1) is up in the real system.
++ systemd\[1\]:
+# A normal boot reaches multi-user (the node appliance is headless/getty).
++ Reached target
+# Login surface: a getty prompt, the auto-login shell, or the Postern OS MOTD
+# from os/configuration.nix. Any one ends the node-ISO ladder.
++ (login:|◆ Postern OS|Postern OS — Module-SIS|Welcome to NixOS)
+
+# -- Hard failures (any one means the boot did NOT pass) -----------------------
+- Kernel panic
+- Entering emergency mode
+- Unable to mount root fs
+- Failed to start .*Stage 1
+- No filesystem could mount root
+- .*-- stage-1 --.*(emergency|shell)
+
+# -- Informational (nice to see; never gate the node-ISO rung) -----------------
+# The node service coming up on boot (os/bloch-node.nix / services.bloch.mine).
+~ (bloch|Bloch-SIS|Started.*bloch)
+# The MOTD's post-quantum banner line.
+~ Falcon.*ML-DSA
+# systemd handing off from initrd to the real root.
+~ Switching root

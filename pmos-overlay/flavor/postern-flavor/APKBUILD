@@ -1,0 +1,115 @@
+# Maintainer: Tiago Beltrao Acioli <tiagobeltraoacioli@gmail.com>
+#
+# ==========================================================================
+# STATUS: UNBUILT / UNBOOTED. "Postern for postmarketOS" - community edition.
+# This APKBUILD has NEVER been run through abuild/pmbootstrap on a real
+# Alpine/pmOS host. Lint-reviewed only (sh -n on the shipped scripts + manual
+# field review). Non-reproducible, non-attestable (see ../../HONESTY.md). This
+# is NOT "Postern OS". No build result exists yet.
+# ==========================================================================
+#
+# postern-flavor - the flavor package for "Postern for postmarketOS - community
+# edition". This is the concrete package that OWNS the ../../overlay/ rootfs
+# files (OpenRC services, nftables firewall, Arti/Tor wiring, honest tier MOTD +
+# about screen, branding hooks) PLUS the flavor UI defaults in ../ (wallet-first
+# phosh favorites, the wallet terminal launcher, the one-time first-run notice).
+# It is what turns the three published apks into a coherent, honestly-labeled
+# phone experience -- a package selection + rootfs overlay + first-run, never an
+# image and never "Postern OS" (../README.md).
+#
+# It installs static config/text only (no compiled code) -> arch="noarch".
+# It is additive: it never rewrites /etc/os-release or any surface that would
+# imply this is a distribution or an attestable image (../../HONESTY.md).
+#
+# SOURCE MODEL: like postern-apps, this builds from the repo tarball and installs
+# files out of the in-tarball pmos-overlay/ tree. The `vTODO`/mirror source below
+# is a scaffold that deliberately does NOT resolve until a real tag exists (no
+# accidental fetch), matching the other packages in this overlay.
+pkgname=postern-flavor
+pkgver=0.1.0_alpha1
+pkgrel=0
+pkgdesc="Postern for postmarketOS flavor - overlay services, firewall, Tor/Arti wiring, phosh defaults, first-run (community edition, non-attestable)"
+url="https://posternlabs.com"  # TODO: confirm canonical project URL before first publish
+# Static config/text only -> noarch (same .apk indexed into every arch dir).
+arch="noarch"
+license="MIT"
+# Runtime deps: the published Postern bits + the firewall tool. The `postern`
+# meta pulls the wallet/apps/phosh/tor; nftables provides /sbin/nft. Arti is a
+# recommendation the postern-tor service uses when present (documented in
+# ../packages.list), not hard-pinned here to avoid an ABI fight on device.
+depends="
+	postern
+	nftables
+	"
+# glib-dev provides glib-compile-schemas for the post-install schema recompile.
+# (Alpine's glib also ships a trigger on /usr/share/glib-2.0/schemas; the
+# post-install call is a belt-and-suspenders. Kept as a makedepend note only --
+# the recompile is done on-device by the trigger + post-install, not at build.)
+makedepends=""
+# No test suite: static config package.
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+
+# TODO(release-artifact) - BLOCKER: needs a tagged release carrying pmos-overlay/.
+# The mirror tarball name below matches the apps package's scaffold pattern; the
+# vTODO tag deliberately does NOT resolve. Expected final form mirrors
+# ../../postern-apps/APKBUILD.
+source="bloch-sis-project-v0.1.0-alpha1.tar.gz::https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/src/bloch-sis-project-v0.1.0-alpha1.tar.gz"
+builddir="$srcdir/bloch-sis-project-v0.1.0-alpha1"
+
+_ov="pmos-overlay/overlay"       # rootfs overlay (services, firewall, configs, motd)
+_fl="pmos-overlay/flavor"        # flavor UI assets (phosh, launchers, first-run)
+
+package() {
+	cd "$builddir"
+
+	# --- OpenRC services (executable) ------------------------------------
+	for svc in postern-tor postern-node postern-firewall; do
+		install -Dm755 "$_ov/etc/init.d/$svc" \
+			"$pkgdir/etc/init.d/$svc"
+	done
+	for cd in postern-tor postern-node; do
+		install -Dm644 "$_ov/etc/conf.d/$cd" \
+			"$pkgdir/etc/conf.d/$cd"
+	done
+
+	# --- shared helper (sourced by the services) -------------------------
+	install -Dm644 "$_ov/usr/libexec/postern/postern-common.sh" \
+		"$pkgdir/usr/libexec/postern/postern-common.sh"
+
+	# --- transparent config under /etc/postern ---------------------------
+	for cfg in arti.toml node.toml branding.conf; do
+		install -Dm644 "$_ov/etc/postern/$cfg" \
+			"$pkgdir/etc/postern/$cfg"
+	done
+
+	# --- default-deny firewall ruleset -----------------------------------
+	install -Dm644 "$_ov/etc/nftables.d/postern.nft" \
+		"$pkgdir/etc/nftables.d/postern.nft"
+
+	# --- honest tier labeling: MOTD + about screen -----------------------
+	install -Dm644 "$_ov/etc/motd" \
+		"$pkgdir/etc/motd"
+	install -Dm644 "$_ov/usr/share/postern/first-run/about-tier.txt" \
+		"$pkgdir/usr/share/postern/first-run/about-tier.txt"
+	install -Dm644 "$_ov/usr/share/postern/branding/NOTICE" \
+		"$pkgdir/usr/share/postern/branding/NOTICE"
+
+	# --- flavor UI defaults (phosh, launcher, first-run) -----------------
+	# Wallet-first app grid (gsettings override, recompiled on install).
+	install -Dm644 "$_fl/phosh/20_postern-flavor.gschema.override" \
+		"$pkgdir/usr/share/glib-2.0/schemas/20_postern-flavor.gschema.override"
+	# Wallet terminal launcher (the wallet is a CLI -- honest label in the file).
+	install -Dm644 "$_fl/apps/postern-wallet.desktop" \
+		"$pkgdir/usr/share/applications/postern-wallet.desktop"
+	# One-time first-run notice: helper + XDG autostart entry.
+	install -Dm755 "$_fl/first-run/postern-first-run.sh" \
+		"$pkgdir/usr/libexec/postern/postern-first-run.sh"
+	install -Dm644 "$_fl/first-run/postern-first-run.desktop" \
+		"$pkgdir/etc/xdg/autostart/postern-first-run.desktop"
+}
+
+# TODO(build-host): populate with `pmbootstrap checksum postern-flavor` /
+# `abuild checksum` once `source=` resolves to a real tag (also checksums the
+# .post-install / .post-upgrade scripts).
+sha512sums=""

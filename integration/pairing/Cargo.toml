@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# SCAFFOLD — not a secure, audited, or deployed system.
+#
+# Standalone Postern mobile<->desktop PAIRING + secure CHANNEL crate. It carries
+# its OWN `[workspace]` table (empty) so it is intentionally NOT a member of the
+# ancestor bloch-protocol workspace — it builds and tests in isolation. It reuses
+# the SAME cryptographic primitives the in-tree crates use, but by depending on
+# the published RustCrypto crates directly (light, self-contained) rather than on
+# workspace path crates, so this stays offline-buildable and re-homeable:
+#   * ML-KEM-1024 (FIPS-203) + X25519 hybrid KEM ...... mirrors `postern-courier`
+#   * channel binding = SHA-256(nonce || pubkey) ...... mirrors `postern-seal-companion`
+#   * XChaCha20-Poly1305 AEAD session frames ........... same seal family as `postern-vault`
+#
+# The network TRANSPORT (LAN / mDNS) is stubbed behind a trait (`transport.rs`)
+# so the whole crate compiles and tests with NO sockets and NO network.
+[workspace]
+
+[package]
+name = "postern-pairing"
+version = "0.0.0-scaffold"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+description = "SCAFFOLD ONLY — unaudited mobile<->desktop pairing (QR-pinned ephemeral anchor + mandatory 6-digit SAS, fail-closed, no PAKE) and a mutually-authenticated PQ-hybrid (ML-KEM-1024 + X25519) encrypted channel bound to the paired anchor. LAN-first; transport stubbed behind a trait. Not secure, not deployed."
+publish = false
+
+[lib]
+name = "postern_pairing"
+path = "src/lib.rs"
+
+[dependencies]
+# --- PQ-hybrid channel KEM (same combiner shape as postern-courier) ----------
+# ML-KEM-1024 (FIPS-203), the post-quantum leg. RustCrypto pure-Rust impl is
+# pre-1.0 and UNAUDITED — which is exactly why the classical X25519 leg is kept.
+# `DecapsulationKey` is `ZeroizeOnDrop`, so the secret is scrubbed on drop.
+ml-kem = { version = "0.2", features = ["zeroize"] }
+# X25519 — the classical leg of the hybrid (the HNDL hedge). Mature dalek impl;
+# secrets zeroize-on-drop.
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+# HKDF-SHA-256 — the KEM combiner KDF and the SAS/binding derivations. A raw KEM
+# secret is NEVER used directly as a key.
+hkdf = "0.12"
+sha2 = "0.10"
+# XChaCha20-Poly1305 — the session-frame AEAD (24-byte random nonce; same seal
+# family the Postern vault/courier use).
+chacha20poly1305 = "0.10"
+# CSPRNG for keygen, encapsulation randomness, nonces, and pairing nonces
+# (OS entropy via getrandom -> OsRng).
+rand_core = { version = "0.6", features = ["getrandom"] }
+# Wipe derived session keys + raw KEM shared secrets from RAM.
+zeroize = { version = "1", features = ["zeroize_derive"] }
+thiserror = "2"

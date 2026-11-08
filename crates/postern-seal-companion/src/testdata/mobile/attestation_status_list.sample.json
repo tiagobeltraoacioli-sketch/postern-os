@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "SYNTHETIC sample of Google's Android Key-Attestation status list, in the",
+    "EXACT wire schema fetched from https://android.googleapis.com/attestation/status",
+    "(cross-checked against Google's published Android Key-Attestation docs, 2026-07).",
+    "Top level is `entries`: a map from certificate serial number, rendered as",
+    "Java BigInteger.toString(16) (lowercase hex, no leading zeros), to a status",
+    "object. `status` is REVOKED (permanent) or SUSPENDED (temporary); `reason`,",
+    "`expires` and `comment` are optional. The first two entries are Google's own",
+    "documented examples; `1234567890abcdef` is a fixture serial the mobile-attest",
+    "tests mint an rcgen leaf for, to prove a listed serial -> Verdict::Mismatch.",
+    "This crate does NO network I/O — an operator fetches this JSON out of band",
+    "and hands the bytes to GoogleStatusList::from_json (snp/tdx CRL discipline).",
+    "NOTE: JSON has no comment syntax; this `_comment` key is ignored by the parser."
+  ],
+  "entries": {
+    "2c8cdddfd5e03bfc": {
+      "status": "REVOKED",
+      "expires": "2020-11-13",
+      "reason": "KEY_COMPROMISE",
+      "comment": "Key stored on unsecure system"
+    },
+    "c8966fcb2fbb0d7a": {
+      "status": "SUSPENDED",
+      "reason": "SOFTWARE_FLAW",
+      "comment": "Bug in keystore causes this key malfunction b/555555"
+    },
+    "1234567890abcdef": {
+      "status": "REVOKED",
+      "reason": "KEY_COMPROMISE",
+      "comment": "Fixture serial: the mobile-attest revocation test mints an rcgen leaf with this exact serial and asserts it is rejected."
+    }
+  }
+}

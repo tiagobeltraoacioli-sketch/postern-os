@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Porog (Postern Container) — the SINGLE Gradle version catalog.
+#
+# Dev 5 (Toolchain & Test Harness) is the SOLE owner of this file. Every
+# dependency any of the other four Wave-1 devs needs routes through here — there
+# is exactly ONE source of truth for versions across the profile app, the shared
+# android-common module, and the T1 instrumented harness.
+#
+# This catalog lives in the Porog profile project (gradle/libs.versions.toml) and
+# is auto-discovered as `libs` by every project included from
+# ../settings.gradle.kts — including :android-common (../../android-common).
+#
+# INTEGRATION NOTE (NoporIS): android-common is co-owned and is ALSO consumed by
+# NoporIS. Because its build.gradle.kts now references `libs.*`, any standalone
+# build that includes android-common must expose this same catalog (point its
+# settings.gradle.kts `versionCatalogs { create("libs") { from(files("...")) } }`
+# at this file). That keeps one catalog, not two forks. Wave-integration item.
+#
+# STATUS: UNAUDITED. These coordinates now resolve and build for real: on a host
+# with the Android SDK + JDK 17, `./gradlew :app:assembleDebug` produces the debug
+# APK and `:app:testDebugUnitTest` runs the host unit tests green. The INSTRUMENTED
+# androidTest path (T1 lifecycle) still needs a work-profile AVD / device and stays
+# `deferred-to-VM`. `built ≠ booted`; nothing here is provisioned on hardware.
+
+[versions]
+# ── Build plugins (pin AGP↔Gradle↔Kotlin as a matched set) ───────────────────
+# AGP 8.5.0 requires Gradle 8.7+ (wrapper pins 8.9) and JDK 17.
+agp = "8.5.0"
+kotlin = "1.9.24"
+# Compose compiler extension matched to Kotlin 1.9.24 (Compose↔Kotlin table).
+composeCompiler = "1.5.14"
+
+# ── AndroidX / Compose runtime (the DPC onboarding surface) ──────────────────
+composeBom = "2024.06.00"
+activity = "1.9.1"
+activityCompose = "1.9.1"
+lifecycle = "2.8.4"
+coroutines = "1.8.1"
+annotation = "1.8.0"
+
+# ── Host unit tests (plain JVM: kernel-parity + policy-guard tests) ──────────
+# The REAL org.json ahead of the mockable android.jar, so the pure
+# CrossProfileReconciler.decide() runs on the JVM against the golden vectors.
+orgJson = "20240303"
+
+# ── T1 instrumented harness (ProfileLifecycleE2ETest, androidTest) ───────────
+androidxTestJunit = "1.2.1"
+androidxTestRunner = "1.6.1"
+androidxTestRules = "1.6.1"
+uiautomator = "2.3.0"
+espresso = "3.6.1"
+junit = "4.13.2"
+
+# ── NDK / cargo-ndk (Dev-B's libpostern_sdk.so; NOT a Gradle dependency) ─────
+# Pinned here so the Nix devshell (toolchain/flake.nix) and any cargo-ndk build
+# agree on ONE NDK. r26b. The .so is built by cargo-ndk and dropped into the
+# in-profile wallet/workspace app's jniLibs — the DPC housing embeds no cores.
+ndk = "26.1.10909125"
+
+[libraries]
+# android-common (shared DPC plumbing) — non-Compose runtime.
+androidx-activity = { module = "androidx.activity:activity", version.ref = "activity" }
+androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# Porog app shell — Compose onboarding ("Create Postern Container").
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+# BOM-managed: intentionally no version (the compose-bom platform pins it).
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+# The lightweight @Preview annotation artifact (BOM-managed). Needed at COMPILE
+# time because the onboarding composables ship @Preview functions in the main
+# source set; the heavier ui-tooling renderer is a debug-only concern and is not
+# pulled in here.
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+
+# Host unit tests (testImplementation).
+org-json = { module = "org.json:json", version.ref = "orgJson" }
+
+# T1 harness (androidTestImplementation).
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTestRules" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
+androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+junit = { module = "junit:junit", version.ref = "junit" }
+
+[bundles]
+compose = ["compose-ui", "compose-material3", "compose-ui-tooling-preview"]
+# Everything the instrumented ProfileLifecycleE2ETest links against.
+androidTest = [
+    "androidx-test-ext-junit",
+    "androidx-test-runner",
+    "androidx-test-rules",
+    "androidx-test-uiautomator",
+    "androidx-espresso-core",
+]
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

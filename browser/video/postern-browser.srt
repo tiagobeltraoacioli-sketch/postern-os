@@ -1,0 +1,84 @@
+1
+00:00:00,000 --> 00:00:04,000
+This is Postern Browser.
+A hardened distribution of Firefox ESR.
+
+2
+00:00:04,000 --> 00:00:08,500
+The same Gecko engine millions already run —
+rebuilt around privacy.
+
+3
+00:00:08,500 --> 00:00:13,500
+Not a new engine. Not Chromium. Firefox ESR,
+with the Mozilla branding stripped.
+
+4
+00:00:13,500 --> 00:00:19,000
+Telemetry is gone. No studies, no Pocket,
+no crash pings, no phone-home to Mozilla.
+
+5
+00:00:19,000 --> 00:00:23,500
+Disabled at both the config
+and the enterprise-policy level.
+
+6
+00:00:23,500 --> 00:00:28,500
+resistFingerprinting and letterboxing
+present one uniform surface.
+
+7
+00:00:28,500 --> 00:00:34,000
+Timezone reads as UTC. Locale as en-US.
+Canvas and audio, spoofed.
+
+8
+00:00:34,000 --> 00:00:38,500
+This reduces your fingerprint.
+It does not erase it.
+
+9
+00:00:38,500 --> 00:00:44,500
+Strict tracking protection. Dynamic first-party
+isolation. HTTPS-only, even in private windows.
+
+10
+00:00:44,500 --> 00:00:49,500
+WebRTC that won't leak your local IP.
+And uBlock Origin, shipped in the box.
+
+11
+00:00:49,500 --> 00:00:55,500
+Some things break on purpose. That's the trade,
+not a bug — DRM is off, and sites may letterbox.
+
+12
+00:00:55,500 --> 00:01:00,000
+We fix compatibility per site,
+never by weakening the defense.
+
+13
+00:01:00,000 --> 00:01:05,500
+Here's the honest part.
+Postern Browser makes you harder to track.
+
+14
+00:01:05,500 --> 00:01:11,000
+It does not make you anonymous.
+And it has not been independently audited.
+
+15
+00:01:11,000 --> 00:01:16,000
+For strong anonymity, use the Tor Browser —
+the uniformity gold standard.
+
+16
+00:01:16,000 --> 00:01:21,500
+Built from public source. Hardened,
+not anonymous. Unaudited. Not Tor.
+
+17
+00:01:21,500 --> 00:01:26,500
+Postern Browser. A Postern Labs product.
+Public beta.

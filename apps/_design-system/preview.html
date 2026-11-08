@@ -1,0 +1,1101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postern Design System — Preview</title>
+<!-- SELF-CONTAINED: tokens.css + components.css + components.js are inlined below.
+     No external fonts, no CDN, no network. CSP-safe. UNAUDITED reference work. -->
+<style>
+/* === tokens.css === */
+/* ============================================================================
+   Postern Design System — TOKENS
+   ----------------------------------------------------------------------------
+   The shared visual language extracted from the single-file apps (sotto,
+   vedetta, tolmach, ezekiel1, postern-login, postern-store, postern-enterprise).
+   Every app already ships the same graphite/ink neutral base + its own accent;
+   this file is that language named once, so apps can adopt it incrementally.
+
+   STATUS: UNAUDITED reference work. These tokens describe a look, not a
+   security property. Nothing here asserts audit, attestation, or verification.
+
+   All tokens are namespaced `--ps-*` so this file can be dropped into any app
+   without colliding with the app's existing (un-prefixed) variables.
+
+   THEME MODEL — keyed off the SAME `data-theme` attribute the apps already
+   toggle, so adoption is automatic:
+     - no attribute        -> follows the OS via prefers-color-scheme (auto)
+     - data-theme="dark"   -> forced dark
+     - data-theme="light"  -> forced light
+   The selectors also match `data-theme` on ANY container (not only :root), so a
+   page can show both themes side-by-side (see preview.html).
+   ============================================================================ */
+
+/* ---- Non-color tokens (theme-independent) -------------------------------- */
+:root {
+  /* Type families — system stacks only; NO web fonts (CSP-safe, offline). */
+  --ps-font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ps-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Type scale — UI copy is ~14.5px; mono labels/badges are small + tracked.
+     The apps use uppercase tracked mono for every "system voice" label. */
+  --ps-fs-micro: 10px;    /* badge / eyebrow mono */
+  --ps-fs-label: 11.5px;  /* honesty strip, trust-state, chips */
+  --ps-fs-sm:    12.5px;  /* help text, captions */
+  --ps-fs-base:  14.5px;  /* body */
+  --ps-fs-md:    16px;    /* lead / card title */
+  --ps-fs-lg:    19px;    /* section heading */
+  --ps-fs-xl:    24px;    /* dialog / page title */
+  --ps-fs-2xl:   32px;    /* hero */
+  --ps-lh-tight: 1.25;
+  --ps-lh-body:  1.55;
+  --ps-tracking-label: .12em;  /* uppercase mono labels */
+  --ps-tracking-wm:    .34em;  /* wordmark */
+
+  /* Spacing scale (px, 4-based with the 6/10/14 half-steps the apps use). */
+  --ps-sp-1: 4px;
+  --ps-sp-2: 6px;
+  --ps-sp-3: 8px;
+  --ps-sp-4: 10px;
+  --ps-sp-5: 12px;
+  --ps-sp-6: 14px;
+  --ps-sp-7: 16px;
+  --ps-sp-8: 20px;
+  --ps-sp-9: 28px;
+  --ps-sp-10: 40px;
+
+  /* Radius — badge 6, control 10, card 12, base 14, dialog 18, pill 999. */
+  --ps-radius-sm:   6px;
+  --ps-radius:      10px;
+  --ps-radius-card: 12px;
+  --ps-radius-lg:   14px;
+  --ps-radius-xl:   18px;
+  --ps-radius-pill: 999px;
+
+  /* Motion — micro .15s, transitions .25s; honest, quick, non-decorative. */
+  --ps-dur-micro: .15s;
+  --ps-dur-base:  .25s;
+  --ps-ease: cubic-bezier(.2, .6, .2, 1);
+  --ps-ease-in-out: ease-in-out;
+
+  /* Focus ring width (color comes from the accent, per theme). */
+  --ps-focus-w: 2px;
+  --ps-focus-offset: 2px;
+
+  /* Layout */
+  --ps-measure: 780px;  /* comfortable reading column the apps use */
+}
+
+/* ---- DARK is the default (matches every app's default) ------------------- */
+:root,
+[data-theme="dark"] {
+  --ps-bg:         #0d1014;
+  --ps-bg-glow:    #10141b;
+  --ps-surface:    #14181f;
+  --ps-surface-2:  #1a2029;
+  --ps-surface-3:  #212934;
+  --ps-border:     #29323e;
+  --ps-border-hi:  #3a4552;
+  --ps-text:       #e7e8ec;
+  --ps-text-dim:   #a8adb5;
+  --ps-muted:      #79818c;
+
+  /* Semantic — shared across all apps. `ok` is earned green, `warn` amber is
+     the honesty/caution color, `err` + `live` are the two reds. */
+  --ps-ok:    #63ab7c;
+  --ps-warn:  #d08c2e;
+  --ps-err:   #d96a63;
+  --ps-live:  #e4574f;
+
+  /* Default accent = "steel" (Vedetta / the most neutral of the family).
+     Override per app with an accent preset class (see below). */
+  --ps-acc:      #6fa3dc;
+  --ps-acc-hi:   #8fbceb;
+  --ps-acc-dim:  #47688f;
+  --ps-acc-ink:  #0b1118;
+
+  --ps-shadow: 0 18px 50px rgba(0,0,0,.45);
+  --ps-shadow-sm: 0 6px 18px rgba(0,0,0,.35);
+  --ps-scrim: rgba(6,8,10,.62);
+}
+
+/* ---- LIGHT ---------------------------------------------------------------- */
+[data-theme="light"] {
+  --ps-bg:         #f0eff3;
+  --ps-bg-glow:    #f6f5f0;
+  --ps-surface:    #fbfaf7;
+  --ps-surface-2:  #eceae2;
+  --ps-surface-3:  #e3e0d5;
+  --ps-border:     #d5d0c4;
+  --ps-border-hi:  #bdb7a8;
+  --ps-text:       #20242b;
+  --ps-text-dim:   #4f555e;
+  --ps-muted:      #767d87;
+
+  --ps-ok:    #2f7a4d;
+  --ps-warn:  #9a6210;
+  --ps-err:   #b1443d;
+  --ps-live:  #bc3b33;
+
+  --ps-acc:      #2d5f9e;
+  --ps-acc-hi:   #234b7d;
+  --ps-acc-dim:  #5b82ad;
+  --ps-acc-ink:  #f6faff;
+
+  --ps-shadow: 0 14px 40px rgba(40,50,64,.14);
+  --ps-shadow-sm: 0 4px 14px rgba(40,50,64,.10);
+  --ps-scrim: rgba(30,36,46,.42);
+}
+
+/* ---- AUTO: no data-theme -> follow the OS ------------------------------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ps-bg:#f0eff3; --ps-bg-glow:#f6f5f0; --ps-surface:#fbfaf7;
+    --ps-surface-2:#eceae2; --ps-surface-3:#e3e0d5; --ps-border:#d5d0c4;
+    --ps-border-hi:#bdb7a8; --ps-text:#20242b; --ps-text-dim:#4f555e;
+    --ps-muted:#767d87;
+    --ps-ok:#2f7a4d; --ps-warn:#9a6210; --ps-err:#b1443d; --ps-live:#bc3b33;
+    --ps-acc:#2d5f9e; --ps-acc-hi:#234b7d; --ps-acc-dim:#5b82ad; --ps-acc-ink:#f6faff;
+    --ps-shadow: 0 14px 40px rgba(40,50,64,.14);
+    --ps-shadow-sm: 0 4px 14px rgba(40,50,64,.10);
+    --ps-scrim: rgba(30,36,46,.42);
+  }
+}
+
+/* ============================================================================
+   ACCENT PRESETS — the per-app "voice".
+   Apply ONE class to <html> or <body> (or any container). Each preset carries
+   both its dark and its light value, gated on the same theme model above so it
+   tracks the app's existing toggle.
+   ============================================================================ */
+
+/* brass — Sotto */
+.ps-accent-brass { --ps-acc:#c9a648; --ps-acc-hi:#e4c465; --ps-acc-dim:#8f7630; --ps-acc-ink:#16130a; }
+[data-theme="light"].ps-accent-brass, [data-theme="light"] .ps-accent-brass,
+.ps-accent-brass[data-theme="light"], .ps-accent-brass [data-theme="light"] {
+  --ps-acc:#96781f; --ps-acc-hi:#7c6316; --ps-acc-dim:#b1963f; --ps-acc-ink:#fffdf5; }
+
+/* steel — Vedetta (same as default; provided for explicitness) */
+.ps-accent-steel { --ps-acc:#6fa3dc; --ps-acc-hi:#8fbceb; --ps-acc-dim:#47688f; --ps-acc-ink:#0b1118; }
+[data-theme="light"].ps-accent-steel, [data-theme="light"] .ps-accent-steel,
+.ps-accent-steel[data-theme="light"], .ps-accent-steel [data-theme="light"] {
+  --ps-acc:#2d5f9e; --ps-acc-hi:#234b7d; --ps-acc-dim:#5b82ad; --ps-acc-ink:#f6faff; }
+
+/* verdigris — Tolmach */
+.ps-accent-verdigris { --ps-acc:#4fa48d; --ps-acc-hi:#6fc4ab; --ps-acc-dim:#35705f; --ps-acc-ink:#0a1512; }
+[data-theme="light"].ps-accent-verdigris, [data-theme="light"] .ps-accent-verdigris,
+.ps-accent-verdigris[data-theme="light"], .ps-accent-verdigris [data-theme="light"] {
+  --ps-acc:#1f7a63; --ps-acc-hi:#14604d; --ps-acc-dim:#4f9b86; --ps-acc-ink:#f4fffb; }
+
+/* beryl — Ezekiel */
+.ps-accent-beryl { --ps-acc:#3fb6ad; --ps-acc-hi:#63d3ca; --ps-acc-dim:#2c7f79; --ps-acc-ink:#06110f; }
+[data-theme="light"].ps-accent-beryl, [data-theme="light"] .ps-accent-beryl,
+.ps-accent-beryl[data-theme="light"], .ps-accent-beryl [data-theme="light"] {
+  --ps-acc:#157e77; --ps-acc-hi:#0f645e; --ps-acc-dim:#4fa39c; --ps-acc-ink:#f2fbfa; }
+
+/* iris — Postern Login (Chiave) */
+.ps-accent-iris { --ps-acc:#9d8ce0; --ps-acc-hi:#b6a8ef; --ps-acc-dim:#6a5da3; --ps-acc-ink:#120e1f; }
+[data-theme="light"].ps-accent-iris, [data-theme="light"] .ps-accent-iris,
+.ps-accent-iris[data-theme="light"], .ps-accent-iris [data-theme="light"] {
+  --ps-acc:#5b4a9c; --ps-acc-hi:#483a7e; --ps-acc-dim:#8578b5; --ps-acc-ink:#f8f6ff; }
+
+/* amethyst — Postern Store */
+.ps-accent-amethyst { --ps-acc:#ab90e0; --ps-acc-hi:#c7b1f0; --ps-acc-dim:#7a63a8; --ps-acc-ink:#140f1e; }
+[data-theme="light"].ps-accent-amethyst, [data-theme="light"] .ps-accent-amethyst,
+.ps-accent-amethyst[data-theme="light"], .ps-accent-amethyst [data-theme="light"] {
+  --ps-acc:#6a4aa5; --ps-acc-hi:#543a86; --ps-acc-dim:#8f75c2; --ps-acc-ink:#faf7ff; }
+
+/* cobalt — Postern Enterprise (Consiglio) */
+.ps-accent-cobalt { --ps-acc:#5f87d6; --ps-acc-hi:#7ea2e6; --ps-acc-dim:#44619e; --ps-acc-ink:#0d1322; }
+[data-theme="light"].ps-accent-cobalt, [data-theme="light"] .ps-accent-cobalt,
+.ps-accent-cobalt[data-theme="light"], .ps-accent-cobalt [data-theme="light"] {
+  --ps-acc:#35569e; --ps-acc-hi:#2a4680; --ps-acc-dim:#6c83b8; --ps-acc-ink:#f6f8ff; }
+/* === components.css === */
+/* ============================================================================
+   Postern Design System — COMPONENTS
+   ----------------------------------------------------------------------------
+   Dependency-free. Consumes only `--ps-*` tokens from tokens.css. Every class
+   is `.ps-*` prefixed so it can coexist with an app's existing styles during
+   incremental adoption.
+
+   STATUS: UNAUDITED reference work. The honesty / trust components below make a
+   *labeling* discipline easy to keep; they are NOT a cryptographic guarantee.
+   `.ps-trust` turns green ONLY when JS is given a real "verified" result
+   (see components.js — the green state cannot be set by a caption alone).
+
+   Accessibility is baked in, not bolted on:
+     - focus-visible ring on every interactive element (WCAG 2.4.7)
+     - honesty/trust state never relies on color alone — always a word + a
+       shape/icon (WCAG 1.4.1 Use of Color)
+     - prefers-reduced-motion kills all animation/transition (WCAG 2.3.3)
+     - hit targets >= 32px; controls keep visible text labels
+   ============================================================================ */
+
+/* ---- Reset-ish base for adopting pages (scoped, opt-in) ------------------ */
+.ps-root {
+  font-family: var(--ps-font-ui);
+  font-size: var(--ps-fs-base);
+  line-height: var(--ps-lh-body);
+  color: var(--ps-text);
+  background:
+    radial-gradient(1200px 620px at 50% -8%, var(--ps-bg-glow), transparent 70%),
+    var(--ps-bg);
+  -webkit-font-smoothing: antialiased;
+}
+.ps-root ::selection { background: var(--ps-acc); color: var(--ps-acc-ink); }
+
+/* ---- Global focus ring (applies wherever .ps-* controls live) ------------ */
+.ps-root :focus-visible,
+.ps-btn:focus-visible,
+.ps-input:focus-visible,
+.ps-select:focus-visible,
+.ps-textarea:focus-visible {
+  outline: var(--ps-focus-w) solid var(--ps-acc);
+  outline-offset: var(--ps-focus-offset);
+  border-radius: var(--ps-radius-sm);
+}
+
+/* Wordmark / eyebrow — the "system voice" mono lettering */
+.ps-wordmark {
+  font-family: var(--ps-font-mono);
+  font-size: 17px; font-weight: 700;
+  letter-spacing: var(--ps-tracking-wm); text-indent: var(--ps-tracking-wm);
+  color: var(--ps-text); user-select: none;
+}
+.ps-wordmark .ps-tick { color: var(--ps-acc); }
+.ps-eyebrow {
+  font-family: var(--ps-font-mono);
+  font-size: var(--ps-fs-micro);
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ps-muted);
+}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+.ps-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-size: var(--ps-fs-base); font-weight: 600;
+  min-height: 36px; padding: 8px 16px;
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius);
+  background: var(--ps-surface-2); color: var(--ps-text);
+  cursor: pointer; user-select: none;
+  transition: border-color var(--ps-dur-micro), color var(--ps-dur-micro),
+              background var(--ps-dur-micro), transform var(--ps-dur-micro);
+}
+.ps-btn:hover { border-color: var(--ps-border-hi); background: var(--ps-surface-3); }
+.ps-btn:active { transform: translateY(1px); }
+.ps-btn:disabled, .ps-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+
+.ps-btn--primary {
+  background: var(--ps-acc); border-color: var(--ps-acc); color: var(--ps-acc-ink);
+}
+.ps-btn--primary:hover { background: var(--ps-acc-hi); border-color: var(--ps-acc-hi); }
+
+.ps-btn--ghost { background: transparent; }
+.ps-btn--ghost:hover { background: var(--ps-surface-2); }
+
+.ps-btn--danger {
+  background: transparent; color: var(--ps-err);
+  border-color: color-mix(in srgb, var(--ps-err) 55%, var(--ps-border));
+}
+.ps-btn--danger:hover { background: color-mix(in srgb, var(--ps-err) 12%, transparent); }
+
+.ps-btn--sm { min-height: 30px; padding: 5px 11px; font-size: var(--ps-fs-sm); }
+
+/* Icon / header pill button — the .hbtn family */
+.ps-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 34px; min-height: 32px; padding: 6px 12px;
+  background: transparent; border: 1px solid var(--ps-border);
+  border-radius: 9px; cursor: pointer;
+  font-family: var(--ps-font-mono); font-size: var(--ps-fs-label);
+  letter-spacing: .06em; color: var(--ps-text-dim);
+  transition: border-color var(--ps-dur-micro), color var(--ps-dur-micro), background var(--ps-dur-micro);
+}
+.ps-iconbtn:hover { border-color: var(--ps-border-hi); color: var(--ps-text); background: var(--ps-surface-2); }
+
+/* ==========================================================================
+   CARDS
+   ========================================================================== */
+.ps-card {
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius-card);
+  background: var(--ps-surface); box-shadow: var(--ps-shadow-sm);
+  padding: var(--ps-sp-7);
+  display: flex; flex-direction: column; gap: var(--ps-sp-4);
+}
+.ps-card__eyebrow {
+  font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ps-muted);
+}
+.ps-card__title { margin: 0; font-size: var(--ps-fs-md); font-weight: 700; color: var(--ps-text); line-height: var(--ps-lh-tight); }
+.ps-card__body { margin: 0; color: var(--ps-text-dim); font-size: var(--ps-fs-sm); line-height: var(--ps-lh-body); }
+.ps-card__foot { display: flex; align-items: center; gap: var(--ps-sp-3); flex-wrap: wrap; }
+.ps-card--accent { border-color: color-mix(in srgb, var(--ps-acc) 45%, var(--ps-border)); }
+
+/* ==========================================================================
+   BADGES  — base + semantic + HONESTY variants (first-class)
+   ========================================================================== */
+.ps-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro);
+  letter-spacing: .06em; line-height: 1;
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius-sm);
+  padding: 3px 7px; color: var(--ps-text-dim); white-space: nowrap;
+}
+.ps-badge--ok      { border-color: color-mix(in srgb, var(--ps-ok) 55%, var(--ps-border));  color: var(--ps-ok);  font-weight: 700; }
+.ps-badge--info    { border-color: color-mix(in srgb, var(--ps-acc) 45%, var(--ps-border)); color: color-mix(in srgb, var(--ps-acc) 85%, var(--ps-text)); }
+.ps-badge--warn    { border-color: color-mix(in srgb, var(--ps-warn) 55%, var(--ps-border)); color: var(--ps-warn); font-weight: 700; }
+.ps-badge--err     { border-color: var(--ps-err); color: var(--ps-err); font-weight: 700; }
+.ps-badge--neutral { border-color: var(--ps-border-hi); color: var(--ps-text-dim); }
+
+/* --- HONESTY BADGES ------------------------------------------------------
+   These are the caveat words the project cannot afford to lose. They are
+   deliberately loud (dashed amber / solid red), carry a leading glyph so the
+   meaning survives grayscale + screen readers, and are NOT restyleable into
+   the "earned green" look. Keeping them visible is the whole point. */
+.ps-badge--unaudited,
+.ps-badge--prototype,
+.ps-badge--designed,      /* "designed, not built yet" */
+.ps-badge--unverified {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ps-warn) 60%, var(--ps-border));
+  color: var(--ps-warn);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+/* leading caution glyph, injected so an author can't drop the signal by
+   forgetting to type it. Uses ::before so screen readers still read the text
+   node ("UNAUDITED") that authors are expected to place inside. */
+.ps-badge--unaudited::before,
+.ps-badge--prototype::before,
+.ps-badge--designed::before,
+.ps-badge--unverified::before { content: "\26A0\FE0E"; /* ⚠ non-emoji */ font-size: 11px; }
+
+/* The hardest caveat — a claim was checked and FAILED / must not be trusted. */
+.ps-badge--tampered {
+  border-style: solid; border-color: var(--ps-err);
+  background: color-mix(in srgb, var(--ps-err) 10%, transparent);
+  color: var(--ps-err); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.ps-badge--tampered::before { content: "\2716\FE0E"; /* ✖ */ }
+
+/* ==========================================================================
+   HONESTY STRIP  — the always-visible caveat bar the apps put under the header
+   ("your key, your machine · UNAUDITED preview"). First-class, full-bleed,
+   never inside a collapsible. role="note" is expected in markup.
+   ========================================================================== */
+.ps-honesty {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap; text-align: center;
+  font-family: var(--ps-font-mono);
+  font-size: var(--ps-fs-label); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ps-muted);
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--ps-border);
+  background: color-mix(in srgb, var(--ps-surface) 40%, transparent);
+}
+.ps-honesty b { color: var(--ps-text-dim); font-weight: 600; }
+/* When the strip carries an active caveat, tint it amber so it can't blend in. */
+.ps-honesty[data-caveat="1"] {
+  color: var(--ps-warn);
+  border-bottom-color: color-mix(in srgb, var(--ps-warn) 45%, var(--ps-border));
+  background: color-mix(in srgb, var(--ps-warn) 7%, transparent);
+}
+.ps-honesty[data-caveat="1"] b { color: var(--ps-warn); }
+
+/* Inline attestation note — a longer-form caveat inside a card/dialog. */
+.ps-attest-note {
+  display: flex; gap: 9px; align-items: flex-start;
+  border: 1px dashed color-mix(in srgb, var(--ps-warn) 50%, var(--ps-border));
+  border-radius: var(--ps-radius);
+  background: color-mix(in srgb, var(--ps-warn) 6%, transparent);
+  padding: 10px 13px; font-size: var(--ps-fs-sm); color: var(--ps-text-dim);
+  line-height: var(--ps-lh-body);
+}
+.ps-attest-note::before { content: "\26A0\FE0E"; color: var(--ps-warn); flex: none; font-size: 14px; line-height: 1.3; }
+.ps-attest-note strong { color: var(--ps-warn); }
+
+/* ==========================================================================
+   TRUST STATE  — VERIFIED / TAMPERED / UNSIGNED / UNVERIFIABLE / CHECKING
+   Honest by construction: amber for UNSIGNED/UNVERIFIABLE, red for TAMPERED,
+   green ONLY when a signature actually verified. Every state pairs a color
+   with a WORD and a distinct dot, so color is never the sole signal.
+   Drive it from JS with PosternDS.trust(el, state, why).
+   ========================================================================== */
+.ps-trust {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius);
+  background: var(--ps-surface);
+  padding: 8px 13px;
+  font-family: var(--ps-font-mono); font-size: var(--ps-fs-label); letter-spacing: .03em;
+}
+.ps-trust__dot  { width: 9px; height: 9px; border-radius: 50%; background: var(--ps-muted); flex: none; }
+.ps-trust__key  { color: var(--ps-muted); text-transform: uppercase; letter-spacing: .12em; }
+.ps-trust__val  { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.ps-trust__why  { color: var(--ps-text-dim); font-family: var(--ps-font-ui); font-size: var(--ps-fs-sm); letter-spacing: normal; flex: 1 1 260px; min-width: 0; }
+
+/* CHECKING — neutral, indeterminate */
+.ps-trust[data-trust="checking"] .ps-trust__val { color: var(--ps-muted); }
+.ps-trust[data-trust="checking"] .ps-trust__dot { animation: ps-pulse 1.1s var(--ps-ease-in-out) infinite; }
+
+/* UNSIGNED / UNVERIFIABLE — amber caution (the default honest posture) */
+.ps-trust[data-trust="unsigned"],
+.ps-trust[data-trust="unverifiable"] { border-color: color-mix(in srgb, var(--ps-warn) 45%, var(--ps-border)); }
+.ps-trust[data-trust="unsigned"] .ps-trust__dot,
+.ps-trust[data-trust="unverifiable"] .ps-trust__dot { background: var(--ps-warn); }
+.ps-trust[data-trust="unsigned"] .ps-trust__val,
+.ps-trust[data-trust="unverifiable"] .ps-trust__val { color: var(--ps-warn); }
+
+/* VERIFIED — earned green. Only JS with a real result should set this. */
+.ps-trust[data-trust="verified"] { border-color: color-mix(in srgb, var(--ps-ok) 55%, var(--ps-border)); }
+.ps-trust[data-trust="verified"] .ps-trust__dot { background: var(--ps-ok); }
+.ps-trust[data-trust="verified"] .ps-trust__val { color: var(--ps-ok); }
+
+/* TAMPERED — the loudest, error red with a wash */
+.ps-trust[data-trust="tampered"] { border-color: var(--ps-err); background: color-mix(in srgb, var(--ps-err) 8%, var(--ps-surface)); }
+.ps-trust[data-trust="tampered"] .ps-trust__dot { background: var(--ps-err); }
+.ps-trust[data-trust="tampered"] .ps-trust__val { color: var(--ps-err); }
+
+/* ==========================================================================
+   FORM FIELDS
+   ========================================================================== */
+.ps-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--ps-sp-8); }
+.ps-field__label { font-size: var(--ps-fs-sm); font-weight: 600; color: var(--ps-text); }
+.ps-field__help  { font-size: var(--ps-fs-sm); color: var(--ps-muted); line-height: var(--ps-lh-body); }
+.ps-field__error { font-size: var(--ps-fs-sm); color: var(--ps-err); }
+
+.ps-input, .ps-select, .ps-textarea {
+  width: 100%; box-sizing: border-box;
+  font: inherit; font-size: var(--ps-fs-base);
+  background: var(--ps-surface-2); color: var(--ps-text);
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius);
+  padding: 10px 12px;
+  transition: border-color var(--ps-dur-micro);
+}
+.ps-textarea { min-height: 92px; resize: vertical; }
+.ps-input:focus, .ps-select:focus, .ps-textarea:focus { border-color: var(--ps-acc); outline: none; }
+.ps-input[aria-invalid="true"], .ps-textarea[aria-invalid="true"] { border-color: var(--ps-err); }
+.ps-input::placeholder, .ps-textarea::placeholder { color: var(--ps-muted); }
+.ps-input:disabled, .ps-select:disabled, .ps-textarea:disabled { opacity: .55; cursor: not-allowed; }
+input.ps-range { width: 100%; accent-color: var(--ps-acc); }
+
+/* Radio / choice card */
+.ps-radio-card {
+  display: flex; gap: 10px; align-items: flex-start;
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius);
+  padding: 10px 12px; cursor: pointer;
+  transition: border-color var(--ps-dur-micro), background var(--ps-dur-micro);
+}
+.ps-radio-card:hover { border-color: var(--ps-border-hi); background: var(--ps-surface-2); }
+.ps-radio-card:has(input:checked) { border-color: var(--ps-acc); background: color-mix(in srgb, var(--ps-acc) 8%, transparent); }
+.ps-radio-card input { accent-color: var(--ps-acc); margin-top: 3px; }
+
+/* ==========================================================================
+   DIALOG  — native <dialog>, styled + accessible (focus trap is built-in)
+   ========================================================================== */
+.ps-dialog {
+  border: 1px solid var(--ps-border); border-radius: var(--ps-radius-xl);
+  background: var(--ps-surface); color: var(--ps-text);
+  padding: 0; width: min(680px, calc(100vw - 36px));
+  max-height: min(86vh, 800px); box-shadow: var(--ps-shadow);
+}
+.ps-dialog--wide { width: min(920px, calc(100vw - 36px)); }
+.ps-dialog::backdrop { background: var(--ps-scrim); backdrop-filter: blur(3px); }
+.ps-dialog__head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--ps-border);
+  position: sticky; top: 0; background: var(--ps-surface); z-index: 2;
+  border-radius: var(--ps-radius-xl) var(--ps-radius-xl) 0 0;
+}
+.ps-dialog__title { margin: 0; font-size: var(--ps-fs-lg); font-weight: 700; }
+.ps-dialog__close {
+  margin-left: auto; width: 32px; height: 32px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--ps-border);
+  color: var(--ps-muted); cursor: pointer; font-size: 16px;
+}
+.ps-dialog__close:hover { color: var(--ps-text); border-color: var(--ps-border-hi); }
+.ps-dialog__body { padding: 20px; overflow: auto; }
+.ps-dialog__foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--ps-sp-3);
+  padding: 14px 20px; border-top: 1px solid var(--ps-border);
+  position: sticky; bottom: 0; background: var(--ps-surface);
+}
+
+/* ==========================================================================
+   MOTION — reduced-motion is a hard override (WCAG 2.3.3)
+   ========================================================================== */
+@keyframes ps-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-root *, .ps-root *::before, .ps-root *::after,
+  .ps-btn, .ps-iconbtn, .ps-trust__dot, .ps-input, .ps-select, .ps-textarea, .ps-radio-card {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Screen-reader-only utility (labels for icon-only controls) */
+.ps-sr-only {
+  position: absolute !important; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+/* === gallery.css (preview chrome only) === */
+/* ---- gallery chrome (not part of the shipped system) ---- */
+* { box-sizing: border-box; }
+body { margin: 0; }
+.gallery { min-height: 100vh; }
+.g-top { border-bottom: 1px solid var(--ps-border); background: color-mix(in srgb, var(--ps-surface) 72%, transparent); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 30; }
+.g-top-inner { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 14px; }
+.g-top-actions { margin-left: auto; }
+.g-wrap { max-width: 1120px; margin: 0 auto; padding: 22px 20px 60px; }
+.g-lead { color: var(--ps-text-dim); font-size: var(--ps-fs-md); max-width: 760px; line-height: var(--ps-lh-body); }
+.g-lead code, .g-doc code, .g-note code, .g-accents code { font-family: var(--ps-font-mono); font-size: .88em; background: var(--ps-surface-2); border: 1px solid var(--ps-border); border-radius: 5px; padding: 1px 5px; color: var(--ps-text-dim); }
+.g-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 22px 0 34px; }
+@media (max-width: 900px) { .g-columns { grid-template-columns: 1fr; } }
+.g-col { border: 1px solid var(--ps-border); border-radius: var(--ps-radius-lg); background: var(--ps-bg); overflow: hidden; }
+.g-col-tag { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: .12em; text-transform: uppercase; color: var(--ps-muted); padding: 8px 14px; border-bottom: 1px solid var(--ps-border); background: var(--ps-surface); }
+.g-col-mount { padding: 16px; }
+.g-sec { margin: 0 0 22px; }
+.g-h { font-size: var(--ps-fs-lg); margin: 0 0 12px; color: var(--ps-text); display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.g-h-note, .g-note { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: .08em; text-transform: uppercase; color: var(--ps-muted); font-weight: 400; }
+.g-note { text-transform: none; letter-spacing: normal; font-family: var(--ps-font-ui); font-size: var(--ps-fs-sm); margin: 10px 0; line-height: var(--ps-lh-body); }
+.g-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.g-trust-stack { display: flex; flex-direction: column; gap: 8px; }
+.g-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .g-cards { grid-template-columns: 1fr; } }
+.g-doc, .g-accents { max-width: 900px; }
+.g-list { color: var(--ps-text-dim); line-height: var(--ps-lh-body); padding-left: 20px; }
+.g-list li { margin: 8px 0; }
+.g-list strong { color: var(--ps-text); }
+.g-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.g-swatch { border: 1px solid var(--ps-border); border-radius: var(--ps-radius); overflow: hidden; }
+.g-swatch-bar { height: 44px; display: flex; }
+.g-swatch-bar span { flex: 1; }
+.g-swatch-cap { font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: .1em; text-transform: uppercase; color: var(--ps-text-dim); padding: 7px 10px; display: flex; justify-content: space-between; align-items: center; }
+.g-foot { text-align: center; font-family: var(--ps-font-mono); font-size: var(--ps-fs-micro); letter-spacing: .1em; text-transform: uppercase; color: var(--ps-muted); padding: 22px; border-top: 1px solid var(--ps-border); }
+</style>
+</head>
+<body>
+<!-- ========================= GALLERY BODY ========================= -->
+<div class="ps-root gallery">
+
+<header class="g-top">
+  <div class="g-top-inner">
+    <span class="ps-wordmark">POSTERN<span class="ps-tick">·</span>DS</span>
+    <span class="ps-eyebrow">design system · preview gallery</span>
+    <div class="g-top-actions">
+      <button class="ps-iconbtn" data-ps-theme-toggle title="Cycle theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<!-- The honesty strip is mounted at the very top and cannot be collapsed. -->
+<div class="ps-honesty" role="note" data-caveat="1">
+  <b>UNAUDITED</b> reference gallery · your key, your machine · no network, no CDN, no web fonts
+</div>
+
+<main class="g-wrap">
+
+  <p class="g-lead">
+    Every component below is rendered <strong>twice</strong> — the left column is
+    forced <code>data-theme="dark"</code>, the right is forced
+    <code>data-theme="light"</code> — so both themes are provable on one page.
+    The top-right toggle drives the page's <em>own</em> (auto) theme.
+  </p>
+
+  <!-- ============ COMPONENT SECTION TEMPLATE, duplicated per theme ======= -->
+  <!-- Rather than repeat markup, a small script clones the .specimen block
+       into both theme columns. See bottom of file. -->
+
+  <template id="specimen">
+    <div class="specimen">
+
+      <!-- BUTTONS -->
+      <section class="g-sec">
+        <h2 class="g-h">Buttons</h2>
+        <div class="g-row">
+          <button class="ps-btn ps-btn--primary">Primary</button>
+          <button class="ps-btn">Secondary</button>
+          <button class="ps-btn ps-btn--ghost">Ghost</button>
+          <button class="ps-btn ps-btn--danger">Delete key</button>
+          <button class="ps-btn ps-btn--sm">Small</button>
+          <button class="ps-btn ps-btn--primary" disabled>Disabled</button>
+          <button class="ps-iconbtn">⚙ Settings</button>
+        </div>
+      </section>
+
+      <!-- BADGES + HONESTY BADGES -->
+      <section class="g-sec">
+        <h2 class="g-h">Badges &amp; honesty badges</h2>
+        <div class="g-row">
+          <span class="ps-badge">neutral</span>
+          <span class="ps-badge ps-badge--ok">BUILT</span>
+          <span class="ps-badge ps-badge--info">E2E</span>
+          <span class="ps-badge ps-badge--warn">META</span>
+          <span class="ps-badge ps-badge--err">PROPRIETARY</span>
+        </div>
+        <p class="g-note">The honesty caveats are first-class — loud, dashed, glyph-led, and not restyleable into "earned green":</p>
+        <div class="g-row">
+          <span class="ps-badge ps-badge--unaudited">UNAUDITED</span>
+          <span class="ps-badge ps-badge--prototype">PROTOTYPE</span>
+          <span class="ps-badge ps-badge--designed">DESIGNED, NOT BUILT</span>
+          <span class="ps-badge ps-badge--unverified">UNVERIFIED</span>
+          <span class="ps-badge ps-badge--tampered">TAMPERED</span>
+        </div>
+      </section>
+
+      <!-- TRUST STATE -->
+      <section class="g-sec">
+        <h2 class="g-h">Trust state <span class="g-h-note">VERIFIED / TAMPERED / UNSIGNED</span></h2>
+        <div class="g-trust-stack">
+          <div class="ps-trust js-trust" data-demo="checking"></div>
+          <div class="ps-trust js-trust" data-demo="unsigned"></div>
+          <div class="ps-trust js-trust" data-demo="unverifiable"></div>
+          <div class="ps-trust js-trust" data-demo="verified"></div>
+          <div class="ps-trust js-trust" data-demo="tampered"></div>
+        </div>
+      </section>
+
+      <!-- ATTESTATION NOTE -->
+      <section class="g-sec">
+        <h2 class="g-h">Attestation note</h2>
+        <div class="ps-attest-note">
+          <span><strong>Honest caveat:</strong> the engine slot is wired but the model isn't bundled in this
+          prototype. Until it is, typing is the fully-local path — nothing here is attested or audited.</span>
+        </div>
+      </section>
+
+      <!-- CARDS -->
+      <section class="g-sec">
+        <h2 class="g-h">Cards</h2>
+        <div class="g-cards">
+          <article class="ps-card">
+            <span class="ps-card__eyebrow">Local-first</span>
+            <h3 class="ps-card__title">Sotto</h3>
+            <p class="ps-card__body">Voice to your own API key. Nothing routes through a Postern server.</p>
+            <div class="ps-card__foot">
+              <span class="ps-badge ps-badge--ok">BUILT</span>
+              <span class="ps-badge ps-badge--info">LOCAL</span>
+            </div>
+          </article>
+          <article class="ps-card ps-card--accent">
+            <span class="ps-card__eyebrow">On the shelf</span>
+            <h3 class="ps-card__title">Store listing</h3>
+            <p class="ps-card__body">Hosted is hosted, linked is linked. The caveat rides with the card.</p>
+            <div class="ps-card__foot">
+              <span class="ps-badge ps-badge--warn">DESIGNED</span>
+              <span class="ps-badge ps-badge--unaudited">UNAUDITED</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- FORM -->
+      <section class="g-sec">
+        <h2 class="g-h">Form fields</h2>
+        <label class="ps-field">
+          <span class="ps-field__label">Anthropic API key</span>
+          <input class="ps-input" type="password" placeholder="sk-ant-…">
+          <span class="ps-field__help">Stored only in this browser's localStorage. No server here can see it.</span>
+        </label>
+        <label class="ps-field">
+          <span class="ps-field__label">Note</span>
+          <textarea class="ps-textarea" placeholder="Type here…"></textarea>
+        </label>
+        <label class="ps-radio-card">
+          <input type="radio" name="stt" checked>
+          <span><strong>On-device transcription</strong><br><span class="g-note" style="margin:2px 0 0">Audio never leaves this machine.</span></span>
+        </label>
+      </section>
+
+      <!-- DIALOG -->
+      <section class="g-sec">
+        <h2 class="g-h">Dialog</h2>
+        <div class="g-row">
+          <button class="ps-btn ps-btn--primary js-open-dialog">Open dialog</button>
+        </div>
+      </section>
+
+    </div>
+  </template>
+
+  <div class="g-columns">
+    <div class="g-col" data-theme="dark">
+      <div class="g-col-tag">data-theme="dark"</div>
+      <div class="g-col-mount"></div>
+    </div>
+    <div class="g-col" data-theme="light">
+      <div class="g-col-tag">data-theme="light"</div>
+      <div class="g-col-mount"></div>
+    </div>
+  </div>
+
+  <!-- ACCENT SWATCHES -->
+  <section class="g-sec g-accents">
+    <h2 class="g-h">Accent presets — one voice per app</h2>
+    <p class="g-note">Apply one class (e.g. <code>.ps-accent-brass</code>) to a container; it carries both themes.</p>
+    <div class="g-swatches" id="accent-swatches"></div>
+  </section>
+
+  <!-- A11Y + ADOPTION -->
+  <section class="g-sec g-doc">
+    <h2 class="g-h">Accessibility (WCAG 2.1 AA)</h2>
+    <ul class="g-list">
+      <li><strong>Color is never the only signal (1.4.1).</strong> Every trust/honesty state pairs its color with an uppercase WORD and a distinct dot or glyph (⚠ / ✖).</li>
+      <li><strong>Contrast (1.4.3 / 1.4.11).</strong> Text and semantic colors are tuned per theme so body text and UI borders clear 4.5:1 / 3:1. Light-theme accents were darkened specifically for this.</li>
+      <li><strong>Visible focus (2.4.7).</strong> A 2px accent focus-visible ring sits on every interactive element, with offset so it never clips.</li>
+      <li><strong>Reduced motion (2.3.3).</strong> <code>prefers-reduced-motion</code> hard-kills all animation and transition.</li>
+      <li><strong>Semantics.</strong> Native <code>&lt;dialog&gt;</code> gives a real focus trap; the trust helper sets <code>role="status"</code> + <code>aria-live</code>; the honesty strip is <code>role="note"</code>; icon-only controls carry <code>.ps-sr-only</code> labels / <code>aria-label</code>.</li>
+      <li><strong>Hit targets.</strong> Buttons are ≥ 32–36px tall and keep visible text labels.</li>
+    </ul>
+
+    <h2 class="g-h">How an app adopts it</h2>
+    <ol class="g-list">
+      <li>Copy <code>tokens.css</code>, <code>components.css</code>, <code>components.js</code> into the app (or inline them — they are CSP-safe, no external anything).</li>
+      <li>Add an accent class to <code>&lt;html&gt;</code>/<code>&lt;body&gt;</code>, e.g. <code>class="ps-accent-brass"</code>; wrap the app in <code>.ps-root</code>.</li>
+      <li>The tokens read the <em>same</em> <code>data-theme</code> the apps already toggle — so the existing theme button keeps working. Or call <code>PosternDS.theme.init()</code> and mark the button <code>data-ps-theme-toggle</code>.</li>
+      <li>Replace bespoke buttons/cards/badges with <code>.ps-*</code> classes incrementally — the prefix means old and new styles coexist during migration.</li>
+      <li>For any trust surface, use <code>&lt;div class="ps-trust"&gt;</code> + <code>PosternDS.trust(el, state, why[, PosternDS.VERIFIED_OK])</code>. Green requires the sentinel — a caption can't fake it.</li>
+    </ol>
+  </section>
+
+</main>
+
+<footer class="g-foot">
+  Postern Design System · UNAUDITED reference work · self-contained (no CDN, no web fonts, no network)
+</footer>
+
+<!-- DIALOG instance (one, shared) -->
+<dialog class="ps-dialog" id="demo-dialog">
+  <div class="ps-dialog__head">
+    <h2 class="ps-dialog__title">Where your data lives</h2>
+    <button class="ps-dialog__close" data-ps-close aria-label="Close dialog">✕</button>
+  </div>
+  <div class="ps-dialog__body">
+    <div class="ps-attest-note" style="margin-bottom:16px">
+      <span><strong>UNAUDITED.</strong> This dialog is a layout specimen, not a security claim.</span>
+    </div>
+    <p style="margin:0 0 12px;color:var(--ps-text-dim)">Your API key and settings live in this browser's
+    localStorage; the conversation lives in this tab's memory only. Nothing is sent to a Postern server —
+    there isn't one.</p>
+    <div class="ps-trust" id="dlg-trust"></div>
+  </div>
+  <div class="ps-dialog__foot">
+    <button class="ps-btn ps-btn--ghost" data-ps-close>Cancel</button>
+    <button class="ps-btn ps-btn--primary" data-ps-close>Got it</button>
+  </div>
+</dialog>
+
+</div>
+<script>
+/* === components.js === */
+/* ============================================================================
+   Postern Design System — COMPONENT JS  (PosternDS)
+   ----------------------------------------------------------------------------
+   Dependency-free, framework-free, CSP-safe (no eval, no network). UMD-ish:
+   attaches `window.PosternDS` in a browser and exports the same object under
+   Node/CommonJS/ESM bundlers so `node --check` and tooling stay happy.
+
+   STATUS: UNAUDITED reference work. The trust helper enforces a *labeling*
+   discipline (green cannot be faked from a caption), not cryptography — the
+   caller must pass a real verification result.
+   ============================================================================ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.PosternDS = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  var hasDOM = typeof document !== "undefined";
+  var hasWin = typeof window !== "undefined";
+
+  /* -- small helpers ------------------------------------------------------ */
+  function prefersReducedMotion() {
+    return hasWin && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false;
+  }
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  /* ======================================================================
+     THEME — cycles auto -> light -> dark, persists, tracks OS in "auto".
+     Uses the same `data-theme` attribute the apps already read, so the whole
+     page (app styles + ps-* tokens) flips together.
+     ====================================================================== */
+  var THEME_KEY = "ps.theme";
+  var THEME_ORDER = { auto: "light", light: "dark", dark: "auto" };
+  var THEME_GLYPH = { auto: "◐" /* ◐ */, light: "○" /* ○ */, dark: "●" /* ● */ };
+
+  var theme = {
+    current: function () { return store.get(THEME_KEY, "auto"); },
+    apply: function () {
+      if (!hasDOM) return;
+      var t = this.current();
+      if (t === "auto") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", t);
+      this._syncButtons(t);
+    },
+    set: function (t) { if (THEME_ORDER[t]) { store.set(THEME_KEY, t); this.apply(); } },
+    cycle: function () { this.set(THEME_ORDER[this.current()] || "auto"); },
+    _syncButtons: function (t) {
+      if (!hasDOM) return;
+      var btns = document.querySelectorAll("[data-ps-theme-toggle]");
+      for (var i = 0; i < btns.length; i++) {
+        var b = btns[i];
+        if (b.dataset.psGlyph !== "off") b.textContent = THEME_GLYPH[t] || "◐";
+        b.setAttribute("aria-label", "Color theme: " + t + " (activate to change)");
+        b.setAttribute("title", "Theme: " + t);
+      }
+    },
+    /* Wire every [data-ps-theme-toggle] button and apply the saved theme. */
+    init: function () {
+      if (!hasDOM) return;
+      var self = this;
+      var btns = document.querySelectorAll("[data-ps-theme-toggle]");
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].addEventListener("click", function () { self.cycle(); });
+      }
+      this.apply();
+    }
+  };
+
+  /* ======================================================================
+     TRUST STATE — the honest core.
+     States: checking | unsigned | unverifiable | verified | tampered.
+     "verified" (green) may only be reached by passing the sentinel
+     PosternDS.VERIFIED_OK as the 3rd arg — a caption string can never turn a
+     surface green by accident. This mirrors the check-trust-labels guardrail
+     in code: the earned state is gated, everything else is honest-by-default.
+     ====================================================================== */
+  var VERIFIED_OK = { __psVerified: true }; // opaque sentinel; hard to forge by typo
+
+  var TRUST_LABELS = {
+    checking:     "CHECKING",
+    unsigned:     "UNSIGNED",
+    unverifiable: "UNVERIFIABLE",
+    verified:     "VERIFIED",
+    tampered:     "TAMPERED"
+  };
+  var TRUST_DEFAULT_WHY = {
+    checking:     "Verifying signature…",
+    unsigned:     "No signature was provided. Treat as untrusted.",
+    unverifiable: "A signature exists but could not be checked here.",
+    verified:     "A detached signature verified against a known key.",
+    tampered:     "Signature check FAILED — do not trust this artifact."
+  };
+
+  /* Build the inner markup (key + dot + value + why) once. */
+  function ensureTrustParts(el) {
+    if (el.querySelector(".ps-trust__val")) return;
+    el.classList.add("ps-trust");
+    var dot = document.createElement("span"); dot.className = "ps-trust__dot"; dot.setAttribute("aria-hidden", "true");
+    var key = document.createElement("span"); key.className = "ps-trust__key"; key.textContent = "TRUST";
+    var val = document.createElement("span"); val.className = "ps-trust__val";
+    var why = document.createElement("span"); why.className = "ps-trust__why";
+    el.appendChild(dot); el.appendChild(key); el.appendChild(val); el.appendChild(why);
+  }
+
+  var trust = function (el, state, why, proof) {
+    if (!el) return;
+    if (!TRUST_LABELS[state]) state = "unverifiable";
+    // Gate the earned green state.
+    if (state === "verified" && proof !== VERIFIED_OK) {
+      state = "unverifiable";
+      if (!why) why = "Verification not proven to the UI; showing UNVERIFIABLE by policy.";
+    }
+    ensureTrustParts(el);
+    el.setAttribute("data-trust", state);
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", state === "checking" ? "polite" : "assertive");
+    el.querySelector(".ps-trust__val").textContent = TRUST_LABELS[state];
+    el.querySelector(".ps-trust__why").textContent = why || TRUST_DEFAULT_WHY[state];
+    // Screen-reader summary so state isn't color-only.
+    el.setAttribute("aria-label", "Trust state: " + TRUST_LABELS[state] + ". " + (why || TRUST_DEFAULT_WHY[state]));
+    return state;
+  };
+  trust.VERIFIED_OK = VERIFIED_OK;
+
+  /* ======================================================================
+     HONESTY STRIP — keep a caveat impossible to lose.
+     mount() guarantees a role="note" strip exists at the top of a container;
+     setCaveat() toggles the amber "active caveat" styling + text.
+     ====================================================================== */
+  var honesty = {
+    mount: function (container, text) {
+      if (!hasDOM || !container) return null;
+      var strip = container.querySelector(".ps-honesty");
+      if (!strip) {
+        strip = document.createElement("div");
+        strip.className = "ps-honesty";
+        strip.setAttribute("role", "note");
+        container.insertBefore(strip, container.firstChild);
+      }
+      if (text != null) strip.innerHTML = text;
+      return strip;
+    },
+    setCaveat: function (strip, on, text) {
+      if (!strip) return;
+      strip.setAttribute("data-caveat", on ? "1" : "0");
+      if (text != null) strip.innerHTML = text;
+    }
+  };
+
+  /* ======================================================================
+     DIALOG — thin ergonomics over native <dialog> (focus trap is native).
+     ====================================================================== */
+  var dialog = {
+    open: function (el) {
+      if (!el) return;
+      if (typeof el.showModal === "function") el.showModal();
+      else el.setAttribute("open", "");
+      var first = el.querySelector("[autofocus], input, button, select, textarea, [tabindex]");
+      if (first && typeof first.focus === "function") first.focus();
+    },
+    close: function (el) {
+      if (!el) return;
+      if (typeof el.close === "function") el.close();
+      else el.removeAttribute("open");
+    },
+    /* Auto-wire: [data-ps-open="#id"], [data-ps-close], backdrop click, Esc. */
+    init: function (scope) {
+      if (!hasDOM) return;
+      var self = this;
+      var s = scope || document;
+      var openers = s.querySelectorAll("[data-ps-open]");
+      for (var i = 0; i < openers.length; i++) {
+        (function (btn) {
+          btn.addEventListener("click", function () {
+            var target = document.querySelector(btn.getAttribute("data-ps-open"));
+            self.open(target);
+          });
+        })(openers[i]);
+      }
+      var closers = s.querySelectorAll("[data-ps-close]");
+      for (var j = 0; j < closers.length; j++) {
+        (function (btn) {
+          btn.addEventListener("click", function () {
+            var d = btn.closest("dialog"); if (d) self.close(d);
+          });
+        })(closers[j]);
+      }
+      // Click on backdrop closes.
+      var dialogs = s.querySelectorAll("dialog.ps-dialog");
+      for (var k = 0; k < dialogs.length; k++) {
+        dialogs[k].addEventListener("click", function (e) {
+          if (e.target === this) self.close(this);
+        });
+      }
+    }
+  };
+
+  /* ======================================================================
+     Convenience: init everything the DOM opts into.
+     ====================================================================== */
+  function init(scope) {
+    theme.init();
+    dialog.init(scope);
+  }
+
+  if (hasDOM) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function () { /* opt-in only */ });
+    }
+  }
+
+  return {
+    version: "0.1.0-unaudited",
+    theme: theme,
+    trust: trust,
+    VERIFIED_OK: VERIFIED_OK,
+    honesty: honesty,
+    dialog: dialog,
+    prefersReducedMotion: prefersReducedMotion,
+    init: init
+  };
+});
+/* === gallery.js (preview wiring only) === */
+/* ---- gallery wiring (demo only; uses the shipped PosternDS API) ---- */
+(function () {
+  var TRUST_WHY = {
+    checking:     "Verifying the detached signature…",
+    unsigned:     "No signature was provided. Treat as untrusted.",
+    unverifiable: "A signature exists but can't be checked in this browser.",
+    verified:     "Detached signature verified against the pinned key.",
+    tampered:     "Signature check FAILED — the bytes do not match. Do not trust."
+  };
+
+  // Clone the specimen into both theme columns.
+  var tpl = document.getElementById("specimen");
+  var mounts = document.querySelectorAll(".g-col-mount");
+  for (var m = 0; m < mounts.length; m++) {
+    mounts[m].appendChild(tpl.content.cloneNode(true));
+  }
+
+  // Populate every trust specimen. Only the "verified" one gets the sentinel.
+  var trusts = document.querySelectorAll(".js-trust");
+  for (var i = 0; i < trusts.length; i++) {
+    var state = trusts[i].getAttribute("data-demo");
+    var proof = state === "verified" ? PosternDS.VERIFIED_OK : undefined;
+    PosternDS.trust(trusts[i], state, TRUST_WHY[state], proof);
+  }
+
+  // Demonstrate the gate: trying to force green WITHOUT proof falls back honestly.
+  // (No visual output; proves in the console for the curious.)
+  try {
+    var probe = document.createElement("div");
+    var got = PosternDS.trust(probe, "verified", "faked caption");
+    if (got === "verified") console.warn("[PosternDS] gate FAILED — green was set without proof");
+    else console.info("[PosternDS] honesty gate OK — 'verified' without proof resolved to:", got);
+  } catch (e) {}
+
+  // Dialog open buttons (there are two — one per column clone).
+  var openers = document.querySelectorAll(".js-open-dialog");
+  var dlg = document.getElementById("demo-dialog");
+  for (var o = 0; o < openers.length; o++) {
+    openers[o].addEventListener("click", function () {
+      PosternDS.trust(document.getElementById("dlg-trust"), "unsigned",
+        "This specimen artifact carries no signature.");
+      PosternDS.dialog.open(dlg);
+    });
+  }
+  PosternDS.dialog.init();
+
+  // Accent swatches.
+  var ACCENTS = [
+    ["brass", "Sotto"], ["steel", "Vedetta"], ["verdigris", "Tolmach"],
+    ["beryl", "Ezekiel"], ["iris", "Login"], ["amethyst", "Store"], ["cobalt", "Enterprise"]
+  ];
+  var box = document.getElementById("accent-swatches");
+  ACCENTS.forEach(function (a) {
+    var w = document.createElement("div");
+    w.className = "g-swatch ps-accent-" + a[0];
+    var bar = document.createElement("div");
+    bar.className = "g-swatch-bar";
+    ["--ps-acc", "--ps-acc-hi", "--ps-acc-dim"].forEach(function (v) {
+      var s = document.createElement("span");
+      s.style.background = "var(" + v + ")";
+      bar.appendChild(s);
+    });
+    var cap = document.createElement("div");
+    cap.className = "g-swatch-cap";
+    cap.innerHTML = "<span>" + a[0] + "</span><span>" + a[1] + "</span>";
+    w.appendChild(bar); w.appendChild(cap);
+    box.appendChild(w);
+  });
+
+  // Wire the page's own theme toggle (auto/light/dark).
+  PosternDS.theme.init();
+})();
+</script>
+</body>
+</html>

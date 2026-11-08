@@ -1,0 +1,7 @@
+# build output
+/target/
+
+# generated local dev TUF repositories / keys — never commit, never ship
+dev-keys-DO-NOT-SHIP/
+*.tuf-out/
+tuf-repo/

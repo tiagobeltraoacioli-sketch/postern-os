@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Never commit real vendor private keys. Only the clearly-marked *sample/dev*
+# key under keys/ is intentionally tracked. Real signing keys must live in a
+# secret manager / HSM and must NEVER touch this repo.
+keys/*.secret
+keys/production*
+*.pem

@@ -1,0 +1,110 @@
+# Maintainer: Tiago Beltrao Acioli <tiagobeltraoacioli@gmail.com>
+#
+# ==========================================================================
+# STATUS: UNBUILT / UNBOOTED. "Postern for postmarketOS" — community edition.
+# This APKBUILD has NEVER been run through abuild/pmbootstrap on a real
+# Alpine/pmOS host. It is lint-reviewed only. Non-reproducible, non-attestable
+# (see ../HONESTY.md). No build result exists yet.
+# ==========================================================================
+#
+# Postern app suite for postmarketOS — the self-contained web apps from the
+# Postern Labs products repo (apps/*): postern-store, postern-login,
+# postern-onboard, sotto, tolmach, vedetta, postern-enterprise. Shipped as
+# static assets plus one generated .desktop launcher per app that opens the
+# page in the system browser via xdg-open (launch strategy (a)).
+pkgname=postern-apps
+pkgver=0.1.0_alpha1
+pkgrel=0
+pkgdesc="Postern application suite (web apps) for postmarketOS - community edition, non-attestable"
+url="https://posternlabs.com"  # TODO: confirm canonical public URL before first publish
+# Pure web assets + text .desktop files: no architecture-specific binaries, so
+# "noarch" is correct per APKBUILD(5). The same .apk is indexed into both the
+# aarch64/ and x86_64/ repo dirs (aarch64-build.md). If a compiled webview
+# shell ever ships in THIS package, switch to arch="aarch64 x86_64".
+arch="noarch"
+license="MIT"
+# Launch strategy (a): .desktop entries call `xdg-open <index.html>`, which
+# hands off to the system default browser. xdg-utils provides xdg-open; the
+# browser itself is pulled by the UI meta (postmarketos-ui-phosh) that the
+# `postern` meta package depends on, so we do not hard-pin one here.
+depends="xdg-utils"
+# No makedepends/toolchain: every app is a single self-contained index.html
+# (no package.json, no npm, no bundler — see apps/build-offline.md). The
+# committed HTML *is* the dist artifact, so the build is offline by
+# construction and options="net" must never be needed here.
+makedepends=""
+# TODO(check): wire apps/*/test-core.mjs into check() (needs nodejs in
+# checkdepends) once a build host exists.
+options="!check"
+
+# App list, mirrored from assemble-public.sh. tolmach-subscription is
+# deliberately excluded: its client only works against an operator-deployed
+# metering proxy (server infra, never on-device); the Sovereign BYO-key
+# tolmach is the right on-device default.
+_apps="sotto vedetta tolmach postern-store postern-login postern-onboard postern-enterprise"
+
+# TODO(release-artifact) — BLOCKER #1: needs a tagged release of the products
+# repo. The `vTODO` tag deliberately does NOT resolve (no accidental fetch).
+# GitLab archive-by-tag extracts to <project>-<tag>, hence builddir override.
+# Expected final form:
+#   source="$pkgname-$pkgver.tar.gz::https://gitlab.com/bloch-sis-group/bloch-sis-project/-/archive/v$pkgver/bloch-sis-project-v$pkgver.tar.gz"
+source="bloch-sis-project-v0.1.0-alpha1.tar.gz::https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/src/bloch-sis-project-v0.1.0-alpha1.tar.gz"
+builddir="$srcdir/bloch-sis-project-v0.1.0-alpha1"
+
+build() {
+	# Nothing to compile: each app ships as a prebuilt, committed, self-
+	# contained apps/<app>/index.html (no CDN scripts, no fonts, no fetches).
+	# Two real jobs instead:
+	#
+	# 1) Guard the offline/privacy invariant: fail if anyone reintroduced an
+	#    external script/style reference into an app.
+	for app in $_apps; do
+		if [ ! -f "apps/$app/index.html" ]; then
+			error "apps/$app/index.html missing from the source tarball"
+			return 1
+		fi
+		if grep -Eq '(src|href)="https?://' "apps/$app/index.html"; then
+			error "apps/$app/index.html references an external URL"
+			return 1
+		fi
+	done
+
+	# 2) Generate one freedesktop .desktop launcher per app (there are no
+	#    committed .desktop files; desktop/ in the repo is the Tauri app, not
+	#    launcher entries). Written to $srcdir so package() can install them.
+	mkdir -p "$srcdir"/desktop-entries
+	for app in $_apps; do
+		# Human name: strip the "postern-" prefix, keep it simple.
+		_name="Postern ${app#postern-}"
+		cat > "$srcdir/desktop-entries/postern-$app.desktop" <<-EOF
+			[Desktop Entry]
+			Type=Application
+			Name=$_name
+			Comment=Postern $app (opens in the system browser)
+			Exec=xdg-open /usr/share/postern/apps/$app/index.html
+			Terminal=false
+			Categories=Network;Utility;
+			X-Postern-Edition=postmarketOS-community
+		EOF
+	done
+}
+
+package() {
+	# Static assets under /usr/share/postern/apps/<app>/, plus the generated
+	# launcher into /usr/share/applications/ so apps appear in the Phosh grid.
+	for app in $_apps; do
+		install -Dm644 "apps/$app/index.html" \
+			"$pkgdir"/usr/share/postern/apps/$app/index.html
+		install -Dm644 "$srcdir/desktop-entries/postern-$app.desktop" \
+			"$pkgdir"/usr/share/applications/postern-$app.desktop
+	done
+
+	# First-run honesty note (referenced by postern.post-install). Path is
+	# relative to builddir = the products-repo root inside the tarball.
+	install -Dm644 pmos-overlay/flavor/first-run.md \
+		"$pkgdir"/usr/share/doc/postern-apps/first-run.md
+}
+
+# TODO(build-host): populate with `pmbootstrap checksum postern-apps` /
+# `abuild checksum` once `source=` resolves to a real tag.
+sha512sums="86e1534c2e3294107d6a171e9378652f5a72ff65c8c34ff2968a39c714028c2a8f5f453515240fd5c3a614688a45327638962b2b5edf1b2af8983108475a77bf  bloch-sis-project-v0.1.0-alpha1.tar.gz"

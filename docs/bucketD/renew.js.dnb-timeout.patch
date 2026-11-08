@@ -1,0 +1,60 @@
+--- a/functions/license/renew.js	2026-07-13 12:02:52
++++ b/functions/license/renew.js	2026-07-13 12:03:50
+@@ -63,23 +63,39 @@
+ }
+ 
+ // --- D&B Direct+ (same contract as master.js verifyDunsWithDnB) ---------------
++// F2 fix (Bucket D, docs/bucketD/PARTITION.md §4): AbortController timeout on
++// every fetch (env.DNB_TIMEOUT_MS, default 8s) -> fail-open to format-only on
++// timeout, same as any other DNB outage. Never confused with "not-found".
++const DNB_TIMEOUT_MS_DEFAULT = 8000;
+ async function verifyDunsWithDnB(duns, env, fetchImpl = fetch) {
+   const clientId = env && env.DNB_CLIENT_ID, clientSecret = env && env.DNB_CLIENT_SECRET, staticBearer = env && env.DNB_BEARER;
+   if (!staticBearer && !(clientId && clientSecret)) return { status: "unavailable", reason: "dnb-not-configured" };
++  const timeoutMs = Number(env && env.DNB_TIMEOUT_MS) > 0 ? Number(env.DNB_TIMEOUT_MS) : DNB_TIMEOUT_MS_DEFAULT;
+   try {
+     let bearer = staticBearer;
+     if (!bearer) {
+-      const tokRes = await fetchImpl(DNB_AUTH_URL, {
+-        method: "POST",
+-        headers: { authorization: "Basic " + btoa(`${clientId}:${clientSecret}`), "content-type": "application/x-www-form-urlencoded" },
+-        body: "grant_type=client_credentials",
+-      });
++      const ac = new AbortController();
++      const timer = setTimeout(() => ac.abort(), timeoutMs);
++      let tokRes;
++      try {
++        tokRes = await fetchImpl(DNB_AUTH_URL, {
++          method: "POST",
++          headers: { authorization: "Basic " + btoa(`${clientId}:${clientSecret}`), "content-type": "application/x-www-form-urlencoded" },
++          body: "grant_type=client_credentials",
++          signal: ac.signal,
++        });
++      } finally { clearTimeout(timer); }
+       if (!tokRes.ok) return { status: "unavailable", reason: `dnb-auth-http-${tokRes.status}` };
+       const tj = await tokRes.json();
+       bearer = tj && (tj.access_token || tj.accessToken);
+       if (!bearer) return { status: "unavailable", reason: "dnb-auth-no-token" };
+     }
+-    const res = await fetchImpl(`${DNB_DATA_URL}/${encodeURIComponent(duns)}?blockIDs=companyinfo_L1_v1`, { headers: { authorization: "Bearer " + bearer } });
++    const ac2 = new AbortController();
++    const timer2 = setTimeout(() => ac2.abort(), timeoutMs);
++    let res;
++    try {
++      res = await fetchImpl(`${DNB_DATA_URL}/${encodeURIComponent(duns)}?blockIDs=companyinfo_L1_v1`, { headers: { authorization: "Bearer " + bearer }, signal: ac2.signal });
++    } finally { clearTimeout(timer2); }
+     if (res.status === 404) return { status: "not-found", reason: "dnb-duns-not-found" };
+     if (!res.ok) return { status: "unavailable", reason: `dnb-data-http-${res.status}` };
+     const data = await res.json();
+@@ -90,7 +106,10 @@
+       legalName: String(org.primaryName),
+       country: org.primaryAddress && org.primaryAddress.addressCountry ? String(org.primaryAddress.addressCountry.isoAlpha2Code || "") : "",
+     };
+-  } catch { return { status: "unavailable", reason: "dnb-network-error" }; }
++  } catch (e) {
++    if (e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")))) return { status: "unavailable", reason: "dnb-timeout" };
++    return { status: "unavailable", reason: "dnb-network-error" };
++  }
+ }
+ function dnbDecisionFrom(result, now) {
+   if (result.status === "verified") {

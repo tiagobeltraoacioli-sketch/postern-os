@@ -1,0 +1,57 @@
+/target
+**/*.rs.bk
+# Cargo.lock is committed — this is a binary project, reproducible builds
+# require the lock (prev practice of gitignoring it produced divergent CI
+# builds vs local builds).
+.env
+.env.local
+*.log
+.DS_Store
+data/
+node_data/
+logs/
+*.sqlite
+*.db
+
+# Archive / releases (não versionar)
+docs/*.tar.gz
+docs/*.tar
+*.bak
+*.tmp
+scan/node_modules/
+scan/dist/
+scan/.astro/
+scan/node_modules/
+scan/dist/
+scan/.astro/
+loc-alpha.txt
+loc-beta-day0.txt
+
+# Personal session journal (not versioned)
+journal.txt
+
+# Tauri desktop build artifacts
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+
+# build artifacts in any subcrate
+**/target/
+
+# build output + local hi-res video backup (not versioned)
+/public/
+site/media/_originals_hires/
+/tmp/
+tmp/
+
+# wrangler local build cache
+.wrangler/
+
+# POC Ed25519 test keypair generated on demand by
+# apps/postern-store/repro-verifier/scripts/gen-builder-keys.mjs — no
+# committed signed fixture depends on this specific key (unlike
+# repo-poc/fixtures/repo-key.json), so it is not committed. See
+# apps/postern-store/repro-verifier/fixtures/README.md.
+apps/postern-store/repro-verifier/fixtures/builder-key.json
+
+# workflow worktrees / agent scratch
+.claude/

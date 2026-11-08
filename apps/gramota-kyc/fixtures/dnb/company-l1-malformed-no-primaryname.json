@@ -1,0 +1,8 @@
+{
+  "_synthetic": "SYNTHETIC FIXTURE — shaped from D&B's public Direct+ API reference docs; NOT a captured real response. Postern Labs holds no D&B account.",
+  "_source": "Malformed-but-200 edge case — `organization` present but with no `primaryName`. Must fail CLOSED to not-found/dnb-no-organization.",
+  "organization": {
+    "duns": "555666777",
+    "primaryAddress": { "addressCountry": { "isoAlpha2Code": "BR" } }
+  }
+}

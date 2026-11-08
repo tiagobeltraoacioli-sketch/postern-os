@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# compose.yaml — self-hosting skeleton for the Postern Enterprise edition.
+#
+# REPRODUCIBLE-BY-DESIGN, NOT REPRODUCED. Privacy-preserving defaults: no
+# telemetry, egress-closed unless the operator opts in, secrets injected at
+# runtime (never baked into the image). This is a SKELETON, not a hardened,
+# audited, or production-ready deployment.
+#
+# Run (operator-run):  podman compose up -d   (or docker compose up -d)
+name: postern-enterprise
+
+services:
+  postern-enterprise:
+    # Build locally from the pinned Containerfile, or pull a signed image you
+    # verified with ../signing/verify-build.sh before deploying.
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        SOURCE_DATE_EPOCH: "0"
+    image: postern-enterprise:local
+    restart: unless-stopped
+
+    # No new privileges; drop all capabilities; read-only root FS. Data lives
+    # only in the named volume below.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    user: "10001:10001"
+
+    environment:
+      # Privacy-preserving default posture. No analytics, no phone-home.
+      POSTERN_TELEMETRY: "off"
+      TZ: "UTC"
+
+    # Config is operator-owned and mounted READ-ONLY. Keep real secrets out of
+    # this file — use an env_file or a secrets manager the operator controls.
+    volumes:
+      - ./config:/etc/postern:ro
+      - postern-data:/var/lib/postern
+    # env_file:
+    #   - ./enterprise.env   # operator-provided; gitignored; never committed
+
+    ports:
+      - "127.0.0.1:8080:8080"   # bound to loopback by default; front with your own TLS proxy
+
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "exit 0"]   # replace with a real check
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postern-data:

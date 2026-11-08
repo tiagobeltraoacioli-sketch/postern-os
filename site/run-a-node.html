@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PGvaJOHh/2Hs04GrXLsHhj1nqW6SKkPSFiW+NbJArrI='; style-src 'sha256-SMLID9BWNjKkKtuDRZ6i3E+tksgAGbTfYINb1WxwXcA=' 'unsafe-hashes' 'sha256-/VbthIwcEYMXx4fxyR0jXt4EhV2cY/SvXjtLqy7Lwic=' 'sha256-/8bPNTwQpOj3ZluB4/gq33E+uCo9ilMR0qHN6pKAjZM=' 'sha256-vyaCh9A5MeESrzYoay95A6yLQjJ388e8La2tXHqoVQQ=' 'sha256-g+NFUmBKflyklwID7aYj+HbTms2gouWtPZ5TnmoAWIU='; img-src 'self'; media-src 'self'; font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests">
+<meta name="description" content="Build and run a Bloch-SIS-PoW mainnet-beta node: clone, cargo build, run a relay or a solo miner, check it over RPC, and peer without privileged seeds. Unaudited, 51%-attackable mainnet beta — coins carry no value claim.">
+<meta name="color-scheme" content="dark light">
+<title>Run a mainnet-beta node · Postern Labs</title>
+<style>
+:root {
+  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* dark (default) — graphite / ink */
+  --bg:        #161e2a;
+  --bg-glow:   #1b2430;
+  --surface:   #1f2836;
+  --surface-2: #243040;
+  --surface-3: #2c3a4c;
+  --border:    #2e3d4f;
+  --border-hi: #41546b;
+  --text:      #eef2f6;
+  --text-dim:  #a9b6c4;
+  --muted:     #7e8da0;
+
+  --brass:     #c07f45;
+  --brass-hi:  #d9995c;
+  --brass-dim: #8f5a28;
+  --brass-ink: #131922;
+
+  --warn-bg:   #231a10;
+  --warn-bord: #6e5426;
+  --ok:        #6fae7d;
+  --danger:    #ea6a62;
+
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:        #f4f7fa;
+    --bg-glow:   #e8edf2;
+    --surface:   #ffffff;
+    --surface-2: #eef2f6;
+    --surface-3: #e1e8f0;
+    --border:    #ccd6e0;
+    --border-hi: #a7b7c8;
+    --text:      #1b2430;
+    --text-dim:  #46566a;
+    --muted:     #5a6b7d;
+
+    --brass:     #8f5a28;
+    --brass-hi:  #7a4b1f;
+    --brass-dim: #b87333;
+    --brass-ink: #f4f7fa;
+
+    --warn-bg:   #fbf3e7;
+    --warn-bord: #c9a06a;
+    --ok:        #3c7a4c;
+    --danger:    #b23830;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a, .card, .btn { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--brass); color: var(--brass-ink);
+  padding: .5rem 1rem; z-index: 100; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+a { color: var(--brass-hi); text-decoration-color: var(--brass-dim); text-underline-offset: 3px; }
+a:hover { color: var(--text); }
+code, .mono { font-family: var(--font-mono); font-size: .92em; }
+code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: .08em .38em; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-family: var(--font-mono);
+  font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 1rem 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ---------- header ---------- */
+.site-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-glow);
+}
+.site-head .inner {
+  max-width: 68rem; margin: 0 auto; padding: .9rem 1.25rem;
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.wordmark {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-weight: 700; letter-spacing: .14em; font-size: .95rem;
+  color: var(--text); text-decoration: none; text-transform: uppercase;
+}
+.wordmark svg { flex: none; }
+.wordmark .gate-arch { stroke: var(--brass); }
+.wordmark .lab { color: var(--brass); }
+.site-head nav { margin-left: auto; display: flex; gap: .25rem 1.1rem; flex-wrap: wrap; }
+.site-head nav a {
+  font-size: .82rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none; padding: .25rem 0;
+  border-bottom: 2px solid transparent;
+}
+.site-head nav a:hover { color: var(--text); }
+.site-head nav a[aria-current="page"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+
+/* ---------- honest-beta ribbon ---------- */
+.beta-ribbon {
+  background: var(--warn-bg); border-bottom: 1px solid var(--warn-bord);
+  padding: .65rem 1.25rem; text-align: center;
+  font-size: .86rem; color: var(--text);
+}
+.beta-ribbon strong { color: var(--brass-hi); letter-spacing: .05em; }
+.beta-ribbon a { white-space: nowrap; }
+
+/* ---------- layout ---------- */
+main { display: block; }
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.narrow { max-width: 46rem; }
+section { padding: 3.2rem 0; }
+section + section { border-top: 1px solid var(--border); }
+
+.kicker {
+  font-size: .74rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass); font-weight: 700; margin-bottom: .8rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4.6vw, 3.1rem); line-height: 1.12;
+  letter-spacing: -.015em; font-weight: 750; margin-bottom: 1rem;
+  text-wrap: balance;
+}
+h2 {
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem); line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: .9rem; text-wrap: balance;
+}
+h3 { font-size: 1.06rem; margin-bottom: .4rem; }
+.lede { font-size: 1.14rem; color: var(--text-dim); max-width: 44rem; text-wrap: pretty; }
+p + p, .prose ul, .prose ol { margin-top: .9rem; }
+.prose { max-width: 46rem; color: var(--text-dim); }
+.prose strong, .prose b { color: var(--text); }
+.prose ul, .prose ol { padding-left: 1.3rem; }
+.prose li + li { margin-top: .45rem; }
+.dim { color: var(--text-dim); }
+.small { font-size: .86rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 4.2rem 0 3.4rem; background: var(--bg-glow); }
+.hero .rule {
+  width: 4.5rem; height: 4px; background: var(--brass);
+  margin-bottom: 1.6rem; border-radius: 0;
+}
+.cta-row { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.8rem; }
+.btn {
+  display: inline-block; padding: .68rem 1.25rem; border-radius: 6px;
+  font-weight: 650; font-size: .95rem; text-decoration: none;
+  border: 1px solid var(--border-hi); color: var(--text);
+}
+.btn:hover { border-color: var(--brass); color: var(--brass-hi); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+.btn.primary:hover { background: var(--brass-hi); border-color: var(--brass-hi); color: var(--brass-ink); }
+
+/* ---------- warning panel ---------- */
+.warnpanel {
+  background: var(--warn-bg); border: 1px solid var(--warn-bord);
+  border-left: 4px solid var(--brass); border-radius: 8px;
+  padding: 1.3rem 1.5rem; margin: 1.5rem 0; max-width: 52rem;
+}
+.warnpanel h2, .warnpanel h3 { color: var(--brass-hi); font-size: 1.02rem; letter-spacing: .04em; text-transform: uppercase; }
+.warnpanel p { color: var(--text); margin-top: .55rem; font-size: .95rem; }
+.warnpanel ul { margin: .55rem 0 0 1.2rem; font-size: .95rem; }
+.warnpanel li + li { margin-top: .35rem; }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-top: 1.6rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .45rem;
+}
+.card:hover { border-color: var(--brass-dim); }
+.card h3 { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card p { color: var(--text-dim); font-size: .92rem; flex: 1; }
+.card .badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .2rem; }
+
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .14rem .5rem; border-radius: 4px; border: 1px solid var(--border-hi);
+  color: var(--text-dim); white-space: nowrap;
+}
+.badge.built    { color: var(--ok); border-color: var(--ok); }
+.badge.proto    { color: var(--brass-hi); border-color: var(--brass-dim); }
+.badge.design   { color: var(--muted); border-style: dashed; }
+.badge.unaud    { color: var(--danger); border-color: var(--danger); }
+.badge.byok     { color: var(--brass-hi); border-color: var(--brass-dim); }
+
+/* ---------- two-panel compare ---------- */
+.compare { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.8rem; }
+.panel {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.panel header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.panel.owned header { border-top: 3px solid var(--brass); }
+.panel.commons header { border-top: 3px solid var(--muted); }
+.panel header .tag { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); font-weight: 700; }
+.panel.commons header .tag { color: var(--muted); }
+.panel header h3 { font-size: 1.25rem; margin-top: .25rem; }
+.panel .body { padding: 1.1rem 1.4rem 1.4rem; }
+.panel ul { list-style: none; }
+.panel li {
+  padding: .55rem 0 .55rem 1.4rem; position: relative;
+  color: var(--text-dim); font-size: .94rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel li:last-child { border-bottom: none; }
+.panel li::before { content: "▸"; position: absolute; left: 0; color: var(--brass); }
+.panel.commons li::before { color: var(--muted); }
+.panel li strong { color: var(--text); }
+
+/* ---------- stack diagram ---------- */
+.stack { margin: 2rem 0 0; max-width: 52rem; }
+.stack .layer {
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1rem 1.3rem; background: var(--surface);
+}
+.stack .layer.base { border-style: dashed; background: transparent; }
+.stack .layer .t { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: var(--brass); }
+.stack .layer.base .t { color: var(--muted); }
+.stack .layer p { font-size: .9rem; color: var(--text-dim); margin-top: .3rem; }
+.stack .join {
+  text-align: center; color: var(--muted); font-size: .78rem;
+  padding: .45rem 0; font-family: var(--font-mono);
+}
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; margin-top: 1.4rem; border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; min-width: 34rem; }
+th, td { text-align: left; padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td { color: var(--text-dim); }
+td strong { color: var(--text); }
+
+/* ---------- demo videos ---------- */
+.videos { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-top: 1.6rem; }
+.videos figure { margin: 0; min-width: 0; }
+.videos video {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: #000;
+}
+.videos figcaption { margin-top: .6rem; color: var(--text-dim); }
+.videos figcaption strong { color: var(--text); }
+
+/* ---------- manifesto film ---------- */
+.film { margin: 1.6rem 0 .9rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #000; max-width: 54rem; }
+.film video { display: block; width: 100%; height: auto; }
+
+/* ---------- steps / definition rows ---------- */
+.defrow { display: grid; grid-template-columns: minmax(9rem, 13rem) 1fr; gap: .4rem 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.defrow:last-of-type { border-bottom: none; }
+.defrow dt { font-weight: 650; color: var(--text); }
+.defrow dd { color: var(--text-dim); font-size: .95rem; }
+@media (max-width: 40rem) { .defrow { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+.site-foot {
+  border-top: 1px solid var(--border); margin-top: 3rem;
+  background: var(--bg-glow); padding: 2.4rem 0 3rem;
+  font-size: .85rem; color: var(--muted);
+}
+.site-foot .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.site-foot h4 { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; }
+.site-foot p + p { margin-top: .6rem; }
+.site-foot nav a { display: block; color: var(--text-dim); text-decoration: none; padding: .15rem 0; }
+.site-foot nav a:hover { color: var(--brass-hi); }
+.site-foot .legal { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+
+/* Vestnik node-setup assistant (the one interactive widget on the site). */
+.vestnik { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 1.2rem; background: var(--panel, rgba(255,255,255,.02)); }
+.vestnik .vk-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.vestnik .vk-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brass-hi); flex: 0 0 auto; }
+.vestnik .vk-title { font-weight: 600; }
+.vestnik .vk-scope { color: var(--text-dim); font-size: .85rem; margin-left: auto; }
+.vk-log { max-height: 26rem; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; }
+.vk-msg { max-width: 92%; padding: .6rem .8rem; border-radius: 9px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.vk-msg.vk-user { align-self: flex-end; background: var(--brass-hi); color: #1a1305; }
+.vk-msg.vk-bot { align-self: flex-start; background: rgba(255,255,255,.05); border: 1px solid var(--border); }
+.vk-msg.vk-sys { align-self: center; color: var(--text-dim); font-size: .85rem; background: none; border: none; text-align: center; max-width: 100%; }
+.vk-msg code { background: rgba(0,0,0,.25); padding: .05rem .3rem; border-radius: 4px; }
+.vk-msg pre { background: rgba(0,0,0,.35); padding: .6rem .8rem; border-radius: 6px; overflow-x: auto; margin: .4rem 0; }
+.vk-msg pre code { background: none; padding: 0; }
+.vk-form { display: flex; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--border); }
+.vk-input { flex: 1; background: rgba(0,0,0,.25); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: .55rem .7rem; font: inherit; resize: none; }
+.vk-input:focus { outline: none; border-color: var(--brass-hi); }
+.vk-send { background: var(--brass-hi); color: #1a1305; border: none; border-radius: 7px; padding: 0 1rem; font: inherit; font-weight: 600; cursor: pointer; }
+.vk-send:disabled { opacity: .5; cursor: default; }
+.vk-note { padding: .1rem 1rem 1rem; color: var(--text-dim); font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="inner">
+    <a class="wordmark" href="index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path class="gate-arch" d="M5 22V11a7 7 0 0 1 14 0v11"/><path class="gate-line" d="M12 4v18" stroke-width="1.1"/></svg><span>Postern&nbsp;<span class="lab">Labs</span></span></a>
+    <nav aria-label="Site">
+      <a href="index.html">Home</a>
+      <a href="postern-vs-bloch.html">Postern & Bloch</a>
+      <a href="products.html">Products</a>
+      <a href="downloads.html">Downloads</a>
+      <a href="run-a-node.html" aria-current="page">Run a node</a>
+      <a href="migration.html">SHA-256 migration</a>
+      <a href="snapshot.html">Snapshot sync</a>
+      <a href="pool.html">Pool</a>
+      <a href="asic.html">ASIC</a>
+      <a href="releases.html">Releases</a>
+      <a href="security.html">Security</a>
+      <a href="/explorer/">Explorer</a>
+      <a href="disclaimer.html">Disclaimer</a>
+      <a href="acknowledgments.html">Acknowledgments</a>
+    </nav>
+  </div>
+</header>
+<div class="beta-ribbon" role="note" aria-label="Mainnet beta status warning">
+  <strong>MAINNET BETA.</strong> Unaudited · <strong>difficulty-driven k-ramp</strong> (k=4 now, rising with hashrate — a structural filter, not a security claim) · very few nodes, low hashrate, 51%-attackable · not a security · for evaluation —
+  <strong>not to protect real secrets yet</strong>. <a href="disclaimer.html">Full disclaimer&nbsp;→</a>
+</div>
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker">Run a mainnet-beta node</p>
+    <h1>Join the Bloch-SIS-PoW mainnet beta.</h1>
+    <p class="lede">This page walks you through building and running a node of the <strong>ownerless</strong> Bloch-SIS-PoW protocol on its <strong>mainnet beta</strong> — as a relay, or as a solo miner. The network is nascent and unaudited, and its coins carry <strong>no value claim</strong>. You are helping run and harden experimental post-quantum PoW research, nothing more.</p>
+    <div class="warnpanel" role="note">
+      <h3>Read before running anything</h3>
+      <ul>
+        <li><strong>Mainnet beta — a designation, not a security claim.</strong> As of node v0.1.0-alpha2 the Module-SIS gate is a <strong>difficulty-driven k-ramp</strong>: <strong>k=4 today</strong>, rising 5→6→7→8 as the network's own ASERT difficulty sustains above spaced thresholds, and easing back if hashrate falls — the Bitcoin model. This replaces the fixed k=8 gate, which was choking block production at low hashrate for <strong>no security gain</strong> (β=q/16 is the trivial regime at any k — raising k adds no cryptographic hardness). The ramp is a structural filter, <strong>not a security claim</strong>; real security is <strong>cumulative SHAKE-256 hashcash work — hashrate × time</strong>. Onboarding: a new node can <strong>sync from genesis</strong> (the historical chain validates under the ramp) or fast-sync from the optional <strong>signed snapshot</strong>.</li>
+        <li><strong>Very few nodes, low hashrate → 51%-attackable.</strong> The software is <strong>unaudited</strong>: a third-party audit is contracted but <strong>not done yet</strong>, and the concrete-security analysis and IACR ePrint are still outstanding.</li>
+        <li><strong>Recently patched.</strong> An <strong>internal</strong> security review's fixes are merged into <code>main</code> and deployed to the public demo nodes — a fresh build from this page already includes them (this is separate from, and does not substitute for, the outstanding third-party audit). Already running an older build? <a href="security.html">Update guide &amp; disclosures →</a></li>
+        <li><strong>The coin is not a security and not an asset.</strong> No token sale, no listing effort, no market-making, no price — <strong>no value claim</strong>. Disclosed in full: a 17% founder premine (10-year cliff, 40-year vest), structurally passive. <a href="disclaimer.html">Full disclaimer</a>.</li>
+        <li>Run it to evaluate, strengthen, break, and report — <strong>not</strong> as an investment. Use at your own risk.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="setupvid-h">
+  <div class="wrap">
+    <p class="kicker" id="setupvid-h">Watch first · snapshot sync</p>
+    <h2>The whole setup, in one short video.</h2>
+    <figure style="margin:1.2rem 0 0">
+      <video controls playsinline preload="metadata" poster="/media/bloch-node-setup-v3-poster.png" style="width:100%;max-width:100%;border:1px solid var(--border);border-radius:10px;background:#000">
+        <source src="/media/bloch-node-setup-v3.mp4" type="video/mp4">
+        <track kind="subtitles" srclang="en" label="English" default src="/media/bloch-node-setup-v3.vtt">
+      </video>
+      <figcaption class="small dim" style="margin-top:.6rem"><strong>Snapshot sync — set up a Bloch node in ~3 min</strong> · narrated · English captions. The video is an overview — the <strong>written steps below are authoritative</strong>. See also <a href="snapshot.html">Snapshot sync — why &amp; how</a>.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section aria-labelledby="src-h">
+  <div class="wrap">
+    <p class="kicker" id="src-h">Step 1 · Get the source</p>
+    <h2>Clone the protocol repository.</h2>
+    <div class="prose">
+      <p>The protocol is not a Postern Labs product and has no official website. It lives in its own ownerless repository — rendered as text on purpose, because the protocol has no official site to link to and this site will not invent one:</p>
+    </div>
+<pre><code>gitlab.com/blochsispow-group/BlochSISPoW-project</code></pre>
+<pre><code># Prefix the path above with your git host scheme of choice, then:
+git clone &lt;the repository above&gt; bloch
+cd bloch</code></pre>
+    <p class="prose small">Prerequisites: a Rust toolchain (rustup, stable), plus a C toolchain — <code>clang</code>, <code>cmake</code>, <code>pkg-config</code> — needed by RocksDB, blst, and the PQClean-based crypto crates.</p>
+  </div>
+</section>
+
+<section aria-labelledby="build-h">
+  <div class="wrap">
+    <p class="kicker" id="build-h">Step 2 · Build</p>
+    <h2>One command, one binary (plus friends).</h2>
+<pre><code>cargo build --release</code></pre>
+    <div class="prose">
+      <p>Binaries land in <code>target/release/</code>: <code>bloch</code> (the full node), <code>bloch-cli</code> (an RPC client, like <code>bitcoin-cli</code>), and <code>bloch-wallet</code>. Verify the build with <code>cargo test</code> if you like — the suite should pass.</p>
+      <p>Prefer an appliance? The Postern OS node ISO (x86_64) is now <strong>hosted, release-signed, and QEMU-boots on x86_64</strong> (a first hardware boot is still further out) — grab it, with its checksum and signature, from <a href="downloads.html">downloads</a>. Building from source, as on this page, remains the strongest verification.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="snap-h">
+  <div class="wrap">
+    <p class="kicker" id="snap-h">Step 2b · Fast-sync from a snapshot — optional</p>
+    <h2>Optional: bootstrap at the tip instead of syncing from genesis.</h2>
+    <div class="prose">
+      <p>Under the difficulty-driven k-ramp (node v0.1.0-alpha2), a fresh node <strong>can sync from genesis again</strong> — the historical chain validates under the ramp's k=4. If you'd rather skip the initial block download, a <strong>signed snapshot</strong> of a current node's chain state (the pruned RocksDB at the tip) gets you to the tip in one pass. A convenience, not a requirement.</p>
+    </div>
+<div class="warnpanel" role="note" style="margin:0 0 1rem">
+      <h3>The older snapshot is a dead end — use the one below</h3>
+      <p>The previously published <code>bloch-db-snapshot.tar.gz</code> ends at height <strong>394,361</strong>. Peers have since pruned block bodies below <strong>~394,913</strong>, so a node restored from it asks for the ~550 blocks in between, <strong>no peer has them, and it stalls forever</strong> with a healthy-looking log. This snapshot (height <strong>408,482</strong>) starts above that gap and syncs normally.</p>
+      <p class="small dim">Why this happens: pruning deletes block bodies below <code>tip &minus; 10,000</code>. A published snapshot must be refreshed <strong>before</strong> the network prunes past the height it ends at, or the chain from snapshot to tip breaks silently. That is a real failure this network hit, not a hypothetical.</p>
+    </div>
+    <pre><code># 1) download the signed snapshot + checksums, verify, restore, then start
+curl -O https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/bloch-db-snapshot-408482.tar.gz
+curl -O https://pub-dca67fd26bfb4a6b98115e596095ecd3.r2.dev/SHA256SUMS-408482
+sha256sum -c SHA256SUMS-408482     # must print: bloch-db-snapshot-408482.tar.gz: OK
+
+mkdir -p ./bloch-data
+tar xzf bloch-db-snapshot-408482.tar.gz -C ./bloch-data   # restores ./bloch-data/db
+
+# 2) start — it boots at the snapshot's tip and syncs the small gap forward
+./target/release/bloch --data-dir ./bloch-data \
+  --listen /ip4/0.0.0.0/tcp/16110 \
+  --peer /ip4/45.32.154.137/tcp/16110</code></pre>
+    <div class="prose">
+      <p class="small">The snapshot excludes node identity, so your node generates its own. This is a <strong>trust-the-operator bootstrap</strong> — you trust the snapshot's chain instead of verifying it from genesis, an honest disclosed tradeoff you can now avoid entirely by syncing from genesis. <strong>Always verify the SHA-256 and signature before trusting it.</strong> Add <code>--mine</code> once it has caught up to mine on the tip. Published to <a href="downloads.html">downloads</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="relay-h">
+  <div class="wrap">
+    <p class="kicker" id="relay-h">Step 3 · Run a relay node</p>
+    <h2>A non-mining node that validates and relays.</h2>
+<pre><code>./target/release/bloch \
+  --data-dir ./bloch-data \
+  --listen /ip4/0.0.0.0/tcp/16110 \
+  --rpc-bind 127.0.0.1 --rpc-port 16210</code></pre>
+    <div class="prose">
+      <p><strong>Network selection:</strong> the current build connects to <strong>the live network — the chain designated mainnet beta</strong> — directly with the command above. (Older builds needed a historical <code>--testnet</code> flag to select the live chain; if your build's <code>--help</code> shows a network flag, match whatever network your bootstrap peer uses.) Network selection does not change the PoW regime: the difficulty-driven k-ramp (k=4 today, rising with hashrate) applies either way.</p>
+      <p>The flags shown are also the defaults, spelled out so you can change them deliberately:</p>
+    </div>
+    <dl>
+      <div class="defrow"><dt><code>--data-dir</code></dt><dd>Where the chain lives: RocksDB block/UTXO storage, the persisted known-peers list, and node identity keys. Default <code>./bloch-data</code>, relative to where you launched the node. Delete it to start fresh.</dd></div>
+      <div class="defrow"><dt><code>--listen</code></dt><dd>The libp2p P2P multiaddr your node accepts peers on. Default <code>/ip4/0.0.0.0/tcp/16110</code>. This is the address other testers will use to bootstrap from <em>you</em>.</dd></div>
+      <div class="defrow"><dt><code>--max-peers</code></dt><dd>Maximum inbound peer connections. Default <code>50</code>. <strong>Raise it on a bootstrap/hub node</strong> (e.g. <code>--max-peers 500</code>) so newcomers aren't dropped once it fills up — a leaf node can leave it at the default. Non-consensus operator knob (see the <a href="releases.html">peering release notes</a>).</dd></div>
+      <div class="defrow"><dt><code>--rpc-bind</code> / <code>--rpc-port</code></dt><dd>JSON-RPC over HTTP. Defaults to <code>127.0.0.1:16210</code> — local only, on purpose. Exposing RPC publicly (<code>--rpc-public</code>) is dangerous when unauthenticated; if you must, set <code>--rpc-api-key</code>.</dd></div>
+      <div class="defrow"><dt>Ports</dt><dd><code>16110/tcp</code> P2P · <code>16111/tcp</code> P2P WebSocket · <code>16210/tcp</code> RPC (keep local) · <code>16310/tcp</code> Prometheus metrics (only with <code>--metrics</code>).</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="mine-h">
+  <div class="wrap">
+    <p class="kicker" id="mine-h">Step 4 · Or run a miner</p>
+    <h2>Solo-mine on the mainnet beta.</h2>
+<pre><code># make a miner address first (only the public address is used to mine):
+./target/release/bloch-cli newwallet ~/miner-wallet.json   # prints: Address: bloch1q…
+
+./target/release/bloch --mine \
+  --miner-address bloch1q…YOUR_ADDRESS \
+  --data-dir ./bloch-data \
+  --listen /ip4/0.0.0.0/tcp/16110 \
+  --peer /ip4/45.32.154.137/tcp/16110</code></pre>
+    <div class="prose">
+      <p>Adding <code>--mine</code> makes the node brute-force Module-SIS solutions (under the current ramp gate — <strong>k=4 today</strong>, rising toward k=8 as hashrate grows) and attach the solution vector as each block's PoW witness, with the coinbase paid to <code>--miner-address</code>. Mining via the node is <strong>solo only</strong>: Stratum V1/V2 pool mining is disabled because the hash-PoW share protocol has no field for a lattice solution vector — a SIS-native pool dialect exists separately (see <a href="pool.html">Pool</a>).</p>
+      <p>To be blunt about the economics: the coins you mine carry <strong>no value claim</strong> — no price, no market, no listing — on a nascent, low-hashrate network that is <strong>51%-attackable</strong>. The ramp's k is a <strong>structural filter, not a security claim</strong> — raising k adds no cryptographic hardness at β=q/16; what mining actually contributes is <strong>cumulative hashcash work</strong>, the only real security source. Mine to exercise the machinery and add hashrate to a young network, not as an investment.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="check-h">
+  <div class="wrap">
+    <p class="kicker" id="check-h">Step 5 · Check it's alive</p>
+    <h2>Query the node over RPC.</h2>
+<pre><code># with the bundled CLI (defaults to 127.0.0.1:16210):
+./target/release/bloch-cli getnetworkinfo
+./target/release/bloch-cli getblockcount
+
+# or raw JSON-RPC over HTTP:
+curl -s -X POST http://127.0.0.1:16210/ \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getnetworkinfo","params":[]}'</code></pre>
+    <div class="prose">
+      <p><code>getnetworkinfo</code> reports version, network (current builds still report the legacy string <code>testnet</code> for the live mainnet-beta chain — a rename ships in a later release), peer count, and sync state. Other read methods include <code>getblockcount</code>, <code>getdaginfo</code>, <code>getmempoolinfo</code>, <code>getpeerinfo</code>, <code>getblockbyheight</code>, and <code>getbalance</code>. Optional Prometheus metrics: add <code>--metrics</code> and scrape <code>127.0.0.1:16310</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="peer-h">
+  <div class="wrap">
+    <p class="kicker" id="peer-h">Step 6 · Peering</p>
+    <h2>Every node is a seed. No node is privileged.</h2>
+    <div class="prose">
+      <p>The shipped seed list is <strong>empty — literally <code>DEFAULT_SEEDS = []</code> in the source</strong>. That is the ethos, honestly applied: no foundation-run bootstrap servers, no DNS seeds yet (a TODO in the code), no node with a special role. The flip side, stated just as honestly: <strong>your node will sit alone until you give it a peer.</strong> This step shows exactly how to give it one, so anyone — with zero prior context — can join.</p>
+
+      <h3>First, what a peer address (multiaddr) looks like</h3>
+      <p>You bootstrap by handing your node the <strong>multiaddr</strong> of any node already on the network. A multiaddr is just a slash-separated recipe for "how to reach this machine". You will only ever need these two shapes:</p>
+    </div>
+<pre><code>/dns4/&lt;hostname&gt;/tcp/16110     # reach a peer by DNS name
+/ip4/&lt;a.b.c.d&gt;/tcp/16110       # reach a peer by raw IPv4 address
+#     └── who ──────┘ └─port┘   16110 is the default P2P port</code></pre>
+    <div class="prose">
+      <p>That address is simply the other node's <code>--listen</code> address as seen from your side of the network — nothing more. Now use it.</p>
+
+      <h3>The one-line way to join, right now</h3>
+      <p>To break the cold-start, here is <strong>one node Postern keeps online</strong> for the mainnet beta. Point your node at it and you are on the network:</p>
+    </div>
+<pre><code>./target/release/bloch \
+  --data-dir ./bloch-data \
+  --listen /ip4/0.0.0.0/tcp/16110 \
+  --peer /ip4/45.32.154.137/tcp/16110</code></pre>
+    <div class="warnpanel" role="note">
+      <h3>Honest note: that node is a convenience, not an authority</h3>
+      <p>The address above is <strong>one Postern-operated node offered purely to break the cold-start</strong> — it is <strong>not</strong> a privileged seed. <code>DEFAULT_SEEDS</code> is still empty in the source, it is <strong>not</strong> hard-coded into any build, it does <strong>not</strong> gate consensus, and <strong>if it vanished the network would continue unchanged.</strong> Do not treat it as official infrastructure — the ownerless protocol has none. It is a starting line, not a gatekeeper: <strong>peer with others too</strong>, and the moment you are connected, <em>your</em> node is a seed for the next person.</p>
+    </div>
+    <div class="prose">
+      <h3>Confirm you actually connected</h3>
+      <p>Give it a few seconds, then ask your node who it is talking to. The peer count should climb above zero and your height should start catching up to the network:</p>
+    </div>
+<pre><code>./target/release/bloch-cli getpeerinfo      # peer_count &gt; 0 means you're in
+./target/release/bloch-cli getnetworkinfo   # watch "peers" and "blocks" rise</code></pre>
+    <div class="prose">
+      <h3>After the first contact, it runs itself</h3>
+      <p><code>--peer</code> can be repeated to dial several nodes at once, and DNS names are resolved automatically. Once you have <em>any</em> connection, <strong>peer exchange (PEX)</strong> takes over: your node learns more peers from the ones it already knows, persists them in the data dir, and redials them on every restart — so you only ever need one good address once. Prefer more than one bootstrap peer? Add a friend's node, or one shared in the community channel, on its own <code>--peer</code> line.</p>
+      <p>For LAN or single-machine experiments, add <code>--allow-private-peers</code> so RFC1918/loopback addresses (like a second node at <code>/ip4/127.0.0.1/tcp/16110</code>) are accepted. And if you have <em>no</em> peer to dial at all, start an island: run one miner and one relay pointing at each other. On a network this young — very few nodes, stated plainly — every new peer measurably matters.</p>
+    </div>
+    <div class="warnpanel" role="note">
+      <h3>Recent peering upgrade — past the ~50-node wall</h3>
+      <p>A bootstrap node used to cap at a hardcoded 50 peers and drop newcomers, and fresh miners could fork from genesis. Fixed with non-consensus knobs (<code>--max-peers</code>, <code>--dns-seed</code>) and a mining-readiness/IBD-latch guard. What changed and how to set up correctly: <a href="releases.html">Release notes&nbsp;→</a> · <a href="/Bloch-Peering-50-Node-Fix.pdf">root-cause PDF&nbsp;↓</a>.</p>
+    </div>
+    <div class="warnpanel" role="note">
+      <h3>Why the network wasn't growing past ~50 nodes — and how to set up correctly</h3>
+      <p>A bootstrap node used to cap out at a hardcoded <strong>50 peers</strong> and drop every newcomer, and fresh miners forked from genesis instead of syncing. Both are now addressed with non-consensus operator knobs (<code>--max-peers</code>, <code>--dns-seed</code>, and a sync-before-mine guard). The full root-cause write-up and the correct setup procedure:</p>
+      <p><strong><a href="/Bloch-Peering-50-Node-Fix.pdf">Peering &amp; the ~50-node wall — root cause &amp; fix (PDF)&nbsp;↓</a></strong> — unaudited engineering note.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="docker-h">
+  <div class="wrap">
+    <p class="kicker" id="docker-h">Alternative · Docker &amp; Fly.io</p>
+    <h2>Containerized, if you prefer.</h2>
+    <div class="prose">
+      <p>The repository ships a <code>Dockerfile</code> (digest-pinned base images, non-root user, core dumps disabled) exposing <code>16110</code>, <code>16111</code>, <code>16210</code>, and <code>16310</code>. Build and run from the repo root:</p>
+    </div>
+<pre><code>docker build -t bloch-sis .
+
+docker run -d --name bloch \
+  -p 16110:16110 -p 127.0.0.1:16210:16210 \
+  -v bloch-data:/bloch-data \
+  bloch-sis \
+  --rpc-bind 0.0.0.0 --rpc-port 16210 \
+  --listen /ip4/0.0.0.0/tcp/16110 \
+  --data-dir /bloch-data</code></pre>
+    <div class="prose">
+      <p>Inside the container RPC must bind <code>0.0.0.0</code> to be reachable; the <code>-p 127.0.0.1:16210:16210</code> mapping keeps it local to your host. Add <code>--mine</code> to the arguments to mine, and <code>--peer &lt;multiaddr&gt;</code> to bootstrap.</p>
+      <p>The repo also carries a <code>fly.toml</code> for Fly.io (it runs the node with <code>--mine</code> on a persistent volume). From the repo root:</p>
+    </div>
+<pre><code>flyctl launch --copy-config --no-deploy   # first time: creates the app
+flyctl volumes create bloch_data --size 30 --region &lt;your-region&gt;
+flyctl deploy</code></pre>
+    <p class="prose small">See <code>deploy/fly/README.md</code> in the protocol repo for the full walkthrough — and remember what the machine will be doing: mining coins that carry no value claim, on unaudited mainnet-beta research software.</p>
+  </div>
+</section>
+
+<section aria-labelledby="report-h">
+  <div class="wrap">
+    <p class="kicker" id="report-h">What to do with what you find</p>
+    <h2>Break it, then tell everyone.</h2>
+    <div class="prose">
+      <p>Useful contributions, in rough order of value: attacks on the Module-SIS PoW design (even on-paper, against the canonical regime), consensus and reorg edge cases, difficulty (ASERT-Lattice) manipulation, IBD and networking failures, build failures on your platform. File issues in the protocol repository — publicly, since there is no private steward to whisper to.</p>
+    </div>
+    <div class="warnpanel" role="note">
+      <h3>One last time</h3>
+      <p><strong>Mainnet beta — unaudited.</strong> The Module-SIS gate is a <strong>difficulty-driven k-ramp</strong> (node v0.1.0-alpha2): <strong>k=4 today, climbing 5→6→7→8 as the network's own difficulty grows and easing back if hashrate falls</strong> — a structural filter, not a security claim (real security is cumulative hashcash work), and no security is claimed. <strong>Very few nodes / low hashrate → 51%-attackable.</strong> Not a security, not an asset — no sale, no listing, no price. 17% founder premine disclosed. You are running research, not joining an economy. If anyone tells you otherwise, they are not us — <a href="disclaimer.html">the disclaimer wins</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="vk-h">
+  <div class="wrap">
+    <p class="kicker" id="vk-h">Need a hand?</p>
+    <h2>Ask the Vestnik node-setup assistant.</h2>
+    <div class="prose">
+      <p>Stuck on a step? This is a small, opt-in helper scoped to <strong>one job: helping you build, run, peer, mine with, and troubleshoot a Bloch node</strong>. It answers node-setup questions only — nothing about price, investment, or anything off-topic.</p>
+      <p><strong>Honest note:</strong> unlike the rest of this site, this widget runs a little JavaScript and — <em>only when you send a message</em> — forwards your question to a language-model backend (Anthropic, via a same-origin function on this site) to compose a reply. It stores nothing. <strong>Don't paste secrets</strong> (wallet seeds, keys) into it. If you'd rather not use it, everything you need is written out in the steps above.</p>
+    </div>
+    <div class="vestnik">
+      <div class="vk-head"><span class="vk-dot" aria-hidden="true"></span><span class="vk-title">Vestnik · node setup</span><span class="vk-scope">node questions only</span></div>
+      <div class="vk-log" id="vk-log" role="log" aria-live="polite"></div>
+      <form class="vk-form" id="vk-form">
+        <textarea class="vk-input" id="vk-input" rows="1" placeholder="e.g. how do I connect my node to the network?" autocomplete="off" aria-label="Ask about node setup"></textarea>
+        <button class="vk-send" id="vk-send" type="submit">Send</button>
+      </form>
+    </div>
+    <noscript><p class="vk-note">The assistant needs JavaScript. Follow the written steps above, or enable JS for this page.</p></noscript>
+    <p class="vk-note">Unaudited, mainnet-beta research software. The assistant can be wrong — always verify against <code>bloch-cli</code> output and the steps above.</p>
+  </div>
+</section>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h4>Postern Labs</h4>
+        <p>Privacy &amp; security products, sold the honest way — the BlackBerry model, on permissive Linux, built on an ownerless post-quantum commons.</p>
+        <p>No tracking. No analytics. This site makes zero network requests beyond its own pages.</p>
+      </div>
+      <div>
+        <h4>Site</h4>
+        <nav aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="postern-vs-bloch.html">Postern &amp; Bloch-SIS-PoW</a>
+          <a href="products.html">Products</a>
+          <a href="downloads.html">Downloads</a>
+          <a href="run-a-node.html">Run a node</a>
+          <a href="/explorer/">Explorer</a>
+          <a href="disclaimer.html">Disclaimer &amp; legal</a>
+          <a href="acknowledgments.html">Acknowledgments &amp; homage</a>
+          <a href="blochprotocol.html">The blochprotocol.com domain</a>
+          <a href="https://t.me/posternlabs" rel="noopener">Community · Telegram</a>
+        </nav>
+      </div>
+      <div>
+        <h4>Standing disclosures</h4>
+        <p>The underlying protocol runs a <strong>mainnet beta</strong> — <strong>unaudited</strong> (audit contracted, not done), nascent, <strong>low-hashrate and 51%-attackable</strong>. The Module-SIS gate is now a <strong>difficulty-driven k-ramp</strong> (v0.1.0-alpha2): k=4 today, rising 5→6→7→8 as the network's own difficulty grows, easing back if hashrate falls — the Bitcoin model. The ramp is a <em>structural</em> filter, <strong>not a security claim</strong>: real security is cumulative SHAKE-256 hashcash work — hashrate × time. Nothing here is a certified security product yet.</p>
+        <p>The coin is <strong>not a security and not an asset</strong>. No token sale, no listing effort, no price. Disclosed in full: a 17% founder premine (10-year cliff, 40-year vest), structurally passive.</p>
+      </div>
+    </div>
+    <p class="legal">MIT / Apache-2.0, per crate — no copyleft embedded in the products. The Bloch-SIS-PoW protocol is ownerless and is not a Postern Labs product; it lives at <code>gitlab.com/blochsispow-group/BlochSISPoW-project</code> (shown as text on purpose — there is no official site to link to). <strong>Postern Labs holds no ownership of, representation of, or prerogative over the protocol</strong>, and for that reason maintains <strong>no website for Bloch-SIS-PoW</strong> (including <code>blochprotocol.com</code>) — <a href="blochprotocol.html">read the full statement</a>.</p>
+  </div>
+</footer>
+<script>
+(function(){
+  var log=document.getElementById('vk-log');
+  var form=document.getElementById('vk-form');
+  var input=document.getElementById('vk-input');
+  var send=document.getElementById('vk-send');
+  if(!log||!form||!input||!send)return;
+  var FENCE=String.fromCharCode(96,96,96);
+  var msgs=[];
+  function bubble(role,text){
+    var cls='vk-msg '+(role==='user'?'vk-user':(role==='sys'?'vk-sys':'vk-bot'));
+    var b=document.createElement('div'); b.className=cls;
+    var segs=String(text).split(FENCE);
+    for(var i=0;i<segs.length;i++){
+      if(i%2===1){
+        var s=segs[i]; var nl=s.indexOf('\n');
+        if(nl>=0 && s.slice(0,nl).indexOf(' ')<0) s=s.slice(nl+1);
+        var pre=document.createElement('pre'); var code=document.createElement('code');
+        code.textContent=s.replace(/\n$/,''); pre.appendChild(code); b.appendChild(pre);
+      } else if(segs[i]){
+        var span=document.createElement('span'); span.textContent=segs[i]; b.appendChild(span);
+      }
+    }
+    log.appendChild(b); log.scrollTop=log.scrollHeight; return b;
+  }
+  bubble('bot','Hi — I am the Vestnik node-setup assistant. I only help with building, running, peering, mining, and troubleshooting a Bloch-SIS-PoW node. Ask me anything about setting one up.');
+  var busy=false;
+  function ask(q){
+    if(busy||!q)return; busy=true; send.disabled=true;
+    msgs.push({role:'user',content:q}); bubble('user',q);
+    var wait=bubble('sys','thinking...');
+    fetch('/api/node-helper',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({messages:msgs})})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(wait.parentNode)log.removeChild(wait);
+        if(d&&d.reply){msgs.push({role:'assistant',content:d.reply}); bubble('bot',d.reply);}
+        else{bubble('sys',(d&&d.error)||'Something went wrong. Please try again.');}
+      })
+      .catch(function(){ if(wait.parentNode)log.removeChild(wait); bubble('sys','Network error — please try again.'); })
+      .then(function(){ busy=false; send.disabled=false; input.focus(); });
+  }
+  form.addEventListener('submit',function(e){ e.preventDefault(); var q=input.value.trim(); if(!q)return; input.value=''; ask(q); });
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var q=input.value.trim(); if(!q)return; input.value=''; ask(q); } });
+})();
+</script>
+</body>
+</html>

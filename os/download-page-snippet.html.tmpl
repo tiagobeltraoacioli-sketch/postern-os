@@ -1,0 +1,82 @@
+<!--
+SPDX-License-Identifier: MIT OR Apache-2.0
+
+download-page-snippet.html.tmpl -- template for the site/downloads.html row
+(and the two follow-up file edits) for a NEW or RE-PUBLISHED "Postern OS" ISO.
+
+This is a TEMPLATE, not live markup: every {{PLACEHOLDER}} must be filled from
+the real values publish-iso.sh prints in its "publish complete" summary, and
+the boot-status prose/badge picked to match EXACTLY what -B was published
+with -- never round up "QEMU-PENDING" to "boot-validated", never round up
+"UNBOOTED" to anything. Do not paste this into site/downloads.html until a
+real publish has happened and you have the real SHA-256 in hand.
+
+Three places to update, in this order:
+
+  1. functions/dl/[[path]].js -- add {{NAME}} to the ALLOW set (only needed if
+     this is a name not already listed there; publish-iso.sh tells you at the
+     end of a run whether this step is required).
+  2. site/downloads.html -- the table row below, in the "3 · The reproducible
+     OS" section (or a new section/table if this is a genuinely new product
+     line, e.g. a cloud-image variant).
+  3. Redeploy: ./assemble-public.sh && wrangler pages deploy --branch main
+     (per wrangler.toml -- project "posternlabs", pages_build_output_dir=public).
+
+Boot-status -> badge class -> exact prose mapping (do not mix these up):
+
+  UNBOOTED               badge class "proto"   "built · hosted + signed · not yet boot-tested (QEMU or hardware)"
+  QEMU-PENDING            badge class "built"   "built · hosted + signed · QEMU boot pending"
+  QEMU-PASS:<ev>@<date>   badge class "built"   "built · hosted + signed · QEMU-boot-validated <date> (hardware boot still pending)"
+  HARDWARE-BOOTED:<d>@<date> badge class "built" "built · hosted + signed · boots on <device> hardware (<date>)"
+
+QEMU-PASS / HARDWARE-BOOTED additionally require that {{BOOT_EVIDENCE_LINK}}
+below actually resolves (the boot log / .evidence sidecar the claim rests on)
+-- do not ship the row with a badge implying a boot and a dead evidence link.
+-->
+
+<tr>
+  <td><strong>{{DISPLAY_NAME}}</strong><br><span class="small dim">{{ARCH}} · {{FIRMWARE}}</span></td>
+  <td>{{SIZE_GB}}&nbsp;GB</td>
+  <td><span class="badge {{BADGE_CLASS}}">{{BADGE_TEXT}}</span></td>
+  <td><a href="/dl/{{NAME}}">Download ISO&nbsp;→</a></td>
+  <td><code>{{SHA256}}</code></td>
+</tr>
+
+<!--
+The shared verify block below this table already covers every row (SHA256SUMS
++ SHA256SUMS.minisig + the minisign pubkey, all under os/v0.1/) -- you do not
+need a per-row verify snippet, only the table row above. If {{BOOT_EVIDENCE_LINK}}
+is non-empty, add one line to the "Before you install" warnpanel:
+
+    <li><strong>Boot evidence for {{DISPLAY_NAME}}:</strong> <a href="{{BOOT_EVIDENCE_LINK}}">{{BOOT_EVIDENCE_LABEL}}</a> -- {{ONE_LINE_HONEST_CAVEAT}} (e.g. "a QEMU/TCG boot proves the software chain only; it says nothing about real hardware").
+-->
+
+<!--
+functions/dl/[[path]].js -- ALLOW set edit (only if {{NAME}} is new):
+
+const ALLOW = new Set([
+  "postern-os-node-x86_64.iso",
+  "postern-os-desktop-x86_64.iso",
+  "postern-os-mobile-pinephone-aarch64.img",
+  "{{NAME}}",                      // <-- added
+]);
+-->
+
+<!--
+Mandatory honesty rails that MUST remain true of whatever page this row lands
+on (do not let a new row's copy drift from these, verbatim from
+site/downloads.html + os/ATTESTATION.md + HONESTY.md):
+
+  * "Hosting and signing a release is not attestation; built is not booted;
+    we won't imply otherwise."
+  * "Mainnet beta -- unaudited -- not a security claim." (protocol-wide banner,
+    already at the top of downloads.html; do not repeat/water it down per-row.)
+  * Never claim a boot without a published evidence link (boot log or
+    .evidence sidecar from os/boot-harness*/check-boot-log.sh).
+  * Never call this artifact "Postern for postmarketOS" or "Postern Android"
+    on this page -- those are a different, non-attestable product tier
+    (pmos-overlay/HONESTY.md) and must not share this table.
+  * scripts/check-trust-labels.sh and scripts/ci-honesty-products.sh should be
+    run over the edited site/ tree before it ships (they are the repo's
+    mechanical trust-label tripwires).
+-->

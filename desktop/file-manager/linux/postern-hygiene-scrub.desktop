@@ -1,0 +1,30 @@
+[Desktop Entry]
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Postern Hygiene — right-click "Scrub metadata" file-manager action (Linux).
+#
+# This is a freedesktop Desktop-Entry + Desktop-Action file. It is consumed by
+# file managers that read `.desktop` service menus / actions — KDE Dolphin
+# (drop into ~/.local/share/kio/servicemenus/ or ~/.local/share/kservices5/
+# ServiceMenus/), and, via `filemanager-actions`/`nautilus-actions`, GNOME
+# Files/Nautilus. For a plain GNOME Files install without nautilus-actions, use
+# the Nautilus Scripts wrapper in ../linux/nautilus-scripts/ instead (same core
+# script). The installer (../install.sh) puts the right one in place per desktop.
+#
+# %F expands to the selected local file paths; postern-scrub.sh scrubs each to a
+# `.scrubbed` sibling via the shipping `postern-hygiene scrub -` embed mode.
+Type=Application
+Name=Scrub metadata (Postern Hygiene)
+Comment=Strip author/timestamp/EXIF/GPS metadata into a scrubbed copy — original untouched
+Icon=security-high
+# MimeType lists the formats the core actually scrubs (magic-byte detection in
+# the tool still has the final say; this only decides where the entry appears).
+MimeType=image/jpeg;image/png;application/pdf;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.oasis.opendocument.text;application/vnd.oasis.opendocument.spreadsheet;application/vnd.oasis.opendocument.presentation;
+# The top-level Exec is what KDE ServiceMenus invoke directly.
+Exec=postern-scrub.sh %F
+Actions=ScrubMetadata;
+NoDisplay=true
+
+[Desktop Action ScrubMetadata]
+Name=Scrub metadata (Postern Hygiene)
+Exec=postern-scrub.sh %F

@@ -1,0 +1,18 @@
+{
+  "name": "postern-repo-poc",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "HOST-testable POC: postern.repo/v1 self-hostable signed repo + client verify. See docs/store-fdroid/A-repo-client.md.",
+  "scripts": {
+    "gen-keys": "node scripts/gen-keys.mjs",
+    "build-index": "node scripts/build-index.mjs",
+    "build-crl": "node scripts/build-crl.mjs",
+    "verify": "node scripts/verify-cli.mjs",
+    "verify-crl": "node scripts/verify-crl-cli.mjs",
+    "test": "node --test test/run-tests.mjs test/crl.test.mjs test/normalize.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

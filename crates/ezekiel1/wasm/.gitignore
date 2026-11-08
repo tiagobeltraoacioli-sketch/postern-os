@@ -1,0 +1,5 @@
+# Generated WASM artifacts — reproducible via build.sh; never committed.
+pkg-web/
+pkg-node/
+pkg-inline/
+ezekiel1.wasm
