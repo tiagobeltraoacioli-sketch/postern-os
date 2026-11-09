@@ -55,3 +55,11 @@ apps/postern-store/repro-verifier/fixtures/builder-key.json
 
 # workflow worktrees / agent scratch
 .claude/
+
+# Postern Python tools and generated OS artifacts
+__pycache__/
+*.py[cod]
+/result
+/result-*
+*.iso
+/postern-artifacts/

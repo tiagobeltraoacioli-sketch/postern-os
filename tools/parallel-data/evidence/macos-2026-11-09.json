@@ -1,0 +1,124 @@
+{
+  "architecture": "x86_64",
+  "bytes_per_file": 16777216,
+  "cache_state": "OS page cache was not reset; successive scans can be cached.",
+  "comparison": [
+    {
+      "median_seconds": 1.335420481999999,
+      "requested_workers": 1,
+      "speedup_vs_sequential": 1.0
+    },
+    {
+      "median_seconds": 0.8501126730000004,
+      "requested_workers": 2,
+      "speedup_vs_sequential": 1.570874690395303
+    },
+    {
+      "median_seconds": 0.5653033920000006,
+      "requested_workers": 4,
+      "speedup_vs_sequential": 2.3623075695254236
+    }
+  ],
+  "effective_cpu_limit": 16,
+  "equivalent_manifests": true,
+  "files": 32,
+  "format": "postern-data-benchmark/v1",
+  "input": "Deterministic synthetic bytes; one seeded 1-MiB block repeated per file.",
+  "interpretation": "Host-, dataset- and cache-specific observations. Ratios below 1 are slowdowns. No consensus or cryptographic acceleration is implied.",
+  "platform": "darwin",
+  "python": "3.9.6",
+  "repeats": 3,
+  "runs": [
+    {
+      "bytes": 536870912,
+      "effective_workers": 1,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 1,
+      "requested_workers": 1,
+      "wall_seconds": 1.480558021
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 2,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 1,
+      "requested_workers": 2,
+      "wall_seconds": 0.8618607600000001
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 4,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 1,
+      "requested_workers": 4,
+      "wall_seconds": 0.5597407670000001
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 2,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 2,
+      "requested_workers": 2,
+      "wall_seconds": 0.8501126730000004
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 4,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 2,
+      "requested_workers": 4,
+      "wall_seconds": 0.5653033920000006
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 1,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 2,
+      "requested_workers": 1,
+      "wall_seconds": 1.3324728610000003
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 4,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 3,
+      "requested_workers": 4,
+      "wall_seconds": 0.5730726390000003
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 1,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 3,
+      "requested_workers": 1,
+      "wall_seconds": 1.335420481999999
+    },
+    {
+      "bytes": 536870912,
+      "effective_workers": 2,
+      "files": 32,
+      "manifest_sha256": "8447d63fe86e1a8f7add3c6ace774ff9178a9c2f8acfc4e1e8b98f5af27c9674",
+      "repeat": 3,
+      "requested_workers": 2,
+      "wall_seconds": 0.8353009249999985
+    }
+  ],
+  "setup_seconds_excluded": 0.34142898899999996,
+  "timing_includes": [
+    "CLI startup",
+    "worker startup",
+    "traversal",
+    "reads",
+    "SHA-256",
+    "manifest encoding",
+    "manifest fsync"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "source": "https://github.com/tiagobeltraoacioli-sketch/bloch-sis-pow",
+  "commit": "b26be4e4eef1109838848673cfd2fee0b655e6b4",
+  "path": "os/bloch-pos-node.nix",
+  "blob": "79adb5f3242337e7a6272a2d1cab83503a99145b",
+  "note": "Optional NixOS service module. Disabled in live images; requires an operator-supplied package, genesis, keystore and network configuration. No validator binary or credentials are bundled.",
+  "local_changes": [
+    "Normalized the final blank line; no semantic changes."
+  ],
+  "local_sha256": "e8c0814875a10d0e1647dec28cc94179e7372c13c83ed1bb768f353c989e92c0"
+}
