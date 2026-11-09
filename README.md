@@ -20,10 +20,12 @@ authenticated installed-user setup are separate work.
 
 | Check | Recorded result |
 | --- | --- |
-| Python integrity-tool tests | 16 passed locally on macOS/Python 3.9.6 after the directory-race fixes; Bash/Python syntax checks also passed |
+| Python integrity-tool tests | 16 passed on macOS/Python 3.9.6 and in the Nix Linux package after the directory-race fixes; Bash/Python syntax checks also passed |
 | Measured parallel hashing after audit fixes | 512 MiB, three repetitions per variant: 1 worker 1.335 s; 2 workers 0.850 s; 4 workers 0.565 s; all nine manifests identical |
+| Measured parallel hashing on Linux | Same 512 MiB workload under a four-CPU limit: 1 worker 1.551 s; 2 workers 0.934 s; 4 workers 0.579 s (2.68×); all nine manifests identical |
 | Nix input lock | NixOS 26.05 pinned at `c56a87d8e41ce69bd2af57eb35dcc117a9dfca33`, with its verified NAR hash in `flake.lock` |
-| Linux package and privacy VM tests | In validation; no passing result recorded here yet |
+| Nix Linux package and evaluated image policy | Passed; package tests completed in 0.604 s on the Linux builder |
+| Privacy VM tests | Initial boot checks passed; restart/reconnection check is being corrected before claiming the full test passed |
 | Compute and desktop ISO builds/boots | In validation; no completed image or boot claim recorded here yet |
 | Physical hardware, persistent installation and Bloch interoperability | Not validated by this development step |
 
@@ -32,6 +34,9 @@ workload on one Mac. It does not establish Linux, general OS or blockchain
 performance. The [tool documentation and raw measurements](tools/parallel-data/README.md#measure-do-not-assume)
 record the run order, effective workers and page-cache limitation. The earlier
 measurement is preserved and labeled as evidence from before the audit fixes.
+The [Linux measurements](docs/evidence/postern-0.2.0-dev/linux-benchmark.json)
+used Python 3.13.17 and the same file-hashing workload under a four-CPU limit.
+Their 2.68× ratio is a within-host comparison; page caches were not reset.
 
 Run `bash scripts/postern-test-core.sh` from a checkout to check the Postern Bash
 and Python syntax and execute the integrity-tool unit tests with the installed

@@ -118,10 +118,20 @@ pkgs.testers.runNixOSTest {
         assert "nosuid" in tmp_options and "nodev" in tmp_options
         machine.succeed("test -d /run/log/journal")
         machine.succeed("test ! -d /var/log/journal || test -z \"$(find /var/log/journal -type f -print -quit)\"")
+        boot_id_before = machine.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+        assert boot_id_before
         machine.succeed("touch /tmp/postern-expiry-probe")
-        machine.reboot()
+        # The pinned driver's start() defaults to allow_reboot=False, so
+        # reboot() makes QEMU exit rather than reconnecting to a new guest.
+        # shutdown() includes wait_for_shutdown(), resetting the driver state;
+        # start() then reconnects new sockets while preserving the VM disk.
+        machine.shutdown()
+        machine.start()
         machine.wait_for_unit("multi-user.target", timeout=600)
         machine.wait_for_unit("firewall.service")
+        boot_id_after = machine.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+        assert boot_id_after and boot_id_after != boot_id_before
+        machine.succeed("test -f /home/alice/private-file")
         machine.succeed("test ! -e /tmp/postern-expiry-probe")
         machine.fail("systemctl is-active --quiet sshd.service")
   '';
