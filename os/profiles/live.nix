@@ -15,7 +15,10 @@
     Use postern-data for offline parallel processing.
     Local sudo is available. Network login is disabled.
   '';
-  boot.kernelParams = [ "console=tty0" "console=ttyS0,115200n8" ];
+  boot.kernelParams = [
+    "console=tty0" "console=ttyS0,115200n8"
+    "systemd.gpt_auto=0" "rd.systemd.gpt_auto=0"
+  ];
   boot.initrd.systemd.enable = lib.mkForce false;
   boot.zfs.forceImportRoot = false;
   isoImage.squashfsCompression = "zstd -Xcompression-level 6";

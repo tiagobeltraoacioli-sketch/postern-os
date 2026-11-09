@@ -54,6 +54,9 @@ systemctl is-active --quiet apparmor.service
 test "$(cat /sys/module/apparmor/parameters/enabled)" = Y
 grep -E '(^|,)apparmor(,|$)' /sys/kernel/security/lsm
 grep -E '(^| )mitigations=auto( |$)' /proc/cmdline
+grep -E '(^| )systemd.gpt_auto=0( |$)' /proc/cmdline
+grep -E '(^| )rd.systemd.gpt_auto=0( |$)' /proc/cmdline
+awk 'NR > 1 && $1 !~ /^\/dev\/zram[0-9]+$/ {bad=1} END {exit bad}' /proc/swaps
 if grep -E '(^| )mitigations=off( |$)' /proc/cmdline; then exit 35; fi
 for unit in sshd.service sshd.socket avahi-daemon.service avahi-daemon.socket geoclue.service gnome-remote-desktop.service; do
   if systemctl is-active --quiet "$unit"; then exit 32; fi

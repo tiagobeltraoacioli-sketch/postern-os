@@ -33,6 +33,8 @@
         && c.networking.firewall.allowedUDPPorts == [ ]
         && c.networking.firewall.allowedTCPPortRanges == [ ]
         && c.networking.firewall.allowedUDPPortRanges == [ ]
+        && c.swapDevices == [ ]
+        && c.zramSwap.writebackDevice == null
         && lockedPassword c.users.users.root
         && lockedPassword c.users.users.nixos
         && !c.services.dleyna.enable
