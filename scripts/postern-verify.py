@@ -80,17 +80,18 @@ if postern-data verify "$smoke_dir/input" "$smoke_dir/parallel.jsonl" --workers 
 """
     if profile == "desktop":
         script += r"""
-systemctl is-active --quiet graphical.target
-systemctl is-active --quiet display-manager.service
 found_wayland=no
 for attempt in $(seq 1 60); do
-  for session in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
-    if test "$(loginctl show-session "$session" -p Name --value)" = nixos &&
-       test "$(loginctl show-session "$session" -p Type --value)" = wayland; then
-      found_wayland=yes
-      break
-    fi
-  done
+  if systemctl is-active --quiet graphical.target &&
+     systemctl is-active --quiet display-manager.service; then
+    for session in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
+      if test "$(loginctl show-session "$session" -p Name --value)" = nixos &&
+         test "$(loginctl show-session "$session" -p Type --value)" = wayland; then
+        found_wayland=yes
+        break
+      fi
+    done
+  fi
   test "$found_wayland" = yes && break
   sleep 2
 done
@@ -117,6 +118,26 @@ def screenshot(socket_path, destination):
                     break
 
 
+def delivery_command(payload, nonce):
+    """Verify transport before running any guest test; always emit a verdict."""
+    encoded = base64.b64encode(payload).decode()
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    # The contiguous marker never appears in echoed input, avoiding a false pass.
+    # Short heredoc lines also avoid the kernel TTY's canonical line limit.
+    command = ("payload=$(mktemp /tmp/postern-guest.XXXXXX); setup_rc=$?\n"
+               + "base64 -d >\"${payload:-/dev/null}\" <<'POSTERN_PAYLOAD'\n"
+               + "\n".join(textwrap.wrap(encoded, 76)) + "\nPOSTERN_PAYLOAD\n"
+               + "decode_rc=$?; rc=91\n"
+               + "if test \"$setup_rc\" -eq 0 && test \"$decode_rc\" -eq 0; then\n"
+               + "  actual=$(sha256sum -- \"$payload\"); hash_rc=$?\n"
+               + f"  if test \"$hash_rc\" -eq 0 && test \"${{actual%% *}}\" = '{payload_sha256}'; then\n"
+               + "    sudo bash \"$payload\"; rc=$?\n"
+               + "  fi\nfi\n"
+               + "if test -n \"$payload\"; then rm -f -- \"$payload\"; fi\n"
+               + f"printf '\\n%s%s:%s\\n' 'POSTERN_' 'RESULT_{nonce}' \"$rc\"\n")
+    return command
+
+
 def main():
     args = arguments()
     os.umask(0o077)
@@ -125,18 +146,16 @@ def main():
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     nonce = secrets.token_hex(12)
     marker = f"POSTERN_RESULT_{nonce}"
-    encoded = base64.b64encode(guest_test(args.profile).encode()).decode()
-    # The contiguous marker never appears in echoed input, avoiding a false pass.
-    # Short heredoc lines also avoid the kernel TTY's canonical line limit.
-    command = ("base64 -d <<'POSTERN_PAYLOAD' | sudo sh\n"
-               + "\n".join(textwrap.wrap(encoded, 76)) + "\nPOSTERN_PAYLOAD\n"
-               + f"rc=$?; printf '\\n%s%s:%s\\n' 'POSTERN_' 'RESULT_{nonce}' \"$rc\"\n")
+    payload = guest_test(args.profile).encode()
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    command = delivery_command(payload, nonce)
     with args.iso.open("rb") as image:
         digest = hashlib.file_digest(image, "sha256").hexdigest()
     result = {"profile": args.profile, "iso": args.iso.name, "iso_sha256": digest,
               "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "accelerator": "tcg", "network": "none", "vcpus": args.cpus,
               "memory_mib": args.memory_mib, "passed": False}
+    result["guest_test_sha256"] = payload_sha256
     (output / "guest-test.sh").write_text(guest_test(args.profile))
     print(f"Boot evidence: {output}", flush=True)
     start = time.monotonic()
