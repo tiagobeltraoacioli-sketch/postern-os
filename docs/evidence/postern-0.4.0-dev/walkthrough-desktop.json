@@ -1,0 +1,349 @@
+{
+  "format": "postern-demo/v1",
+  "profile": "desktop",
+  "iso": "postern-desktop-x86_64.iso",
+  "iso_sha256": "39546a1e976270d30350f1a4615f6dcc0f265fabd17c6196d0936d6d1e8c056f",
+  "accelerator": "tcg",
+  "network": "none",
+  "vcpus": 4,
+  "memory_mib": 4096,
+  "playback_speed": 3.0,
+  "captured_fps": 4.0,
+  "started_at": "2026-11-11T21:36:19.083903+00:00",
+  "scope": "One scripted session in a virtual machine; a demonstration, not boot verification and not a physical-hardware test.",
+  "presentation": "The captured screen is shown unmodified inside a drawn frame. Playback is faster than recorded, idle waits are shortened and the boot before the walkthrough is not shown.",
+  "completed": true,
+  "qemu_command": [
+    "qemu-system-x86_64",
+    "-accel",
+    "tcg,thread=multi",
+    "-cpu",
+    "max",
+    "-machine",
+    "q35",
+    "-smp",
+    "4",
+    "-m",
+    "4096",
+    "-cdrom",
+    "/artifacts/20261111T204921Z-desktop-270/postern-desktop-x86_64.iso",
+    "-boot",
+    "d",
+    "-nic",
+    "none",
+    "-display",
+    "none",
+    "-vga",
+    "none",
+    "-device",
+    "virtio-vga,xres=1280,yres=720",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-qmp",
+    "unix:<scratch>/qmp.sock,server=on,wait=off",
+    "-qmp",
+    "unix:<scratch>/capture.sock,server=on,wait=off",
+    "-no-reboot"
+  ],
+  "qemu_exit_code": 0,
+  "video": "postern-desktop-walkthrough.mp4",
+  "video_sha256": "3a542114d73eef7d070916711e7559530e98e854f9ce7edfd1edb216559be201",
+  "captions": [
+    [
+      0.0,
+      3.2,
+      "The desktop: GNOME on Wayland with a dock that is always at hand"
+    ],
+    [
+      3.2,
+      6.400000000000001,
+      "Activities overview and search"
+    ],
+    [
+      6.400000000000001,
+      9.599999999999998,
+      "Every application in one grid"
+    ],
+    [
+      9.599999999999998,
+      21.164617865292467,
+      "Postern Status: privacy and kernel hardening in one window"
+    ],
+    [
+      21.164617865292467,
+      42.97064242843204,
+      "Terminal: release record of the running image"
+    ],
+    [
+      42.97064242843204,
+      53.133677340445644,
+      "Create sample files to process (64 MiB of random data)"
+    ],
+    [
+      53.133677340445644,
+      64.36218751261293,
+      "postern-data: hash every file in parallel into a private manifest"
+    ],
+    [
+      64.36218751261293,
+      72.04037637113062,
+      "Verify the files against the saved manifest"
+    ],
+    [
+      72.04037637113062,
+      86.7704556429352,
+      "Change one file: verification detects the modification"
+    ],
+    [
+      86.7704556429352,
+      97.0373408612921,
+      "postern-vault: create an encrypted container file (LUKS2), here with a key file"
+    ],
+    [
+      97.0373408612921,
+      110.57680999963945,
+      "Open the vault and write a note inside it"
+    ],
+    [
+      110.57680999963945,
+      123.03603517669846,
+      "Close it: the note cannot be found in the closed file"
+    ],
+    [
+      123.03603517669846,
+      130.45340534973164,
+      "No SSH, discovery or remote-desktop service; firewall and AppArmor active"
+    ],
+    [
+      130.45340534973164,
+      133.92421714526878,
+      "Swap is compressed memory only; nothing listens for remote login"
+    ],
+    [
+      133.92421714526878,
+      154.48870388847257,
+      "Firefox opens on a quiet page: no onboarding, no promotions"
+    ],
+    [
+      154.48870388847257,
+      158.192823776917,
+      "Firefox: telemetry, studies and saved logins are disabled by locked policy"
+    ],
+    [
+      158.192823776917,
+      175.59355695801534,
+      "Tor Browser is included; it starts only when you open it"
+    ],
+    [
+      175.59355695801534,
+      188.41249053327402,
+      "Metadata Cleaner removes author, location and device data from files"
+    ],
+    [
+      188.41249053327402,
+      198.06224117072935,
+      "KeePassXC: an offline password manager"
+    ],
+    [
+      198.06224117072935,
+      211.80520519869006,
+      "Files: removable media is never mounted or opened automatically"
+    ],
+    [
+      211.80520519869006,
+      226.1539802954348,
+      "Settings: location services and usage reporting are off by default"
+    ],
+    [
+      226.1539802954348,
+      229.35398029543475,
+      "All windows in the Activities overview"
+    ],
+    [
+      229.35398029543475,
+      259.8117026244772,
+      "Power off: the live session leaves nothing on the machine's disks"
+    ]
+  ],
+  "frames": 7499,
+  "recorded_seconds": 1875.9,
+  "timing": {
+    "video_seconds": 269.8,
+    "walkthrough_seconds": 259.8,
+    "boot_seconds_not_shown": 242.2,
+    "idle_cap_seconds": 1.6,
+    "caption_minimum_seconds": 3.2,
+    "recorded_walkthrough_seconds": 1703.5
+  },
+  "application_launches": [
+    {
+      "application": "postern-status-gui",
+      "method": "keyboard"
+    },
+    {
+      "application": "gnome-terminal-server",
+      "method": "keyboard"
+    },
+    {
+      "application": "firefox",
+      "method": "keyboard"
+    },
+    {
+      "application": "tor-browser",
+      "method": "keyboard"
+    },
+    {
+      "application": "metadata-cleaner",
+      "method": "keyboard"
+    },
+    {
+      "application": "keepassxc",
+      "method": "keyboard"
+    },
+    {
+      "application": "nautilus",
+      "method": "keyboard"
+    },
+    {
+      "application": "gnome-control-center",
+      "method": "keyboard"
+    }
+  ],
+  "checks": [
+    {
+      "name": "GNOME Wayland session is active",
+      "command": "ok=1; for attempt in $(seq 1 150); do for id in $(loginctl list-sessions --no-legend | awk '{print $1}'); do if test \"$(loginctl show-session $id -p Name --value)\" = nixos && test \"$(loginctl show-session $id -p Type --value)\" = wayland; then ok=0; fi; done; test $ok = 0 && break; sleep 2; done; test $ok = 0",
+      "passed": true,
+      "output": "",
+      "at_seconds": 93.3
+    },
+    {
+      "name": "dock and blur extensions are enabled",
+      "command": "export XDG_RUNTIME_DIR=/run/user/$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; for attempt in $(seq 1 20); do gnome-extensions list --enabled | grep -c -e dash-to-dock -e blur-my-shell | grep -qx 2 && break; sleep 3; done; gnome-extensions list --enabled | grep -c -e dash-to-dock -e blur-my-shell | grep -qx 2",
+      "passed": true,
+      "output": "",
+      "at_seconds": 242.2
+    },
+    {
+      "name": "postern-status-gui is running",
+      "command": "pgrep -f postern-status-gui >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 413.8
+    },
+    {
+      "name": "gnome-terminal-server is running",
+      "command": "pgrep -f gnome-terminal-server >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 523.4
+    },
+    {
+      "name": "modified file is detected",
+      "command": "postern-data verify ~/demo/in ~/demo/manifest.jsonl; test $? -eq 1",
+      "passed": true,
+      "output": "{\"added\": 0, \"changed\": 1, \"command\": \"verify\", \"errors\": 0, \"missing\": 0, \"ok\": false, \"skipped\": 0, \"verified\": 3, \"workers\": 4}",
+      "at_seconds": 736.8
+    },
+    {
+      "name": "closed vault hides the note",
+      "command": "test -s ~/demo/private.vault && ! grep -a -q 'a private note' ~/demo/private.vault && ! test -e /dev/mapper/postern-vault-private",
+      "passed": true,
+      "output": "",
+      "at_seconds": 911.4
+    },
+    {
+      "name": "no SSH daemon",
+      "command": "! systemctl is-active --quiet sshd.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 980.9
+    },
+    {
+      "name": "firewall active",
+      "command": "systemctl is-active --quiet firewall.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 981.0
+    },
+    {
+      "name": "kernel hardening is in effect",
+      "command": "sudo postern-status --json | jq -e '[.checks[] | select(.id == \"hardening\")][0].state == \"ok\"'",
+      "passed": true,
+      "output": "true",
+      "at_seconds": 983.6
+    },
+    {
+      "name": "status report has no failed check",
+      "command": "sudo postern-status --json | jq -e '.summary.fail == 0'",
+      "passed": true,
+      "output": "true",
+      "at_seconds": 986.1
+    },
+    {
+      "name": "firefox is running",
+      "command": "pgrep -f firefox >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1114.7
+    },
+    {
+      "name": "tor-browser is running",
+      "command": "pgrep -f tor-browser >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1321.7
+    },
+    {
+      "name": "no system-wide Tor daemon",
+      "command": "! systemctl is-active --quiet tor.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1341.8
+    },
+    {
+      "name": "metadata-cleaner is running",
+      "command": "pgrep -f metadata-cleaner >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1428.1
+    },
+    {
+      "name": "keepassxc is running",
+      "command": "pgrep -f keepassxc >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1521.0
+    },
+    {
+      "name": "nautilus is running",
+      "command": "pgrep -f nautilus >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1604.9
+    },
+    {
+      "name": "gnome-control-center is running",
+      "command": "pgrep -f gnome-control-center >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1698.0
+    },
+    {
+      "name": "location services disabled",
+      "command": "export XDG_RUNTIME_DIR=/run/user/$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; test \"$(gsettings get org.gnome.system.location enabled)\" = false",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1718.4
+    },
+    {
+      "name": "no remote-desktop or SSH service",
+      "command": "! systemctl is-active --quiet sshd.service && ! systemctl is-active --quiet gnome-remote-desktop.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1718.5
+    }
+  ]
+}

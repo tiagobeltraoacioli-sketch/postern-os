@@ -53,7 +53,12 @@ in
   # Do not introduce a public DNS provider or a background Tor daemon here.
   # These settings also apply when a desktop enables NetworkManager/resolved.
   networking.networkmanager = {
+    # A new random hardware address for every connection, wired and wireless,
+    # and while scanning. A network that admits devices by hardware address
+    # needs this changed for that connection in Settings.
     wifi.scanRandMacAddress = true;
+    wifi.macAddress = "random";
+    ethernet.macAddress = "random";
     settings.connectivity = {
       enabled = false;
       uri = "";
@@ -61,6 +66,10 @@ in
     connectionConfig = {
       "connection.llmnr" = 0;
       "connection.mdns" = 0;
+      # Do not announce the host name to the DHCP server.
+      "ipv4.dhcp-send-hostname-v2" = 0;
+      "ipv6.dhcp-send-hostname-v2" = 0;
+      "ipv6.ip6-privacy" = 2;
     };
   };
   services.resolved.settings.Resolve = {
@@ -133,6 +142,18 @@ in
     location, GNOME online accounts, NetworkManager connectivity probes and
     Firefox telemetry/studies are off.
     This is not a claim that every installed application is free of telemetry.
+
+    Where NetworkManager manages the network, each connection uses a random
+    hardware address and the host name is not sent in DHCP requests. The access
+    point still sees that a device connected, and when.
+
+    Kernel hardening wipes freed memory, hardens the allocator and stack,
+    disables kexec, SysRq and unused network protocol modules. It raises the
+    cost of exploiting a bug; it is not a sandbox and removes no bug.
+
+    postern-vault creates encrypted container files (LUKS2). They protect data
+    while closed; an open vault is readable by the logged-in user and by root.
+    A lost passphrase cannot be recovered.
 
     Tor Browser is optional and protects only traffic inside that browser.
     This profile does not anonymize the whole system, force traffic through Tor,

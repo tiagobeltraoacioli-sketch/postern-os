@@ -47,7 +47,7 @@ awk -F: '$1 == "root" || $1 == "nixos" {n++; if ($2 != "!") bad=1} END {exit (n 
 command -v postern-data
 postern-status
 test "$(postern-status --json | jq -r '.summary.fail + .summary.unknown')" = 0
-grep -F '"version":"0.3.1-dev"' /etc/postern/release.json
+grep -F '"version":"0.4.0-dev"' /etc/postern/release.json
 test "$(sysctl -n kernel.dmesg_restrict)" = 1
 test "$(sysctl -n kernel.kptr_restrict)" = 2
 test "$(sysctl -n fs.suid_dumpable)" = 0

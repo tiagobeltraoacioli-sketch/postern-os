@@ -1,0 +1,190 @@
+{
+  "format": "postern-demo/v1",
+  "profile": "compute",
+  "iso": "postern-compute-x86_64.iso",
+  "iso_sha256": "2309e6be8a312e7ac4e54c3c7bd7dd22db3dc46dc052dc121a209ad741149d45",
+  "accelerator": "tcg",
+  "network": "none",
+  "vcpus": 4,
+  "memory_mib": 4096,
+  "playback_speed": 3.0,
+  "captured_fps": 4.0,
+  "started_at": "2026-11-11T21:19:35.860377+00:00",
+  "scope": "One scripted session in a virtual machine; a demonstration, not boot verification and not a physical-hardware test.",
+  "presentation": "The captured screen is shown unmodified inside a drawn frame. Playback is faster than recorded, idle waits are shortened and the boot before the walkthrough is not shown.",
+  "completed": true,
+  "qemu_command": [
+    "qemu-system-x86_64",
+    "-accel",
+    "tcg,thread=multi",
+    "-cpu",
+    "max",
+    "-machine",
+    "q35",
+    "-smp",
+    "4",
+    "-m",
+    "4096",
+    "-cdrom",
+    "/artifacts/20261111T211610Z-compute-27/postern-compute-x86_64.iso",
+    "-boot",
+    "d",
+    "-nic",
+    "none",
+    "-display",
+    "none",
+    "-vga",
+    "none",
+    "-device",
+    "virtio-vga,xres=1280,yres=720",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-qmp",
+    "unix:<scratch>/qmp.sock,server=on,wait=off",
+    "-qmp",
+    "unix:<scratch>/capture.sock,server=on,wait=off",
+    "-no-reboot"
+  ],
+  "qemu_exit_code": 0,
+  "video": "postern-compute-walkthrough.mp4",
+  "video_sha256": "cd9527885de0e616ef9829cdfbe64791b79348916401817e6b8a2a710dc0bb53",
+  "captions": [
+    [
+      0.0,
+      8.004166417755183,
+      "The compute image boots to a local console: automatic login, locked passwords"
+    ],
+    [
+      8.004166417755183,
+      19.427385529192776,
+      "postern-status: the privacy and hardening baseline observed on this system"
+    ],
+    [
+      19.427385529192776,
+      31.767347720141203,
+      "With root it also confirms that every account password is locked"
+    ],
+    [
+      31.767347720141203,
+      50.110843198063456,
+      "Release record and the written privacy baseline shipped in the image"
+    ],
+    [
+      50.110843198063456,
+      62.86785543709992,
+      "Create sample files to process (64 MiB of random data)"
+    ],
+    [
+      62.86785543709992,
+      76.45763247987868,
+      "postern-data: hash every file in parallel into a private manifest"
+    ],
+    [
+      76.45763247987868,
+      86.4623604329923,
+      "Verify the files against the saved manifest"
+    ],
+    [
+      86.4623604329923,
+      103.7217697463928,
+      "Change one file: verification detects the modification"
+    ],
+    [
+      103.7217697463928,
+      121.89820441137987,
+      "postern-vault: create an encrypted container file (LUKS2), here with a key file"
+    ],
+    [
+      121.89820441137987,
+      139.99149295967052,
+      "Open the vault and write a note inside it"
+    ],
+    [
+      139.99149295967052,
+      154.91566882344546,
+      "Close it: the note cannot be found in the closed file"
+    ],
+    [
+      154.91566882344546,
+      166.0050386867171,
+      "No SSH, discovery or remote-desktop service; firewall and AppArmor active"
+    ],
+    [
+      166.0050386867171,
+      176.51055464458923,
+      "Swap is compressed memory only; nothing listens for remote login"
+    ],
+    [
+      176.51055464458923,
+      202.44178633515997,
+      "Measured benchmark: sequential and parallel hashing of the same data"
+    ],
+    [
+      202.44178633515997,
+      212.8641017045201,
+      "Diagnostics tools are included: htop"
+    ],
+    [
+      212.8641017045201,
+      230.49649807065683,
+      "Power off: the live session leaves nothing on the machine's disks"
+    ]
+  ],
+  "frames": 3131,
+  "recorded_seconds": 783.2,
+  "timing": {
+    "video_seconds": 240.5,
+    "walkthrough_seconds": 230.5,
+    "boot_seconds_not_shown": 91.6,
+    "idle_cap_seconds": 1.6,
+    "caption_minimum_seconds": 3.2,
+    "recorded_walkthrough_seconds": 723.3
+  },
+  "application_launches": [],
+  "checks": [
+    {
+      "name": "modified file is detected",
+      "command": "postern-data verify ~/demo/in ~/demo/manifest.jsonl; test $? -eq 1",
+      "passed": true,
+      "output": "{\"added\": 0, \"changed\": 1, \"command\": \"verify\", \"errors\": 0, \"missing\": 0, \"ok\": false, \"skipped\": 0, \"verified\": 3, \"workers\": 4}",
+      "at_seconds": 396.2
+    },
+    {
+      "name": "closed vault hides the note",
+      "command": "test -s ~/demo/private.vault && ! grep -a -q 'a private note' ~/demo/private.vault && ! test -e /dev/mapper/postern-vault-private",
+      "passed": true,
+      "output": "",
+      "at_seconds": 549.8
+    },
+    {
+      "name": "no SSH daemon",
+      "command": "! systemctl is-active --quiet sshd.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 617.2
+    },
+    {
+      "name": "firewall active",
+      "command": "systemctl is-active --quiet firewall.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 617.3
+    },
+    {
+      "name": "kernel hardening is in effect",
+      "command": "sudo postern-status --json | jq -e '[.checks[] | select(.id == \"hardening\")][0].state == \"ok\"'",
+      "passed": true,
+      "output": "true",
+      "at_seconds": 619.2
+    },
+    {
+      "name": "status report has no failed check",
+      "command": "sudo postern-status --json | jq -e '.summary.fail == 0'",
+      "passed": true,
+      "output": "true",
+      "at_seconds": 621.1
+    }
+  ]
+}

@@ -7,6 +7,7 @@ contacts nothing. A passing report describes only the listed observations; it
 is not an audit and does not establish anonymity.
 """
 import argparse
+import configparser
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,27 @@ UNSAFE_PARAMETERS = frozenset((
 SYSCTL_MINIMUMS = (
     ("kernel/kptr_restrict", 2), ("kernel/dmesg_restrict", 1),
     ("kernel/yama/ptrace_scope", 1), ("kernel/unprivileged_bpf_disabled", 1),
+)
+HARDENING_PARAMETERS = (
+    "slab_nomerge", "init_on_alloc=1", "init_on_free=1", "page_alloc.shuffle=1",
+    "randomize_kstack_offset=on", "vsyscall=none",
+)
+# (sysctl, comparison, value): "min" means at least, "max" means at most.
+HARDENING_SYSCTLS = (
+    # Only settings an ordinary user can read: the report must give the same
+    # answer in the desktop application as with sudo. (net.core.bpf_jit_harden
+    # is root-only; the booted test in os/tests/privacy.nix checks it.)
+    ("kernel/kexec_load_disabled", "min", 1), ("kernel/perf_event_paranoid", "min", 2),
+    ("dev/tty/ldisc_autoload", "max", 0),
+    ("vm/unprivileged_userfaultfd", "max", 0), ("fs/protected_fifos", "min", 2),
+    ("fs/protected_regular", "min", 2), ("kernel/sysrq", "max", 0),
+)
+NETWORK_MANAGER_CONFIG = "/etc/NetworkManager/NetworkManager.conf"
+NETWORK_IDENTITY = (
+    ("wifi.cloned-mac-address", ("random",), "Wi-Fi hardware address is not randomized"),
+    ("ethernet.cloned-mac-address", ("random",), "wired hardware address is not randomized"),
+    ("ipv4.dhcp-send-hostname-v2", ("0",), "the host name is sent in DHCPv4 requests"),
+    ("ipv6.dhcp-send-hostname-v2", ("0",), "the host name is sent in DHCPv6 requests"),
 )
 
 
@@ -218,6 +240,56 @@ def check_sysctls(probe):
     return result("sysctl", title, OK, "kernel pointers, dmesg, ptrace and unprivileged BPF are restricted")
 
 
+def check_hardening(probe):
+    """Extra kernel hardening. Its absence is a warning: the baseline above
+    still holds, but memory-safety bugs are easier to exploit without it."""
+    title = "Kernel hardening"
+    cmdline = probe.word("/proc/cmdline")
+    if cmdline is None:
+        return result("hardening", title, UNKNOWN, "/proc/cmdline is unavailable")
+    words = cmdline.split()
+    absent = [parameter for parameter in HARDENING_PARAMETERS if parameter not in words]
+    unread = []
+    for name, comparison, wanted in HARDENING_SYSCTLS:
+        value = probe.word("/proc/sys/" + name)
+        label = name.replace("/", ".")
+        try:
+            number = None if value is None else int(value)
+        except ValueError:
+            number = None
+        if number is None:
+            unread.append(label)
+        elif (comparison == "min" and number < wanted) or (comparison == "max" and number > wanted):
+            absent.append(f"{label}={number}")
+    if absent:
+        return result("hardening", title, WARN, "not applied: " + ", ".join(absent))
+    if unread:
+        return result("hardening", title, UNKNOWN, "unavailable: " + ", ".join(unread))
+    return result("hardening", title, OK,
+                  "freed memory is wiped, allocator and stack hardening are on, kexec and SysRq are off")
+
+
+def check_network_identity(probe):
+    """What NetworkManager is configured to reveal to a local network. It reads
+    the configuration file; it does not observe packets or other managers."""
+    title = "Network identity"
+    raw = probe.text(NETWORK_MANAGER_CONFIG)
+    if raw is None:
+        return result("network-identity", title, UNKNOWN,
+                      "NetworkManager is not configured on this system")
+    parser = configparser.ConfigParser(interpolation=None, strict=False)
+    try:
+        parser.read_string(raw)
+    except configparser.Error:
+        return result("network-identity", title, UNKNOWN, "NetworkManager.conf is unreadable")
+    exposed = [message for key, accepted, message in NETWORK_IDENTITY
+               if parser.get("connection", key, fallback="").strip().lower() not in accepted]
+    if exposed:
+        return result("network-identity", title, WARN, "; ".join(exposed))
+    return result("network-identity", title, OK,
+                  "random hardware addresses; the host name is not sent in DHCP requests")
+
+
 def check_swap(probe):
     title = "Swap"
     raw = probe.text("/proc/swaps")
@@ -282,6 +354,7 @@ def check_accounts(probe):
 CHECKS = (
     check_release, check_firewall, check_listeners, check_quiet_units,
     check_apparmor, check_mitigations, check_core_dumps, check_sysctls,
+    check_hardening, check_network_identity,
     check_swap, check_tmp, check_journal, check_accounts,
 )
 

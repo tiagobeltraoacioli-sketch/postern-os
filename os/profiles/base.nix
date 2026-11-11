@@ -7,6 +7,12 @@
       type = lib.types.enum [ "live-development" "vm-development" ];
       description = "Recorded in /etc/postern/release.json; never implies a release.";
     };
+    version = lib.mkOption {
+      type = lib.types.str;
+      default = "0.4.0-dev";
+      readOnly = true;
+      description = "Version recorded in the image and used in image file names.";
+    };
     profileName = lib.mkOption {
       type = lib.types.enum [ "compute" "desktop" "mobile" ];
       description = "Software profile, used in image file names.";
@@ -24,7 +30,7 @@
     services.getty.autologinUser = lib.mkForce "nixos";
     services.getty.helpLine = lib.mkForce ''
       Postern OS development image — local console only.
-      postern-status reports the privacy baseline; postern-data processes files offline.
+      postern-status reports the privacy baseline; postern-vault keeps encrypted files.
       Local sudo is available. Network login is disabled.
     '';
     boot.kernelParams = [
@@ -33,9 +39,15 @@
     ];
     boot.zfs.forceImportRoot = false;
 
+    # One network manager on every image, so the privacy settings in
+    # privacy.nix (random hardware addresses, no host name in DHCP) apply to
+    # the console image too. nmtui and nmcli configure Wi-Fi without a desktop.
+    networking.networkmanager.enable = true;
+    networking.wireless.enable = lib.mkForce false;
+
     environment.etc."postern/release.json".text = builtins.toJSON {
       name = "Postern OS";
-      version = "0.3.1-dev";
+      version = config.postern.version;
       type = config.postern.imageType;
       blockchainEnabled = false;
       persistentDiskEncryption =
@@ -44,9 +56,11 @@
         else "not configured; the virtual disk is unencrypted";
     };
     users.motd = lib.mkForce ''
-      Postern OS 0.3.1-dev
+      Postern OS ${config.postern.version}
       Offline data processing; no validator or mining service starts automatically.
-      Run postern-status to see the privacy baseline observed on this system.
+      postern-status   the privacy and hardening baseline observed on this system
+      postern-vault    encrypted container files for private data
+      postern-data     parallel file integrity manifests
       This system does not promise anonymity against every network or hardware threat.
     '';
   };

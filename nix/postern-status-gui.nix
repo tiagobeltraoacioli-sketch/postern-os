@@ -6,7 +6,7 @@ let
 in
 stdenvNoCC.mkDerivation {
   pname = "postern-status-gui";
-  version = "0.1.0";
+  version = "0.2.0";
   src = ../tools/postern-status;
   nativeBuildInputs = [ wrapGAppsHook4 gobject-introspection copyDesktopItems ];
   buildInputs = [ gtk4 libadwaita pythonEnv ];
@@ -17,6 +17,7 @@ stdenvNoCC.mkDerivation {
     cp postern_status.py $out/lib/postern-status/
     { echo '#!${pythonEnv}/bin/python3'; tail -n +2 postern_status_gui.py; } > $out/bin/postern-status-gui
     chmod 755 $out/bin/postern-status-gui
+    install -Dm644 org.postern.Status.svg $out/share/icons/hicolor/scalable/apps/org.postern.Status.svg
     runHook postInstall
   '';
 
@@ -26,10 +27,12 @@ stdenvNoCC.mkDerivation {
       desktopName = "Postern Status";
       comment = "Show the observable privacy baseline of this system";
       exec = "postern-status-gui";
-      icon = "security-high";
+      icon = "org.postern.Status";
       categories = [ "System" "Security" ];
       keywords = [ "privacy" "firewall" "postern" ];
       startupWMClass = "org.postern.Status";
+      # The window adapts to a phone-width screen; phone shells list it as such.
+      extraConfig."X-Purism-FormFactor" = "Workstation;Mobile;";
     })
   ];
 

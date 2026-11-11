@@ -1,0 +1,6 @@
+39546a1e976270d30350f1a4615f6dcc0f265fabd17c6196d0936d6d1e8c056f  postern-os-desktop-0.4.0-dev-x86_64.iso  (on the build host, not downloaded)
+735ddf0641d34bfe227e96ebf5e9656d368b07a85708caa06d4e5a03300ab02b  postern-os-mobile-0.4.0-dev-x86_64.iso  (on the build host, not downloaded)
+2309e6be8a312e7ac4e54c3c7bd7dd22db3dc46dc052dc121a209ad741149d45  postern-os-compute-0.4.0-dev-x86_64.iso  (on the build host, not downloaded)
+cd9527885de0e616ef9829cdfbe64791b79348916401817e6b8a2a710dc0bb53  postern-compute-walkthrough.mp4
+3a542114d73eef7d070916711e7559530e98e854f9ce7edfd1edb216559be201  postern-desktop-walkthrough.mp4
+1d90c4599cab5403736b97368133bb34649ee9db24a1eb5b0032a6567f950f99  postern-mobile-walkthrough.mp4

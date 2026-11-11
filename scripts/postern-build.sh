@@ -80,9 +80,10 @@ repo,out=map(pathlib.Path,sys.argv[1:3])
 files={repo/'flake.nix',repo/'flake.lock'}
 for directory in ('nix','os/profiles','os/tests','os/modules'):
     files.update(p for p in (repo/directory).rglob('*') if p.is_file())
-files.update(p for tool in ('parallel-data','postern-status')
+files.update(p for tool in ('parallel-data','postern-status','postern-vault')
              for p in (repo/'tools'/tool).rglob('*')
-             if p.is_file() and p.suffix in ('.py','.md','.json') and '__pycache__' not in p.parts)
+             if p.is_file() and p.suffix in ('.py','.md','.json','.sh','.svg') and '__pycache__' not in p.parts)
+files.update(p for p in (repo/'os'/'assets').rglob('*') if p.is_file())
 files.update(p for p in (repo/'scripts').glob('postern*') if p.is_file())
 manifest={str(p.relative_to(repo)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
 (out/'input-files-sha256.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n')
@@ -156,7 +157,7 @@ PY
 }
 
 if [[ $mode == checks || $mode == all ]]; then
-  build_phase checks checks.x86_64-linux.parallel-data checks.x86_64-linux.postern-status checks.x86_64-linux.image-policy checks.x86_64-linux.privacy
+  build_phase checks checks.x86_64-linux.parallel-data checks.x86_64-linux.postern-status checks.x86_64-linux.postern-vault checks.x86_64-linux.image-policy checks.x86_64-linux.privacy
 fi
 if [[ $mode == compute-vm || $mode == desktop-vm ]]; then
   build_phase "$mode" "packages.x86_64-linux.$mode-image"

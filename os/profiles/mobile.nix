@@ -5,10 +5,6 @@
 # modem, telephony or battery management is configured or tested here.
 { lib, pkgs, ... }:
 let
-  statusApp = pkgs.callPackage ../../nix/postern-status-gui.nix { };
-  wallpaper = pkgs.runCommand "postern-wallpaper.png" { nativeBuildInputs = [ pkgs.librsvg ]; } ''
-    rsvg-convert --width 2560 --height 1440 ${../assets/wallpaper.svg} --output $out
-  '';
   # The live account has a locked password, so a lock screen could never be
   # opened. Start unlocked, like the desktop live session; an installed phone
   # must set a PIN and keep the lock.
@@ -26,20 +22,8 @@ let
   });
 in
 {
-  imports = [ ./firefox.nix ];
-
-  fonts.fontconfig.enable = true;
-  fonts.enableDefaultPackages = true;
-  fonts.packages = with pkgs; [ inter jetbrains-mono dejavu_fonts ];
-  fonts.fontconfig.defaultFonts = {
-    sansSerif = [ "Inter" "DejaVu Sans" ];
-    monospace = [ "JetBrains Mono" "DejaVu Sans Mono" ];
-  };
-  xdg.icons.enable = true;
-  xdg.mime.enable = true;
-  xdg.sounds.enable = true;
-  boot.consoleLogLevel = 3;
-  boot.kernelParams = [ "quiet" "vt.global_cursor_default=0" ];
+  imports = [ ./graphical.nix ];
+  boot.kernelParams = [ "vt.global_cursor_default=0" ];
 
   services.xserver.desktopManager.phosh = {
     enable = true;
@@ -54,24 +38,40 @@ in
   # mobile image keeps its diagnostic login on the serial console only.
   systemd.services."getty@tty1".enable = false;
   systemd.services."autovt@tty1".enable = false;
-  programs.dconf.enable = true;
+  # In a virtual machine the compositor's OpenGL path runs on a software
+  # rasterizer and left stale black squares on screen (seen in 0.3.1-dev and
+  # reproduced in QEMU); its pixman renderer draws the same picture correctly.
+  # Real hardware keeps the GPU renderer.
+  systemd.services.postern-phone-renderer = {
+    description = "Select the phone shell renderer for a virtual machine";
+    wantedBy = [ "phosh.service" ];
+    before = [ "phosh.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      RuntimeDirectory = "postern";
+      RuntimeDirectoryPreserve = true;
+    };
+    script = ''
+      if ${pkgs.systemd}/bin/systemd-detect-virt --vm --quiet; then
+        echo WLR_RENDERER=pixman > /run/postern/phosh.env
+      else
+        : > /run/postern/phosh.env
+      fi
+    '';
+  };
+  systemd.services.phosh.serviceConfig.EnvironmentFile = "-/run/postern/phosh.env";
   services.gnome.gnome-keyring.enable = true;
-  services.gnome.gnome-online-accounts.enable = lib.mkForce false;
-  services.gnome.gnome-remote-desktop.enable = lib.mkForce false;
   services.gvfs.enable = true;
   services.upower.enable = true;
 
-  networking.networkmanager.enable = true;
-  networking.networkmanager.wifi.macAddress = "random";
-  networking.networkmanager.connectionConfig."ipv6.ip6-privacy" = 2;
-  networking.networkmanager.settings.connectivity.enabled = false;
-  networking.wireless.enable = lib.mkForce false;
-  services.printing.enable = lib.mkForce false;
-  hardware.bluetooth.powerOnBoot = lib.mkDefault false;
-
   environment.systemPackages = with pkgs; [
-    statusApp gnome-console nautilus gnome-control-center gnome-calculator
-    gnome-clocks gnome-text-editor adwaita-icon-theme squeekboard
+    gnome-console nautilus gnome-control-center gnome-calculator gnome-clocks
+    gnome-text-editor gnome-calendar gnome-contacts gnome-weather loupe papers
+    decibels
+    # KeePass-format password manager with a phone layout.
+    gnome-secrets
+    phosh-mobile-settings squeekboard
   ];
 
   programs.dconf.profiles.user.databases = [{
@@ -81,42 +81,19 @@ in
           "firefox.desktop" "org.gnome.Console.desktop" "org.postern.Status.desktop"
           "org.gnome.Nautilus.desktop"
         ];
+        # The grid and search list applications with a phone layout. Firefox
+        # and Files work on a narrow screen without declaring one. Listing
+        # every installed entry instead put terminal programs first in search
+        # ("console" opened btop).
+        force-adaptive = [ "firefox.desktop" "org.gnome.Nautilus.desktop" ];
       };
-      "org/gnome/desktop/background" = {
-        picture-uri = "file://${wallpaper}";
-        picture-uri-dark = "file://${wallpaper}";
-        picture-options = "zoom";
-        primary-color = "#0b1026";
-      };
-      "org/gnome/desktop/screensaver" = {
-        lock-enabled = false;
-        picture-uri = "file://${wallpaper}";
-        picture-options = "zoom";
-      };
+      "org/gnome/desktop/screensaver".lock-enabled = false;
       "org/gnome/desktop/lockdown".disable-lock-screen = true;
       "org/gnome/desktop/session".idle-delay = lib.gvariant.mkUint32 0;
       "org/gnome/desktop/interface" = {
-        color-scheme = "prefer-dark";
-        accent-color = "blue";
-        font-name = "Inter 11";
-        document-font-name = "Inter 11";
         monospace-font-name = "JetBrains Mono 10";
-        show-battery-percentage = true;
+        show-battery-percentage = false;
       };
-      "org/gnome/desktop/media-handling" = {
-        automount = false;
-        automount-open = false;
-        autorun-never = true;
-      };
-      "org/gnome/desktop/privacy" = {
-        remember-recent-files = false;
-        remove-old-temp-files = true;
-        remove-old-trash-files = true;
-        old-files-age = lib.gvariant.mkUint32 1;
-        report-technical-problems = false;
-        send-software-usage-stats = false;
-      };
-      "org/gnome/system/location".enabled = false;
     };
   }];
 

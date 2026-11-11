@@ -8,10 +8,12 @@
       pkgs = import nixpkgs { inherit system; };
       parallelData = pkgs.callPackage ./nix/parallel-data.nix { };
       posternStatus = pkgs.callPackage ./nix/postern-status.nix { };
+      posternVault = pkgs.callPackage ./nix/postern-vault.nix { };
       common = [
         ./os/profiles/privacy.nix
+        ./os/profiles/hardening.nix
         ./os/profiles/performance.nix
-        { environment.systemPackages = [ parallelData posternStatus ]; }
+        { environment.systemPackages = [ parallelData posternStatus posternVault ]; }
       ];
       image = profile: nixpkgs.lib.nixosSystem {
         inherit system;
@@ -35,7 +37,7 @@
         partitionTableType = "hybrid";
         diskSize = "auto";
         additionalSpace = "2G";
-        baseName = "postern-os-${name}-0.3.1-dev-x86_64";
+        baseName = "postern-os-${name}-${vm.config.postern.version}-x86_64";
         copyChannel = false;
       };
       lockedPassword = user:
@@ -57,6 +59,12 @@
         && c.zramSwap.writebackDevice == null
         && lockedPassword c.users.users.root
         && lockedPassword c.users.users.nixos
+        && c.security.protectKernelImage
+        && builtins.elem "init_on_free=1" c.boot.kernelParams
+        && c.networking.networkmanager.enable
+        && c.networking.networkmanager.wifi.macAddress == "random"
+        && c.networking.networkmanager.ethernet.macAddress == "random"
+        && !c.services.tor.enable
         && !c.services.dleyna.enable
         && !c.services.gnome.rygel.enable
         && !c.services.gnome.gnome-user-share.enable
@@ -65,6 +73,7 @@
       nixosModules = {
         privacy = import ./os/profiles/privacy.nix;
         performance = import ./os/profiles/performance.nix;
+        hardening = import ./os/profiles/hardening.nix;
         bloch-pos = import ./os/modules/bloch-pos.nix;
       };
       nixosConfigurations = {
@@ -78,6 +87,7 @@
         default = parallelData;
         parallel-data = parallelData;
         postern-status = posternStatus;
+        postern-vault = posternVault;
         compute-vm-image = vmImage "compute-vm" computeVm;
         desktop-vm-image = vmImage "desktop-vm" desktopVm;
         iso = compute.config.system.build.isoImage;
@@ -88,7 +98,8 @@
       checks.${system} = {
         parallel-data = parallelData;
         postern-status = posternStatus;
-        privacy = pkgs.callPackage ./os/tests/privacy.nix { inherit parallelData posternStatus; };
+        postern-vault = posternVault;
+        privacy = pkgs.callPackage ./os/tests/privacy.nix { inherit parallelData posternStatus posternVault; };
         image-policy =
           assert privateImage compute;
           assert privateImage desktop;
@@ -109,12 +120,12 @@
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
           nix bashInteractive python3 coreutils qemu xorriso git jq
-          ffmpeg-headless
+          ffmpeg-headless librsvg
           parallelData posternStatus
         ];
-        # Caption font for scripts/postern-demo.py; without it captions are
-        # written only to the subtitle file.
-        POSTERN_DEMO_FONT = "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf";
+        # Fonts for the frames that scripts/postern-demo.py renders around the
+        # captured screen (rsvg-convert resolves them through fontconfig).
+        FONTCONFIG_FILE = pkgs.makeFontsConf { fontDirectories = [ pkgs.inter ]; };
       };
     };
 }

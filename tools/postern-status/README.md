@@ -19,6 +19,8 @@ sudo postern-status     # also reads /etc/shadow for the password-login check
 | CPU mitigations | no opt-out on the kernel command line; kernel-reported vulnerabilities |
 | Core dumps | `kernel.core_pattern` discards dumps; `fs.suid_dumpable` is 0 |
 | Kernel exposure limits | `kptr_restrict`, `dmesg_restrict`, `ptrace_scope`, unprivileged BPF |
+| Kernel hardening | wiped freed memory, allocator and stack hardening on the kernel command line; kexec, SysRq, unprivileged userfaultfd and line-discipline autoloading off. Missing items are a warning, never a failure |
+| Network identity | NetworkManager configuration: random hardware addresses, no host name in DHCP requests. Reads the configuration file only; `unknown` where NetworkManager is not configured |
 | Swap | only compressed memory (zram), never a storage device |
 | Temporary storage | `/tmp` is a tmpfs |
 | System journal | volatile only |

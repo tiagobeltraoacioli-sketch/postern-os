@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # A real boot test, including traffic from a separate network namespace.
-{ pkgs, parallelData ? null, posternStatus }:
+{ pkgs, parallelData ? null, posternStatus, posternVault }:
 pkgs.testers.runNixOSTest {
   name = "postern-privacy";
   requiredFeatures.kvm = false;
@@ -8,14 +8,14 @@ pkgs.testers.runNixOSTest {
   sshBackdoor.enable = false;
 
   nodes.machine = { ... }: {
-    imports = [ ../profiles/privacy.nix ];
+    imports = [ ../profiles/privacy.nix ../profiles/hardening.nix ];
     virtualisation = {
       cores = 2;
       memorySize = 2048;
       qemu.forceAccel = false;
     };
     system.stateVersion = "26.05";
-    environment.systemPackages = [ pkgs.curl pkgs.iproute2 pkgs.python3 posternStatus ];
+    environment.systemPackages = [ pkgs.curl pkgs.iproute2 pkgs.python3 posternStatus posternVault ];
     users.users.alice = {
       isNormalUser = true;
       shell = pkgs.bashInteractive;
@@ -67,7 +67,11 @@ pkgs.testers.runNixOSTest {
             "assert not c.getboolean('connectivity','enabled'); "
             "assert c.get('connectivity','uri') == str(); "
             "assert c.getint('connection','connection.llmnr') == 0; "
-            "assert c.getint('connection','connection.mdns') == 0"
+            "assert c.getint('connection','connection.mdns') == 0; "
+            "assert c.get('connection','wifi.cloned-mac-address') == 'random'; "
+            "assert c.get('connection','ethernet.cloned-mac-address') == 'random'; "
+            "assert c.getint('connection','ipv4.dhcp-send-hostname-v2') == 0; "
+            "assert c.getint('connection','ipv6.dhcp-send-hostname-v2') == 0"
         ))
 
     with subtest("status report agrees with the booted system"):
@@ -75,7 +79,8 @@ pkgs.testers.runNixOSTest {
         report = json.loads(machine.succeed("postern-status --json"))
         states = {item["id"]: item["state"] for item in report["checks"]}
         assert report["summary"]["fail"] == 0, report
-        for check in ["firewall", "services", "apparmor", "core-dumps", "sysctl", "tmp", "journal"]:
+        for check in ["firewall", "services", "apparmor", "core-dumps", "sysctl", "hardening",
+                      "network-identity", "tmp", "journal"]:
             assert states[check] == "ok", (check, report)
         # The deliberately exposed test listener is reported, not hidden.
         assert states["listeners"] == "warn", report
@@ -106,6 +111,53 @@ pkgs.testers.runNixOSTest {
             machine.succeed("systemctl start firewall.service")
         machine.fail(probe)
         machine.succeed("ip netns del privacy-peer")
+
+    with subtest("kernel hardening is in effect"):
+        cmdline = machine.succeed("cat /proc/cmdline").split()
+        for parameter in ["init_on_alloc=1", "init_on_free=1", "slab_nomerge", "page_alloc.shuffle=1",
+                          "randomize_kstack_offset=on", "vsyscall=none", "debugfs=off"]:
+            assert parameter in cmdline, (parameter, cmdline)
+        for name, wanted in [("kernel.kexec_load_disabled", "1"), ("kernel.sysrq", "0"),
+                             ("net.core.bpf_jit_harden", "2"), ("dev.tty.ldisc_autoload", "0"),
+                             ("vm.unprivileged_userfaultfd", "0"), ("fs.protected_fifos", "2"),
+                             ("fs.protected_regular", "2"),
+                             ("net.ipv4.conf.all.accept_redirects", "0"),
+                             ("net.ipv4.conf.all.accept_source_route", "0")]:
+            assert machine.succeed(f"sysctl -n {name}").strip() == wanted, name
+        assert int(machine.succeed("sysctl -n kernel.perf_event_paranoid").strip()) >= 2
+        # An unused protocol module can be neither autoloaded nor loaded by hand.
+        machine.fail("modprobe sctp")
+        machine.fail("grep -qw sctp /proc/modules")
+        machine.fail("mountpoint -q /sys/kernel/debug && test -n \"$(ls -A /sys/kernel/debug)\"")
+
+    with subtest("encrypted vault keeps its contents unreadable while closed"):
+        secret = "printf 'correct horse battery\\n'"
+        machine.succeed(f"{secret} | postern-vault create /root/notes.vault 64M")
+        assert machine.succeed("stat -c %a /root/notes.vault").strip() == "600"
+        machine.fail(f"{secret} | postern-vault create /root/notes.vault 64M")
+        machine.succeed(f"{secret} | postern-vault open /root/notes.vault")
+        options = machine.succeed("findmnt -n -o OPTIONS /run/postern-vault/notes").strip().split(",")
+        assert "nosuid" in options and "nodev" in options, options
+        machine.succeed("echo postern-secret-marker > /run/postern-vault/notes/note.txt")
+        assert "notes" in machine.succeed("postern-vault list")
+        machine.succeed("postern-vault close notes")
+        machine.fail("test -e /run/postern-vault/notes/note.txt")
+        machine.fail("test -e /dev/mapper/postern-vault-notes")
+        machine.fail("grep -a -q postern-secret-marker /root/notes.vault")
+        machine.fail("printf 'a wrong passphrase\\n' | postern-vault open /root/notes.vault")
+        machine.fail("test -e /dev/mapper/postern-vault-notes")
+        machine.succeed(f"{secret} | postern-vault open /root/notes.vault --read-only")
+        machine.succeed("grep -q postern-secret-marker /run/postern-vault/notes/note.txt")
+        machine.fail("touch /run/postern-vault/notes/new-file")
+        machine.succeed("postern-vault close --all")
+        assert "No vault is open" in machine.succeed("postern-vault list")
+        # A key file instead of a passphrase.
+        machine.succeed("head -c 64 /dev/urandom > /root/vault.key")
+        machine.succeed("postern-vault create /root/keyed.vault 48M --key-file /root/vault.key")
+        machine.succeed("postern-vault open /root/keyed.vault --key-file /root/vault.key")
+        machine.succeed("postern-vault close /root/keyed.vault")
+        machine.fail("postern-vault create /root/tiny.vault 8M --key-file /root/vault.key")
+        machine.fail("test -e /root/tiny.vault")
 
     with subtest("private file permissions and no core files"):
         machine.succeed("su - alice -c 'touch private-file; mkdir private-dir'")

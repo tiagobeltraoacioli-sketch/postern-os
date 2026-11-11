@@ -1,0 +1,241 @@
+{
+  "format": "postern-demo/v1",
+  "profile": "mobile",
+  "iso": "postern-mobile-x86_64.iso",
+  "iso_sha256": "735ddf0641d34bfe227e96ebf5e9656d368b07a85708caa06d4e5a03300ab02b",
+  "accelerator": "tcg",
+  "network": "none",
+  "vcpus": 4,
+  "memory_mib": 4096,
+  "playback_speed": 3.0,
+  "captured_fps": 4.0,
+  "started_at": "2026-11-11T22:32:27.891049+00:00",
+  "scope": "One scripted session in a virtual machine; a demonstration, not boot verification and not a physical-hardware test.",
+  "presentation": "The captured screen is shown unmodified inside a drawn frame. Playback is faster than recorded, idle waits are shortened and the boot before the walkthrough is not shown.",
+  "completed": true,
+  "qemu_command": [
+    "qemu-system-x86_64",
+    "-accel",
+    "tcg,thread=multi",
+    "-cpu",
+    "max",
+    "-machine",
+    "q35",
+    "-smp",
+    "4",
+    "-m",
+    "4096",
+    "-cdrom",
+    "/artifacts/20261111T222713Z-mobile-27/postern-mobile-x86_64.iso",
+    "-boot",
+    "d",
+    "-nic",
+    "none",
+    "-display",
+    "none",
+    "-vga",
+    "none",
+    "-device",
+    "virtio-vga,xres=720,yres=1280",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-qmp",
+    "unix:<scratch>/qmp.sock,server=on,wait=off",
+    "-qmp",
+    "unix:<scratch>/capture.sock,server=on,wait=off",
+    "-no-reboot"
+  ],
+  "qemu_exit_code": 0,
+  "video": "postern-mobile-walkthrough.mp4",
+  "video_sha256": "1d90c4599cab5403736b97368133bb34649ee9db24a1eb5b0032a6567f950f99",
+  "captions": [
+    [
+      0.0,
+      3.200000000000001,
+      "Home: favourites, the app grid and search"
+    ],
+    [
+      3.200000000000001,
+      13.01801041193765,
+      "Postern Status: privacy and hardening at a glance"
+    ],
+    [
+      13.01801041193765,
+      41.47641200468239,
+      "Console: the release record of this image"
+    ],
+    [
+      41.47641200468239,
+      55.08366492292827,
+      "postern-data: hash files into a manifest"
+    ],
+    [
+      55.08366492292827,
+      71.62623849643066,
+      "Verify, then detect a modified file"
+    ],
+    [
+      71.62623849643066,
+      98.95875535615717,
+      "Firefox with the same locked privacy policy"
+    ],
+    [
+      98.95875535615717,
+      112.20799258756455,
+      "Secrets: a password manager with a phone layout"
+    ],
+    [
+      112.20799258756455,
+      127.59783313008953,
+      "Calendar"
+    ],
+    [
+      127.59783313008953,
+      151.40082308041036,
+      "Files"
+    ],
+    [
+      151.40082308041036,
+      157.53577069879285,
+      "Settings"
+    ],
+    [
+      157.53577069879285,
+      160.73577069879292,
+      "Overview: running apps as cards above the app grid"
+    ],
+    [
+      160.73577069879292,
+      165.4254068166166,
+      "Power off: nothing is left on the device"
+    ]
+  ],
+  "frames": 6098,
+  "recorded_seconds": 1525.6,
+  "timing": {
+    "video_seconds": 175.4,
+    "walkthrough_seconds": 165.4,
+    "boot_seconds_not_shown": 186.2,
+    "idle_cap_seconds": 1.6,
+    "caption_minimum_seconds": 3.2,
+    "recorded_walkthrough_seconds": 1384.9
+  },
+  "application_launches": [
+    {
+      "application": "postern-status-gui",
+      "method": "keyboard"
+    },
+    {
+      "application": "kgx",
+      "method": "keyboard"
+    },
+    {
+      "application": "firefox",
+      "method": "keyboard"
+    },
+    {
+      "application": "secrets",
+      "method": "keyboard"
+    },
+    {
+      "application": "gnome-calendar",
+      "method": "keyboard"
+    },
+    {
+      "application": "nautilus",
+      "method": "serial console"
+    },
+    {
+      "application": "gnome-control-center",
+      "method": "serial console"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Phosh shell is running",
+      "command": "ok=1; for attempt in $(seq 1 150); do if systemctl is-active --quiet phosh.service && pgrep -f libexec/phosh >/dev/null && test -S /run/user/$(id -u)/wayland-0; then ok=0; break; fi; sleep 2; done; test $ok = 0",
+      "passed": true,
+      "output": "",
+      "at_seconds": 97.4
+    },
+    {
+      "name": "postern-status-gui is running",
+      "command": "pgrep -f postern-status-gui >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 294.0
+    },
+    {
+      "name": "kgx is running",
+      "command": "pgrep -f kgx >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 405.7
+    },
+    {
+      "name": "modified file is detected",
+      "command": "postern-data verify ~/d ~/m.jsonl; test $? -eq 1",
+      "passed": true,
+      "output": "{\"added\": 0, \"changed\": 1, \"command\": \"verify\", \"errors\": 0, \"missing\": 0, \"ok\": false, \"skipped\": 0, \"verified\": 0, \"workers\": 4}",
+      "at_seconds": 550.6
+    },
+    {
+      "name": "kernel hardening is in effect",
+      "command": "sudo postern-status --json | jq -e '[.checks[] | select(.id == \"hardening\")][0].state == \"ok\"'",
+      "passed": true,
+      "output": "true",
+      "at_seconds": 553.0
+    },
+    {
+      "name": "status report has no failed check",
+      "command": "sudo postern-status --json | jq -e '.summary.fail == 0'",
+      "passed": true,
+      "output": "true",
+      "at_seconds": 555.0
+    },
+    {
+      "name": "firefox is running",
+      "command": "pgrep -f firefox >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 706.7
+    },
+    {
+      "name": "secrets is running",
+      "command": "pgrep -f secrets >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 843.7
+    },
+    {
+      "name": "gnome-calendar is running",
+      "command": "pgrep -f gnome-calendar >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 947.6
+    },
+    {
+      "name": "nautilus is running",
+      "command": "pgrep -f nautilus >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1283.4
+    },
+    {
+      "name": "gnome-control-center is running",
+      "command": "pgrep -f gnome-control-center >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1356.0
+    },
+    {
+      "name": "no remote-desktop or SSH service",
+      "command": "! systemctl is-active --quiet sshd.service && ! systemctl is-active --quiet gnome-remote-desktop.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1376.1
+    }
+  ]
+}

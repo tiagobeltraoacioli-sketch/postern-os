@@ -1,15 +1,16 @@
 # Postern OS
 
-Private source repository for Postern OS. The **0.3.1-dev** development line
+Private source repository for Postern OS. The **0.4.0-dev** development line
 defines three NixOS 26.05 live images for **x86_64 Linux**, virtual-machine
-development disks, an offline parallel file-integrity tool, a read-only privacy
-status report, and a shared privacy baseline. Historical desktop, mobile,
+development disks, an offline parallel file-integrity tool, encrypted container
+files, a read-only privacy and hardening status report, and a shared privacy
+and kernel-hardening baseline. Historical desktop, mobile,
 wallet and attestation sources remain available separately.
 
 | Image | Flake package | Intended use |
 | --- | --- | --- |
 | Compute | `.#compute-iso` (also `.#iso`) | Local console, offline data processing and diagnostics |
-| Desktop | `.#desktop-iso` | GNOME/Wayland, Firefox, KeePassXC and the same data tools |
+| Desktop | `.#desktop-iso` | GNOME/Wayland, Firefox, Tor Browser, KeePassXC, Metadata Cleaner and the same data tools |
 | Mobile | `.#mobile-iso` | Phone interface (Phosh) on a portrait display, for a virtual machine or x86 tablet; not a handset image |
 | Compute VM disk | `.#compute-vm-image` | qcow2 development disk for a virtual machine; console only |
 | Desktop VM disk | `.#desktop-vm-image` | qcow2 development disk for a virtual machine; GNOME desktop |
@@ -26,7 +27,65 @@ virtual machine. Do not write one to a physical machine or keep private data in
 it; they are not an installer and configure neither disk encryption nor a real
 user account.
 
-## What 0.3.1-dev adds
+## What 0.4.0-dev adds
+
+Security
+
+- Kernel hardening on every image (`os/profiles/hardening.nix`): memory is
+  wiped when allocated and when freed, the allocator and kernel stack are
+  hardened, kexec, hibernation, SysRq, the legacy vsyscall page and debugfs are
+  off, unprivileged userfaultfd and line-discipline autoloading are disabled,
+  ICMP redirects and source routing are ignored, and unused network protocol
+  modules (SCTP, DCCP, RDS, TIPC and others) and FireWire cannot be loaded.
+  This raises the cost of exploiting a bug. It is not a sandbox, removes no
+  bug, and wiping memory costs some speed.
+- Network identity: NetworkManager now runs on every image, including the
+  console image (`nmtui`, `nmcli`). Each connection, wired or wireless, uses a
+  random hardware address and the host name is not sent in DHCP requests. A
+  network that admits devices by hardware address needs that changed for its
+  connection.
+- `postern-vault`: encrypted container files (LUKS2, AES-256-XTS, Argon2id)
+  that can live on removable media, so a live session can keep private files
+  across restarts. See [its documentation and limits](tools/postern-vault/README.md);
+  a lost passphrase cannot be recovered.
+- `postern-status` reports two more observations, kernel hardening and network
+  identity, on the command line and in the Postern Status application.
+- Desktop: Tor Browser and Metadata Cleaner are included. Tor Browser starts
+  only when opened and protects only its own traffic; no system-wide Tor daemon
+  runs.
+
+Function and speed
+
+- Compressed swap in memory now covers up to half of RAM, with kernel settings
+  suited to it; the session stops a runaway group of processes under memory
+  pressure instead of freezing (systemd-oomd); BBR congestion control with fair
+  queueing; interrupt balancing.
+- More tools on every image: `age`, `gnupg`, `git`, `tmux`, `rsync`, `zstd`,
+  `pv`, `parallel`, `fd`, `smartmontools`, `nvme-cli`, `wireguard-tools`,
+  hardware listing tools.
+- Mobile: Calendar, Contacts, Weather, image and document viewers, an audio
+  player, Secrets (a KeePass-format password manager with a phone layout) and
+  the phone shell's settings application.
+
+Look
+
+- One icon family (Tela) and one pointer (Bibata) on desktop and mobile, an
+  original Postern Status application icon, window controls at the left of the
+  title bar, and the existing dock, blur, wallpaper and fonts.
+- Mobile: in a virtual machine the phone shell's compositor uses its pixman
+  renderer. Its OpenGL path on a software rasterizer left stale black squares
+  on screen in 0.3.1-dev; a side-by-side run in QEMU showed pixman drawing the
+  same screens correctly. Real hardware keeps the GPU renderer. Firefox, Files
+  and Postern Status are listed in the phone shell's grid and search.
+- `scripts/postern-demo.py` now composes the walkthrough video: the captured
+  screen, unmodified, inside a drawn device frame, with captions set beside it,
+  an opening card and a closing card listing the checks recorded during the
+  session. Playback is faster than real time, idle waits are shortened and the
+  boot of the graphical images is not shown; the opening card and `result.json`
+  say so. On the mobile image applications are opened from the phone shell's
+  search with keyboard events, with a recorded fallback to the serial console.
+
+## What 0.3.1-dev added
 
 - Desktop look: an original wallpaper (`os/assets/wallpaper.svg`), a fixed
   translucent dock, blurred top bar and overview (Dash to Dock and Blur my
@@ -59,6 +118,27 @@ user account.
   offline in QEMU, driven by keyboard events, as an MP4 with captions.
 
 ## Validation status
+
+### 0.4.0-dev
+
+| Check | Recorded result |
+| --- | --- |
+| Core tests (`scripts/postern-test-core.sh`) | Passed on macOS: 16 integrity-tool tests and 22 status-report tests, plus Bash/Python syntax checks including `postern-vault` |
+| Nix checks (`postern-build.sh checks`) | Passed on the final source tree on an x86_64 Linux builder: the three tool packages with their tests, the evaluated image policy for all five image configurations, and the booted test, which now also checks the kernel hardening on a running system, that an unused protocol module cannot be loaded, and an encrypted vault round trip (contents not readable in the closed file, wrong passphrase rejected, read-only reopen, key file) |
+| ISO builds | Completed on an x86_64 Linux builder: desktop SHA-256 `39546a1e…0d1e8c056f`, mobile `735ddf06…03300ab02b`, compute `2309e6be…d741149d45` |
+| Actual ISO boots (`postern-verify.sh`) | All three passed offline under software emulation with 2 vCPUs and 2 GiB RAM: compute in 155 s, desktop (active Wayland session) in 200 s, mobile (phone shell running) in 219 s. The check requires a status report with no failed and no undetermined item |
+| Recorded walkthroughs (`postern-demo.py`) | Completed for all three ISOs under software emulation; every recorded check passed (19 desktop, 12 mobile, 6 compute). Desktop: all eight applications opened from the Activities search. Mobile: five applications opened from the phone shell's search with keyboard events; Files and Settings did not start within the wait and were started from the serial console, as `result.json` records |
+| Mobile rendering | The stale black squares of 0.3.1-dev were reproduced in QEMU with the compositor's OpenGL renderer and did not appear with pixman in the same session, nor in the final recording. Not tested on physical hardware |
+| VM disks | Defined and evaluated; not rebuilt or booted for 0.4.0-dev |
+| KVM, physical hardware, Wi-Fi/DHCP behaviour on a real network, persistent installation, Tor Browser connectivity and Bloch interoperability | Not validated. The recordings run with no network adapter, so the network-identity settings are checked as configuration, not as observed packets |
+
+The builder had no KVM and ran Nix inside a container with the Nix build sandbox
+disabled; these are development builds, not reproducibility or release claims.
+One earlier recording attempt of the desktop failed a timing check and two of
+the mobile stopped at the Console step (a search for "console" opened a
+terminal program while every installed entry was listed); the recorder now
+polls instead of waiting a fixed time and the phone grid is curated. Result
+files are kept in [docs/evidence/postern-0.4.0-dev](docs/evidence/postern-0.4.0-dev).
 
 ### 0.3.0-dev
 
@@ -184,15 +264,18 @@ nix develop --no-update-lock-file --command python3 scripts/postern-demo.py \
 ```
 
 The recorder boots the ISO with **no network adapter**, opens applications
-through the Activities search with keyboard events, types the commands shown,
-and captures the display through QMP. It uses KVM when `/dev/kvm` is usable and
-software emulation otherwise; under emulation the video is played back faster
-than recorded, and the caption and `result.json` say so. On the compute and
-desktop images the serial console is used only to detect readiness and to
-record checks (for example, that an opened application is running). The phone
-shell is touch-driven, so on the mobile image applications are started from the
-serial console and only the text typed inside them uses keyboard events. The output holds the MP4, an `.srt` caption file, stills,
-the serial log and `result.json`. A recording shows one scripted session in a
+through the shell's search with keyboard events, types the commands shown, and
+captures the display through QMP. It uses KVM when `/dev/kvm` is usable and
+software emulation otherwise. The video shows the captured screen unmodified
+inside a drawn frame; it is played back faster than recorded under emulation,
+runs of identical frames (the guest is waiting) are shortened, and the boot of
+the graphical images is left out. The opening card and `result.json` state all
+of this. The serial console is used to detect readiness and to record checks
+(for example, that an opened application is running); on the mobile image it
+is also the fallback when the phone shell's search does not start an
+application, and `result.json` records how each one was opened. The output
+holds the MP4, an `.srt` caption file, raw stills, composed previews, the
+serial log and `result.json`. A recording shows one scripted session in a
 virtual machine; it is neither the boot verification above nor a hardware test.
 
 ## Offline data processing
@@ -225,13 +308,19 @@ The shared [privacy module](os/profiles/privacy.nix) disables SSH, automatic
 discovery, GNOME sharing/online accounts, location services, connectivity probes
 and Firefox telemetry/studies. It enables inbound filtering and AppArmor,
 discards core dumps, limits the volatile journal, and sets private login-file
-permissions. The desktop applies additional browser policies and randomized
-Wi-Fi MAC addresses. CPU security mitigations remain enabled.
+permissions. Where NetworkManager manages the network it randomizes hardware
+addresses and withholds the host name from DHCP. The graphical images apply
+additional browser policies. CPU security mitigations remain enabled.
 
-The [performance module](os/profiles/performance.nix) uses zstd zram, includes
-diagnostic tools and limits nested OpenMP/BLAS thread defaults so parallel jobs
-do not multiply their worker counts. These settings do not claim a universal
-speedup. AppArmor confinement depends on loaded application profiles; normal
+The [hardening module](os/profiles/hardening.nix) sets the kernel command line,
+sysctl values and module restrictions listed under "What 0.4.0-dev adds". The
+booted test in `os/tests/privacy.nix` checks them on a running system.
+
+The [performance module](os/profiles/performance.nix) uses zstd zram for up to
+half of memory, systemd-oomd, BBR with fair queueing, includes diagnostic tools
+and limits nested OpenMP/BLAS thread defaults so parallel jobs do not multiply
+their worker counts. These settings do not claim a universal speedup, and the
+memory wiping in the hardening module costs some throughput. AppArmor confinement depends on loaded application profiles; normal
 outbound DNS, DHCP, time synchronization and application traffic remain possible.
 The profile does not make the whole OS anonymous or configure disk encryption.
 Volatile system logs do not erase application files, caches or remote records.

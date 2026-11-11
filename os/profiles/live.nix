@@ -9,6 +9,6 @@
   postern.imageType = "live-development";
   networking.hostName = lib.mkForce "postern-live";
   boot.initrd.systemd.enable = lib.mkForce false;
-  image.fileName = lib.mkForce "postern-os-${config.postern.profileName}-0.3.1-dev-x86_64.iso";
+  image.fileName = lib.mkForce "postern-os-${config.postern.profileName}-${config.postern.version}-x86_64.iso";
   isoImage.squashfsCompression = "zstd -Xcompression-level 6";
 }

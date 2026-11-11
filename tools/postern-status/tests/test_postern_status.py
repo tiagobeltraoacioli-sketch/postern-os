@@ -13,11 +13,24 @@ import postern_status as status  # noqa: E402
 TCP_HEADER = "  sl  local_address rem_address   st tx_queue rx_queue\n"
 BASELINE = {
     "etc/postern/release.json": json.dumps(
-        {"name": "Postern OS", "version": "0.3.1-dev", "type": "live-development"}),
+        {"name": "Postern OS", "version": "0.4.0-dev", "type": "live-development"}),
     "etc/shadow": "root:!:1::::::\nnixos:!:1::::::\nnobody:*:1::::::\n",
     "proc/net/tcp": TCP_HEADER + "   0: 0100007F:0277 00000000:0000 0A 00000000:00000000\n",
     "proc/net/tcp6": TCP_HEADER,
-    "proc/cmdline": "BOOT_IMAGE=/boot/bzImage mitigations=auto console=tty0\n",
+    "proc/cmdline": "BOOT_IMAGE=/boot/bzImage mitigations=auto console=tty0 slab_nomerge "
+                    "init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 "
+                    "randomize_kstack_offset=on vsyscall=none\n",
+    "proc/sys/kernel/kexec_load_disabled": "1\n",
+    "proc/sys/kernel/perf_event_paranoid": "3\n",
+    "proc/sys/dev/tty/ldisc_autoload": "0\n",
+    "proc/sys/vm/unprivileged_userfaultfd": "0\n",
+    "proc/sys/fs/protected_fifos": "2\n",
+    "proc/sys/fs/protected_regular": "2\n",
+    "proc/sys/kernel/sysrq": "0\n",
+    "etc/NetworkManager/NetworkManager.conf": (
+        "[connection]\nwifi.cloned-mac-address=random\nethernet.cloned-mac-address=random\n"
+        "ipv4.dhcp-send-hostname-v2=0\nipv6.dhcp-send-hostname-v2=0\n"
+        "[device]\nwifi.scan-rand-mac-address=true\n"),
     "proc/sys/kernel/core_pattern": "|/nix/store/abc-coreutils/bin/false\n",
     "proc/sys/fs/suid_dumpable": "0\n",
     "proc/sys/kernel/kptr_restrict": "2\n",
@@ -123,6 +136,40 @@ class StatusTest(unittest.TestCase):
     def test_low_sysctl_fails(self):
         self.write("proc/sys/kernel/kptr_restrict", "0\n")
         self.assertEqual(self.state("sysctl"), "fail")
+
+    def test_missing_hardening_warns_and_never_fails(self):
+        self.write("proc/cmdline", "console=tty0 mitigations=auto slab_nomerge\n")
+        report = self.report()
+        item = [entry for entry in report["checks"] if entry["id"] == "hardening"][0]
+        self.assertEqual(item["state"], "warn")
+        self.assertIn("init_on_free=1", item["detail"])
+        self.assertNotIn("slab_nomerge", item["detail"])
+        self.assertEqual(report["summary"]["fail"], 0)
+
+    def test_weak_hardening_sysctl_warns_and_unreadable_is_unknown(self):
+        self.write("proc/sys/kernel/sysrq", "1\n")
+        self.assertEqual(self.state("hardening"), "warn")
+        self.write("proc/sys/kernel/sysrq", "0\n")
+        (self.root / "proc/sys/dev/tty/ldisc_autoload").unlink()
+        self.assertEqual(self.state("hardening"), "unknown")
+        (self.root / "proc/cmdline").unlink()
+        self.assertEqual(self.state("hardening"), "unknown")
+
+    def test_network_identity_reports_what_is_revealed(self):
+        self.write("etc/NetworkManager/NetworkManager.conf",
+                   "[connection]\nwifi.cloned-mac-address=random\n"
+                   "ethernet.cloned-mac-address=random\nipv6.dhcp-send-hostname-v2=0\n")
+        report = self.report()
+        item = [entry for entry in report["checks"] if entry["id"] == "network-identity"][0]
+        self.assertEqual(item["state"], "warn")
+        self.assertIn("DHCPv4", item["detail"])
+        self.assertNotIn("DHCPv6", item["detail"])
+
+    def test_network_identity_without_network_manager_is_unknown(self):
+        (self.root / "etc/NetworkManager/NetworkManager.conf").unlink()
+        self.assertEqual(self.state("network-identity"), "unknown")
+        self.write("etc/NetworkManager/NetworkManager.conf", "not an ini file\n")
+        self.assertEqual(self.state("network-identity"), "unknown")
 
     def test_disk_swap_fails_and_no_swap_is_ok(self):
         self.write("proc/swaps", "Filename Type Size Used Priority\n/dev/sda2 partition 1 0 -2\n")

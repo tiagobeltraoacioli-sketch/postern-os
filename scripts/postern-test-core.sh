@@ -10,7 +10,7 @@ trap 'rm -rf -- "$cache_dir"' EXIT
 export PYTHONPYCACHEPREFIX="$cache_dir"
 
 python3 --version
-for script in scripts/postern-*.sh; do
+for script in scripts/postern-*.sh tools/postern-vault/postern-vault.sh; do
   bash -n "$script"
 done
 python3 -m py_compile \
