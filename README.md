@@ -1,22 +1,87 @@
 # Postern OS
 
-Private source repository for Postern OS. The **0.2.0-dev** development line adds
-two NixOS 26.05 live-image definitions for **x86_64 Linux**, an offline parallel
-file-integrity tool, and a shared privacy baseline. Historical desktop, mobile,
+Private source repository for Postern OS. The **0.3.1-dev** development line
+defines three NixOS 26.05 live images for **x86_64 Linux**, virtual-machine
+development disks, an offline parallel file-integrity tool, a read-only privacy
+status report, and a shared privacy baseline. Historical desktop, mobile,
 wallet and attestation sources remain available separately.
 
 | Image | Flake package | Intended use |
 | --- | --- | --- |
 | Compute | `.#compute-iso` (also `.#iso`) | Local console, offline data processing and diagnostics |
 | Desktop | `.#desktop-iso` | GNOME/Wayland, Firefox, KeePassXC and the same data tools |
+| Mobile | `.#mobile-iso` | Phone interface (Phosh) on a portrait display, for a virtual machine or x86 tablet; not a handset image |
+| Compute VM disk | `.#compute-vm-image` | qcow2 development disk for a virtual machine; console only |
+| Desktop VM disk | `.#desktop-vm-image` | qcow2 development disk for a virtual machine; GNOME desktop |
 
-These are development live sessions. Both use local `nixos` autologin with sudo;
+These are development live sessions. All use local `nixos` autologin with sudo;
 root and user passwords are locked, and network login is disabled. The desktop
 screen lock is disabled for this passwordless live session. Physical access gives
 control of the session. Persistent installation, encrypted storage and an
 authenticated installed-user setup are separate work.
 
+The VM disks keep data across restarts on an **unencrypted** virtual disk, with
+the same password-locked local autologin. They exist for development inside a
+virtual machine. Do not write one to a physical machine or keep private data in
+it; they are not an installer and configure neither disk encryption nor a real
+user account.
+
+## What 0.3.1-dev adds
+
+- Desktop look: an original wallpaper (`os/assets/wallpaper.svg`), a fixed
+  translucent dock, blurred top bar and overview (Dash to Dock and Blur my
+  Shell), Inter and JetBrains Mono, a themed terminal, window minimize and
+  maximize buttons, and the desktop shown at login instead of the overview.
+  These are defaults; the user can change each one in Settings.
+- Postern Status is now a desktop application (GTK 4, libadwaita) that adapts
+  to a phone-width window. It renders the same report as the command-line tool.
+- Firefox starts on a quiet page: no onboarding, import prompt or promotions.
+- Mobile image: the Phosh phone shell with the same privacy baseline, wallpaper,
+  fonts, Firefox policy and tools. It starts unlocked because the live account
+  has no password; an installed phone must set a PIN and keep the lock. It has
+  no handset port, modem, telephony or battery management, and none is tested.
+- A graphical boot splash (Plymouth) was tried and removed: after autologin it
+  left the display on the login greeter.
+
+## What 0.3.0-dev added
+
+- `postern-status`: a read-only report of the observable privacy baseline
+  (firewall, listeners, remote-login services, AppArmor, CPU mitigations, core
+  dumps, swap, temporary storage, journal, account passwords), as a table or
+  JSON. A check that cannot read its source reports `unknown`, never `ok`. See
+  [its documentation and limits](tools/postern-status/README.md).
+- Desktop: a "Postern Status" launcher, a fixed dock (Firefox, Files, Terminal,
+  KeePassXC, Postern Status, Settings), dark style, and GNOME defaults that keep
+  no recent-file history, disable location services and usage reporting, and
+  expire trash and temporary files after one day.
+- VM development disks (`compute-vm`, `desktop-vm`) bootable under BIOS and UEFI.
+- `scripts/postern-demo.py`: records a scripted walkthrough of a real ISO booted
+  offline in QEMU, driven by keyboard events, as an MP4 with captions.
+
 ## Validation status
+
+### 0.3.0-dev
+
+| Check | Recorded result |
+| --- | --- |
+| Core tests (`scripts/postern-test-core.sh`) | Passed on macOS/Python 3.9.6: 16 integrity-tool tests and 18 status-report tests, plus Bash/Python syntax checks |
+| Nix checks (`postern-build.sh all`) | Passed on an x86_64 Linux builder: both tool packages with their unit tests, the evaluated image policy for all four images, and the booted privacy test including the status-report subtest |
+| Compute and desktop ISO builds | Completed; SHA-256 `eb443dd6…7ae8c758` (compute, 1.55 GB) and `2020d4da…ea4980d6` (desktop, 3.1 GB) |
+| Actual ISO boots (`postern-verify.sh`) | Both passed offline under software emulation with 2 vCPUs and 2 GiB RAM: compute in 124 s, desktop (active Wayland session) in 152 s |
+| Compute VM disk | Built (qcow2, 2.0 GB, SHA-256 `ca9aa00d…e8c9b00d`); one offline BIOS boot under software emulation reached the console and `postern-status` reported 11 ok, 1 warning, 0 failed. UEFI boot not tested |
+| Desktop VM disk | Defined and evaluated; not built or booted |
+| Recorded walkthroughs (`postern-demo.py`) | Completed for both ISOs under software emulation, played back at 3×; all recorded checks passed (5 compute, 11 desktop) |
+| KVM, physical hardware, persistent installation and Bloch interoperability | Not validated |
+
+The builder had no KVM and ran Nix inside a container with the Nix build sandbox
+disabled; these are development builds, not reproducibility or release claims.
+The one warning in `postern-status` is the emulated CPU reporting no
+`spec_store_bypass` mitigation. Result files are kept in
+[docs/evidence/postern-0.3.0-dev](docs/evidence/postern-0.3.0-dev).
+
+### Earlier results, recorded for 0.2.0-dev
+
+These predate the 0.3.0-dev changes and are not results for the current images.
 
 | Check | Recorded result |
 | --- | --- |
@@ -25,8 +90,9 @@ authenticated installed-user setup are separate work.
 | Measured parallel hashing on Linux | Same 512 MiB workload under a four-CPU limit: 1 worker 1.551 s; 2 workers 0.934 s; 4 workers 0.579 s (2.68×); all nine manifests identical |
 | Nix input lock | NixOS 26.05 pinned at `c56a87d8e41ce69bd2af57eb35dcc117a9dfca33`, with its verified NAR hash in `flake.lock` |
 | Nix Linux package and evaluated image policy | Passed; package tests completed in 0.604 s on the Linux builder |
-| Privacy VM tests | Initial boot checks passed; restart/reconnection check is being corrected before claiming the full test passed |
-| Compute and desktop ISO builds/boots | In validation; no completed image or boot claim recorded here yet |
+| Privacy VM tests | Passed, including real inbound filtering with a positive control, private permissions, discarded core dumps, AppArmor, a new boot ID, preserved disk data and cleared temporary storage |
+| Compute and desktop ISO builds | Completed; final media boot verification is in progress |
+| Actual ISO boots | In validation; no passing boot verdict recorded here yet |
 | Physical hardware, persistent installation and Bloch interoperability | Not validated by this development step |
 
 The measured 2.36× result with four workers applies to one synthetic hashing
@@ -39,8 +105,8 @@ used Python 3.13.17 and the same file-hashing workload under a four-CPU limit.
 Their 2.68× ratio is a within-host comparison; page caches were not reset.
 
 Run `bash scripts/postern-test-core.sh` from a checkout to check the Postern Bash
-and Python syntax and execute the integrity-tool unit tests with the installed
-Python 3. The wrapper downloads no dependencies and can be reused in CI; no
+and Python syntax and execute the integrity-tool and status-report unit tests
+with the installed Python 3. The wrapper downloads no dependencies and can be reused in CI; no
 automatic GitHub workflow is configured. It does not build Nix outputs or boot
 an ISO, and a local pass does not establish a Linux CI result.
 
@@ -103,6 +169,31 @@ The desktop additionally requires an active Wayland session. Evidence includes
 the ISO digest, serial log, executed guest script and `result.json`; a screenshot
 is supporting evidence, not the pass criterion. This does not replace tests on
 physical hardware or establish that every application is confined.
+
+### VM disks and recorded walkthrough
+
+```sh
+# qcow2 development disks; never part of "all".
+nix develop --no-update-lock-file --command bash scripts/postern-build.sh compute-vm
+nix develop --no-update-lock-file --command bash scripts/postern-build.sh desktop-vm
+
+# Scripted, captioned recording of a real ISO (new output directory each time).
+nix develop --no-update-lock-file --command python3 scripts/postern-demo.py \
+  "$POSTERN_BUILD_DIR/postern-desktop-x86_64.iso" --profile desktop \
+  --output "$POSTERN_BUILD_DIR/walkthrough-desktop"
+```
+
+The recorder boots the ISO with **no network adapter**, opens applications
+through the Activities search with keyboard events, types the commands shown,
+and captures the display through QMP. It uses KVM when `/dev/kvm` is usable and
+software emulation otherwise; under emulation the video is played back faster
+than recorded, and the caption and `result.json` say so. On the compute and
+desktop images the serial console is used only to detect readiness and to
+record checks (for example, that an opened application is running). The phone
+shell is touch-driven, so on the mobile image applications are started from the
+serial console and only the text typed inside them uses keyboard events. The output holds the MP4, an `.srt` caption file, stills,
+the serial log and `result.json`. A recording shows one scripted session in a
+virtual machine; it is neither the boot verification above nor a hardware test.
 
 ## Offline data processing
 

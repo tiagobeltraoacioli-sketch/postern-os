@@ -5,7 +5,10 @@ umask 077
 
 usage() {
   cat <<'EOF'
-Usage: postern-build.sh [checks|compute|desktop|all]
+Usage: postern-build.sh [checks|compute|desktop|mobile|all|compute-vm|desktop-vm]
+
+"all" runs the checks and builds the compute, desktop and mobile live ISOs. The VM modes build a qcow2
+development disk and are never part of "all".
 
 Run inside the repository's Linux Nix development shell. Output is written to
 a new private directory below POSTERN_ARTIFACT_DIR (default: ../postern-artifacts).
@@ -19,7 +22,7 @@ EOF
 mode=${1:-all}
 case "$mode" in
   -h|--help) usage; exit 0 ;;
-  checks|compute|desktop|all) ;;
+  checks|compute|desktop|mobile|all|compute-vm|desktop-vm) ;;
   *) usage >&2; exit 2 ;;
 esac
 if [[ $# -gt 1 ]]; then usage >&2; exit 2; fi
@@ -77,7 +80,8 @@ repo,out=map(pathlib.Path,sys.argv[1:3])
 files={repo/'flake.nix',repo/'flake.lock'}
 for directory in ('nix','os/profiles','os/tests','os/modules'):
     files.update(p for p in (repo/directory).rglob('*') if p.is_file())
-files.update(p for p in (repo/'tools/parallel-data').rglob('*')
+files.update(p for tool in ('parallel-data','postern-status')
+             for p in (repo/'tools'/tool).rglob('*')
              if p.is_file() and p.suffix in ('.py','.md','.json') and '__pycache__' not in p.parts)
 files.update(p for p in (repo/'scripts').glob('postern*') if p.is_file())
 manifest={str(p.relative_to(repo)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
@@ -127,8 +131,36 @@ PY
   (cd -- "$artifact_dir" && sha256sum "postern-$phase-x86_64.iso" >> SHA256SUMS)
 }
 
+copy_vm_image() {
+  local phase=$1
+  local output
+  output=$(python3 - "$artifact_dir/$phase-build.json" <<'PY'
+import json,sys
+data=json.load(open(sys.argv[1]))
+if len(data)!=1 or 'out' not in data[0].get('outputs',{}):
+    raise SystemExit('Expected one disk-image build output')
+print(data[0]['outputs']['out'])
+PY
+)
+  local images=()
+  shopt -s nullglob
+  images=("$output"/*.qcow2)
+  shopt -u nullglob
+  if (( ${#images[@]} != 1 )); then
+    echo "Expected exactly one qcow2 image in $output" >&2
+    return 1
+  fi
+  cp --reflink=auto --sparse=always -- "${images[0]}" "$artifact_dir/postern-$phase-x86_64.qcow2"
+  chmod 600 -- "$artifact_dir/postern-$phase-x86_64.qcow2"
+  (cd -- "$artifact_dir" && sha256sum "postern-$phase-x86_64.qcow2" >> SHA256SUMS)
+}
+
 if [[ $mode == checks || $mode == all ]]; then
-  build_phase checks checks.x86_64-linux.parallel-data checks.x86_64-linux.image-policy checks.x86_64-linux.privacy
+  build_phase checks checks.x86_64-linux.parallel-data checks.x86_64-linux.postern-status checks.x86_64-linux.image-policy checks.x86_64-linux.privacy
+fi
+if [[ $mode == compute-vm || $mode == desktop-vm ]]; then
+  build_phase "$mode" "packages.x86_64-linux.$mode-image"
+  copy_vm_image "$mode"
 fi
 if [[ $mode == compute || $mode == all ]]; then
   build_phase compute packages.x86_64-linux.compute-iso
@@ -137,6 +169,10 @@ fi
 if [[ $mode == desktop || $mode == all ]]; then
   build_phase desktop packages.x86_64-linux.desktop-iso
   copy_iso desktop
+fi
+if [[ $mode == mobile || $mode == all ]]; then
+  build_phase mobile packages.x86_64-linux.mobile-iso
+  copy_iso mobile
 fi
 
 python3 - "$repo_dir" "$artifact_dir" "$mode" "$jobs" "$cores" <<'PY'
@@ -153,8 +189,8 @@ record={
  'flake_lock_sha256':hashlib.sha256((repo/'flake.lock').read_bytes()).hexdigest(),
  'input_files_sha256':json.loads((out/'input-files-sha256.json').read_text()),
  'max_jobs':int(sys.argv[4]), 'cores_per_job':int(sys.argv[5]),
- 'images':[p.name for p in sorted(out.glob('*.iso'))],
- 'verification':'Build output only; ISO boot is a separate postern-verify.sh step.'}
+ 'images':[p.name for p in sorted([*out.glob('*.iso'),*out.glob('*.qcow2')])],
+ 'verification':'Build output only; booting an image is a separate step (postern-verify.sh for ISOs).'}
 (out/'build-summary.json').write_text(json.dumps(record,indent=2)+'\n')
 PY
 printf 'complete\n' > "$artifact_dir/STATUS"

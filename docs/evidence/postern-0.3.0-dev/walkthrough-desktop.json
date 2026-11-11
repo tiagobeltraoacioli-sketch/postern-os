@@ -1,0 +1,231 @@
+{
+  "format": "postern-demo/v1",
+  "profile": "desktop",
+  "iso": "postern-desktop-x86_64.iso",
+  "iso_sha256": "2020d4dab780fbb6bf9df3781788671da234f43de2f54e6854c65c39ea4980d6",
+  "accelerator": "tcg",
+  "network": "none",
+  "vcpus": 4,
+  "memory_mib": 4096,
+  "playback_speed": 3.0,
+  "captured_fps": 2.0,
+  "started_at": "2026-11-09T23:03:46.412383+00:00",
+  "scope": "One scripted session in a virtual machine; a demonstration, not boot verification and not a physical-hardware test.",
+  "completed": true,
+  "qemu_command": [
+    "qemu-system-x86_64",
+    "-accel",
+    "tcg,thread=multi",
+    "-cpu",
+    "max",
+    "-machine",
+    "q35",
+    "-smp",
+    "4",
+    "-m",
+    "4096",
+    "-cdrom",
+    "/artifacts/20261109T225908Z-all-1/postern-desktop-x86_64.iso",
+    "-boot",
+    "d",
+    "-nic",
+    "none",
+    "-display",
+    "none",
+    "-vga",
+    "none",
+    "-device",
+    "virtio-vga,xres=1280,yres=720",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-qmp",
+    "unix:<scratch>/qmp.sock,server=on,wait=off",
+    "-qmp",
+    "unix:<scratch>/capture.sock,server=on,wait=off",
+    "-no-reboot"
+  ],
+  "qemu_exit_code": 0,
+  "video": "postern-desktop-walkthrough.mp4",
+  "video_sha256": "cf18d4776509ff08794edaca10ddc6b792b2e475dacf218f3a60aef615f791bd",
+  "captions_burned_in": true,
+  "captions": [
+    [
+      3.786354015270869e-05,
+      28.784539453995723,
+      "Postern OS 0.3.0-dev desktop live image booting offline in a virtual machine (software emulation; shown at 3x speed)"
+    ],
+    [
+      28.784539453995723,
+      49.38566982125243,
+      "The desktop image starts GNOME on Wayland with automatic local login"
+    ],
+    [
+      49.38566982125243,
+      57.38574039532492,
+      "Activities overview: Firefox, Files, Terminal, KeePassXC, Postern Status, Settings"
+    ],
+    [
+      57.38574039532492,
+      67.42617341938119,
+      "Application grid"
+    ],
+    [
+      67.42617341938119,
+      98.85358982471128,
+      "Postern Status: the privacy baseline, one click from the dock"
+    ],
+    [
+      98.85358982471128,
+      132.76058270502836,
+      "Terminal: release record of the running image"
+    ],
+    [
+      132.76058270502836,
+      145.7905801543966,
+      "Create sample files to process (64 MiB of random data)"
+    ],
+    [
+      145.7905801543966,
+      159.15077735297382,
+      "postern-data: hash every file in parallel into a private manifest"
+    ],
+    [
+      159.15077735297382,
+      169.2576337599506,
+      "Verify the files against the saved manifest"
+    ],
+    [
+      169.2576337599506,
+      185.82787847394744,
+      "Change one file: verification detects the modification"
+    ],
+    [
+      185.82787847394744,
+      196.98904296942055,
+      "No SSH, discovery or remote-desktop service; firewall and AppArmor active"
+    ],
+    [
+      196.98904296942055,
+      206.83924067703387,
+      "Swap is compressed memory only; nothing listens for remote login"
+    ],
+    [
+      206.83924067703387,
+      263.06856709873927,
+      "Firefox: telemetry, studies and saved logins are disabled by locked policy"
+    ],
+    [
+      263.06856709873927,
+      277.38285756421584,
+      "Firefox privacy settings: strict tracking protection, HTTPS-only mode"
+    ],
+    [
+      277.38285756421584,
+      308.04423946111154,
+      "KeePassXC: an offline password manager"
+    ],
+    [
+      308.04423946111154,
+      335.7947512793665,
+      "Files: removable media is never mounted or opened automatically"
+    ],
+    [
+      335.7947512793665,
+      367.85822853818536,
+      "Settings: location services and usage reporting are off by default"
+    ],
+    [
+      367.85822853818536,
+      379.67653867478174,
+      "All windows in the Activities overview"
+    ],
+    [
+      379.67653867478174,
+      386.35895869135857,
+      "Power off: the live session leaves nothing on the machine's disks"
+    ]
+  ],
+  "frames": 2318,
+  "recorded_seconds": 1173.7,
+  "checks": [
+    {
+      "name": "GNOME Wayland session is active",
+      "command": "ok=1; for attempt in $(seq 1 150); do for id in $(loginctl list-sessions --no-legend | awk '{print $1}'); do if test \"$(loginctl show-session $id -p Name --value)\" = nixos && test \"$(loginctl show-session $id -p Type --value)\" = wayland; then ok=0; fi; done; test $ok = 0 && break; sleep 2; done; test $ok = 0",
+      "passed": true,
+      "output": "",
+      "at_seconds": 87.2
+    },
+    {
+      "name": "'Press any key to close' is running",
+      "command": "pgrep -f 'Press any key to close' >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 267.3
+    },
+    {
+      "name": "gnome-terminal-server is running",
+      "command": "pgrep -f gnome-terminal-server >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 356.4
+    },
+    {
+      "name": "modified file is detected",
+      "command": "postern-data verify ~/demo/in ~/demo/manifest.jsonl; test $? -eq 1",
+      "passed": true,
+      "output": "{\"added\": 0, \"changed\": 1, \"command\": \"verify\", \"errors\": 0, \"missing\": 0, \"ok\": false, \"skipped\": 0, \"verified\": 3, \"workers\": 4}",
+      "at_seconds": 550.9
+    },
+    {
+      "name": "status report has no failed check",
+      "command": "sudo postern-status --json | jq -e '.summary.fail == 0'",
+      "passed": true,
+      "output": "true\u001b[0m",
+      "at_seconds": 620.6
+    },
+    {
+      "name": "firefox is running",
+      "command": "pgrep -f firefox >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 748.3
+    },
+    {
+      "name": "keepassxc is running",
+      "command": "pgrep -f keepassxc >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 908.2
+    },
+    {
+      "name": "nautilus is running",
+      "command": "pgrep -f nautilus >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 991.5
+    },
+    {
+      "name": "gnome-control-center is running",
+      "command": "pgrep -f gnome-control-center >/dev/null",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1083.3
+    },
+    {
+      "name": "location services disabled",
+      "command": "export XDG_RUNTIME_DIR=/run/user/$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; test \"$(gsettings get org.gnome.system.location enabled)\" = false",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1103.6
+    },
+    {
+      "name": "no remote-desktop or SSH service",
+      "command": "! systemctl is-active --quiet sshd.service && ! systemctl is-active --quiet gnome-remote-desktop.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 1103.7
+    }
+  ]
+}

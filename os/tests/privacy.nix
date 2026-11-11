@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # A real boot test, including traffic from a separate network namespace.
-{ pkgs, parallelData ? null }:
+{ pkgs, parallelData ? null, posternStatus }:
 pkgs.testers.runNixOSTest {
   name = "postern-privacy";
   requiredFeatures.kvm = false;
@@ -15,7 +15,7 @@ pkgs.testers.runNixOSTest {
       qemu.forceAccel = false;
     };
     system.stateVersion = "26.05";
-    environment.systemPackages = [ pkgs.curl pkgs.iproute2 pkgs.python3 ];
+    environment.systemPackages = [ pkgs.curl pkgs.iproute2 pkgs.python3 posternStatus ];
     users.users.alice = {
       isNormalUser = true;
       shell = pkgs.bashInteractive;
@@ -69,6 +69,23 @@ pkgs.testers.runNixOSTest {
             "assert c.getint('connection','connection.llmnr') == 0; "
             "assert c.getint('connection','connection.mdns') == 0"
         ))
+
+    with subtest("status report agrees with the booted system"):
+        import json
+        report = json.loads(machine.succeed("postern-status --json"))
+        states = {item["id"]: item["state"] for item in report["checks"]}
+        assert report["summary"]["fail"] == 0, report
+        for check in ["firewall", "services", "apparmor", "core-dumps", "sysctl", "tmp", "journal"]:
+            assert states[check] == "ok", (check, report)
+        # The deliberately exposed test listener is reported, not hidden.
+        assert states["listeners"] == "warn", report
+        # A stopped firewall must turn the report into a failure.
+        machine.succeed("systemctl stop firewall.service")
+        try:
+            machine.fail("postern-status")
+        finally:
+            machine.succeed("systemctl start firewall.service")
+        machine.succeed("postern-status")
 
     with subtest("inbound firewall blocks a listening service"):
         machine.succeed("ip netns add privacy-peer")

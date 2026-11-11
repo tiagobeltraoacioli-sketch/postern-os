@@ -1,0 +1,15 @@
+{
+  "image": "postern-compute-vm-x86_64.qcow2",
+  "accelerator": "tcg",
+  "network": "none",
+  "passed": true,
+  "summary": {
+    "fail": 0,
+    "ok": 11,
+    "unknown": 0,
+    "warn": 1
+  },
+  "type": "vm-development",
+  "qemu_exit_code": 0,
+  "elapsed_seconds": 89.8
+}

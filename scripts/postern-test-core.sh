@@ -15,7 +15,11 @@ for script in scripts/postern-*.sh; do
 done
 python3 -m py_compile \
   scripts/postern-verify.py \
+  scripts/postern-demo.py \
   tools/parallel-data/postern_data.py \
   tools/parallel-data/benchmark.py \
-  tools/parallel-data/tests/test_parallel_data.py
+  tools/parallel-data/tests/test_parallel_data.py \
+  tools/postern-status/postern_status.py \
+  tools/postern-status/tests/test_postern_status.py
 python3 -m unittest discover -s tools/parallel-data/tests -v
+python3 -m unittest discover -s tools/postern-status/tests -v

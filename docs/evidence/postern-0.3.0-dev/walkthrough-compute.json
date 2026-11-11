@@ -1,0 +1,164 @@
+{
+  "format": "postern-demo/v1",
+  "profile": "compute",
+  "iso": "postern-compute-x86_64.iso",
+  "iso_sha256": "eb443dd641171a7c3d9745e29385816bc81366b920ecaa0164021cea7ae8c758",
+  "accelerator": "tcg",
+  "network": "none",
+  "vcpus": 4,
+  "memory_mib": 4096,
+  "playback_speed": 3.0,
+  "captured_fps": 2.0,
+  "started_at": "2026-11-09T23:03:42.712672+00:00",
+  "scope": "One scripted session in a virtual machine; a demonstration, not boot verification and not a physical-hardware test.",
+  "completed": true,
+  "qemu_command": [
+    "qemu-system-x86_64",
+    "-accel",
+    "tcg,thread=multi",
+    "-cpu",
+    "max",
+    "-machine",
+    "q35",
+    "-smp",
+    "4",
+    "-m",
+    "4096",
+    "-cdrom",
+    "/artifacts/20261109T225908Z-all-1/postern-compute-x86_64.iso",
+    "-boot",
+    "d",
+    "-nic",
+    "none",
+    "-display",
+    "none",
+    "-vga",
+    "none",
+    "-device",
+    "virtio-vga,xres=1280,yres=720",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-qmp",
+    "unix:<scratch>/qmp.sock,server=on,wait=off",
+    "-qmp",
+    "unix:<scratch>/capture.sock,server=on,wait=off",
+    "-no-reboot"
+  ],
+  "qemu_exit_code": 0,
+  "video": "postern-compute-walkthrough.mp4",
+  "video_sha256": "ce453a772a69cb5f62ca432b9810c699bf44919cf3f8b4dda74e9235c4153db1",
+  "captions_burned_in": true,
+  "captions": [
+    [
+      3.5896586875120796e-05,
+      25.80764182067166,
+      "Postern OS 0.3.0-dev compute live image booting offline in a virtual machine (software emulation; shown at 3x speed)"
+    ],
+    [
+      25.80764182067166,
+      33.807704376367234,
+      "The compute image boots to a local console: automatic login, locked passwords"
+    ],
+    [
+      33.807704376367234,
+      44.5468875359123,
+      "postern-status: the observable privacy baseline of this system"
+    ],
+    [
+      44.5468875359123,
+      57.442671601350106,
+      "With root it also confirms that every account password is locked"
+    ],
+    [
+      57.442671601350106,
+      75.75920210685581,
+      "Release record and the written privacy baseline shipped in the image"
+    ],
+    [
+      75.75920210685581,
+      88.73296258909006,
+      "Create sample files to process (64 MiB of random data)"
+    ],
+    [
+      88.73296258909006,
+      101.93915885097037,
+      "postern-data: hash every file in parallel into a private manifest"
+    ],
+    [
+      101.93915885097037,
+      111.8884999876221,
+      "Verify the files against the saved manifest"
+    ],
+    [
+      111.8884999876221,
+      126.33310245598356,
+      "Change one file: verification detects the modification"
+    ],
+    [
+      126.33310245598356,
+      153.50494748416045,
+      "Measured benchmark: sequential and parallel hashing of the same data"
+    ],
+    [
+      153.50494748416045,
+      164.5341317517062,
+      "No SSH, discovery or remote-desktop service; firewall and AppArmor active"
+    ],
+    [
+      164.5341317517062,
+      173.73381563617536,
+      "Swap is compressed memory only; nothing listens for remote login"
+    ],
+    [
+      173.73381563617536,
+      184.1758400918916,
+      "Diagnostics tools are included: htop"
+    ],
+    [
+      184.1758400918916,
+      186.43483073233315,
+      "Power off: the live session leaves nothing on the machine's disks"
+    ]
+  ],
+  "frames": 1119,
+  "recorded_seconds": 568.1,
+  "checks": [
+    {
+      "name": "status report has no failed check",
+      "command": "sudo postern-status --json | jq -e '.summary.fail == 0'",
+      "passed": true,
+      "output": "\u001b[0;39mtrue",
+      "at_seconds": 172.4
+    },
+    {
+      "name": "manifest is private (mode 600)",
+      "command": "test \"$(stat -c %a ~/demo/manifest.jsonl)\" = 600",
+      "passed": true,
+      "output": "",
+      "at_seconds": 375.5
+    },
+    {
+      "name": "modified file is detected",
+      "command": "postern-data verify ~/demo/in ~/demo/manifest.jsonl; test $? -eq 1",
+      "passed": true,
+      "output": "{\"added\": 0, \"changed\": 1, \"command\": \"verify\", \"errors\": 0, \"missing\": 0, \"ok\": false, \"skipped\": 0, \"verified\": 3, \"workers\": 4}",
+      "at_seconds": 379.1
+    },
+    {
+      "name": "no SSH daemon",
+      "command": "! systemctl is-active --quiet sshd.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 521.2
+    },
+    {
+      "name": "firewall active",
+      "command": "systemctl is-active --quiet firewall.service",
+      "passed": true,
+      "output": "",
+      "at_seconds": 521.3
+    }
+  ]
+}

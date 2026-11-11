@@ -21,7 +21,7 @@ import time
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("iso", type=Path)
-    parser.add_argument("--profile", choices=("compute", "desktop"), required=True)
+    parser.add_argument("--profile", choices=("compute", "desktop", "mobile"), required=True)
     parser.add_argument("--output", type=Path, help="New evidence directory; must not exist")
     parser.add_argument("--timeout", type=int, default=900, help="Boot/test deadline, seconds")
     parser.add_argument("--memory-mib", type=int, default=2048)
@@ -45,6 +45,9 @@ test -s /etc/postern/release.json
 grep -F 'Postern OS' /etc/postern/release.json
 awk -F: '$1 == "root" || $1 == "nixos" {n++; if ($2 != "!") bad=1} END {exit (n != 2 || bad)}' /etc/shadow
 command -v postern-data
+postern-status
+test "$(postern-status --json | jq -r '.summary.fail + .summary.unknown')" = 0
+grep -F '"version":"0.3.1-dev"' /etc/postern/release.json
 test "$(sysctl -n kernel.dmesg_restrict)" = 1
 test "$(sysctl -n kernel.kptr_restrict)" = 2
 test "$(sysctl -n fs.suid_dumpable)" = 0
@@ -97,6 +100,19 @@ for attempt in $(seq 1 60); do
 done
 test "$found_wayland" = yes
 """
+    if profile == "mobile":
+        script += r"""
+found_shell=no
+for attempt in $(seq 1 60); do
+  if systemctl is-active --quiet phosh.service && pgrep -f 'libexec/phosh' >/dev/null &&
+     test -S "/run/user/$(id -u nixos)/wayland-0"; then
+    found_shell=yes
+    break
+  fi
+  sleep 2
+done
+test "$found_shell" = yes
+"""
     return script
 
 
@@ -124,17 +140,20 @@ def delivery_command(payload, nonce):
     payload_sha256 = hashlib.sha256(payload).hexdigest()
     # The contiguous marker never appears in echoed input, avoiding a false pass.
     # Short heredoc lines also avoid the kernel TTY's canonical line limit.
-    command = ("payload=$(mktemp /tmp/postern-guest.XXXXXX); setup_rc=$?\n"
+    # Parse the entire compound command before executing sudo: its PTY must
+    # never consume verdict/cleanup lines queued behind the guest tests.
+    command = ("{\npayload=$(mktemp /tmp/postern-guest.XXXXXX); setup_rc=$?\n"
                + "base64 -d >\"${payload:-/dev/null}\" <<'POSTERN_PAYLOAD'\n"
                + "\n".join(textwrap.wrap(encoded, 76)) + "\nPOSTERN_PAYLOAD\n"
                + "decode_rc=$?; rc=91\n"
                + "if test \"$setup_rc\" -eq 0 && test \"$decode_rc\" -eq 0; then\n"
                + "  actual=$(sha256sum -- \"$payload\"); hash_rc=$?\n"
                + f"  if test \"$hash_rc\" -eq 0 && test \"${{actual%% *}}\" = '{payload_sha256}'; then\n"
-               + "    sudo bash \"$payload\"; rc=$?\n"
+               + "    sudo -n bash \"$payload\" </dev/null; rc=$?\n"
                + "  fi\nfi\n"
                + "if test -n \"$payload\"; then rm -f -- \"$payload\"; fi\n"
-               + f"printf '\\n%s%s:%s\\n' 'POSTERN_' 'RESULT_{nonce}' \"$rc\"\n")
+               + f"printf '\\n%s%s:%s\\n' 'POSTERN_' 'RESULT_{nonce}' \"$rc\"\n"
+               + "}\n")
     return command
 
 

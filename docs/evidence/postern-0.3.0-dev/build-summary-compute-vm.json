@@ -1,0 +1,43 @@
+{
+  "completed_at": "2026-11-09T23:26:17.589124+00:00",
+  "mode": "compute-vm",
+  "source_revision": "d3a5e76993b0c8f51b11c482befd53d6444d5882",
+  "source_dirty": true,
+  "flake_lock_sha256": "7e2655579d3319fc06ed7255b11d4af76aefacab9ca8bbaf96f13c84af7d1aa4",
+  "input_files_sha256": {
+    "flake.lock": "7e2655579d3319fc06ed7255b11d4af76aefacab9ca8bbaf96f13c84af7d1aa4",
+    "flake.nix": "c13cefb9d5c384d52590f4db73b11f552f3c337e4cfae48d8a91060c40e89665",
+    "nix/parallel-data.nix": "818bf3a30ca45b6ae73d8cc103b81ff90fa291ee1a1ba06c67ad72a582dbf113",
+    "nix/postern-status.nix": "f17597ffa73ff4b9b524edca8e1d4e06a6cb0573943342e6471787d02ce5d766",
+    "os/modules/BLOCH-UPSTREAM.json": "ff731f929807aba6792e8733ea25ec37f9ab4d54e3538aa7a2ca2c40b8d79b11",
+    "os/modules/bloch-pos.nix": "e8c0814875a10d0e1647dec28cc94179e7372c13c83ed1bb768f353c989e92c0",
+    "os/profiles/base.nix": "c1a3c701b9984da9d928446e76731554763af7063456e3a5d1f70f4762ca0540",
+    "os/profiles/compute.nix": "df84acfcb73bb8e36917a807776cd7f2f51b9d4467636c5f3756a30461ff8f99",
+    "os/profiles/desktop.nix": "5bb15b10cb4ac7dc95e1e548f1da8c7a882307d17c93546e59ac9e645356cd3a",
+    "os/profiles/disk.nix": "4427d9917ec7efa938a6e0c67ff921913d7ab7bb08f68dbe526874ec64ba2ffe",
+    "os/profiles/live.nix": "1ae5395bfdf998b2dd71d172cbee2d727119392e68ddbdcbbccd144421b388c3",
+    "os/profiles/performance.nix": "52a9b64ade96c26154fd2937a18079c8aa4d2e3592bfe6525335b24d43587042",
+    "os/profiles/privacy.nix": "eb54403318723f5d70b780aca572abd4b6b315d00cae744d279c40064a8b9e7a",
+    "os/tests/privacy.nix": "350d8d6e7e48582758ba429c658bf945a0ea4ad7884023bf64f125333fad2c59",
+    "scripts/postern-build.sh": "ef4f24b935360d0e8c4143e948787a1c8da9608a19ab36899d664a6a4dd62dce",
+    "scripts/postern-demo.py": "25305fb0ae9cd1ab56f1eecde9e556363da8a9544672f5ecc1bb5e21cf98cc09",
+    "scripts/postern-test-core.sh": "fff5c83ac4e108c3c6443d24599a5a3ad4f4b2ad4b87600f63aff7f9871bd87a",
+    "scripts/postern-verify.py": "f5d324d3f0b48d59041233b1f8bd02e818b34b7518cb700ebda26d40c7efba2c",
+    "scripts/postern-verify.sh": "2b8c6a4c6847a46ff96e92bb51adfe426be1fa5d051d48267b78d21367c41d8e",
+    "tools/parallel-data/README.md": "cdf5c1b5dce71f50372be0b809429584cb3f8aace79476e14f80eb8b09e4dbca",
+    "tools/parallel-data/benchmark.py": "938725539e9da179f2fc5652fe2dbefaaf69fa34909a069d100ac7c4357a3463",
+    "tools/parallel-data/evidence/macos-2026-11-08.json": "df168547773c5c9c8a506f5bf8fe1183728c4b7fbc189866d1a71dd498f7d5e1",
+    "tools/parallel-data/evidence/macos-2026-11-09.json": "8632e7678d64e7eaa07441bbc70948ba09302083aa7d5c10f14457178447d9f0",
+    "tools/parallel-data/postern_data.py": "c9bf492a1271ead92579261611beb3f9906998f256cf762ac0ef9c6dcaa2c123",
+    "tools/parallel-data/tests/test_parallel_data.py": "e36f70e7a4a627754ae268efa18bd1c95cb645ca2d9aad5f4328e8288aefec51",
+    "tools/postern-status/README.md": "64a9e93e5fc635ab421f2c9c9f8e6b19e4a4241f43ddc3b03eec18a90896adc3",
+    "tools/postern-status/postern_status.py": "873c7be4affd383d345a44a720c5f962508311933aecc8e3289d74f54db27003",
+    "tools/postern-status/tests/test_postern_status.py": "8afc6608009278f9ee18ba6b411ca54805a354c7ff80cbd8b0382c0ebec4a8d0"
+  },
+  "max_jobs": 2,
+  "cores_per_job": 4,
+  "images": [
+    "postern-compute-vm-x86_64.qcow2"
+  ],
+  "verification": "Build output only; booting an image is a separate step (postern-verify.sh for ISOs)."
+}

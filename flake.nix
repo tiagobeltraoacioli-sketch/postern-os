@@ -7,10 +7,11 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       parallelData = pkgs.callPackage ./nix/parallel-data.nix { };
+      posternStatus = pkgs.callPackage ./nix/postern-status.nix { };
       common = [
         ./os/profiles/privacy.nix
         ./os/profiles/performance.nix
-        { environment.systemPackages = [ parallelData ]; }
+        { environment.systemPackages = [ parallelData posternStatus ]; }
       ];
       image = profile: nixpkgs.lib.nixosSystem {
         inherit system;
@@ -18,6 +19,25 @@
       };
       compute = image ./os/profiles/compute.nix;
       desktop = image ./os/profiles/desktop.nix;
+      mobile = image ./os/profiles/mobile.nix;
+      # Persistent, unencrypted development disks for virtual machines only.
+      vmSystem = profile: nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = common ++ [ ./os/profiles/disk.nix profile ];
+      };
+      computeVm = vmSystem ./os/profiles/compute.nix;
+      desktopVm = vmSystem ./os/profiles/desktop.nix;
+      vmImage = name: vm: import "${nixpkgs}/nixos/lib/make-disk-image.nix" {
+        inherit pkgs;
+        lib = nixpkgs.lib;
+        config = vm.config;
+        format = "qcow2";
+        partitionTableType = "hybrid";
+        diskSize = "auto";
+        additionalSpace = "2G";
+        baseName = "postern-os-${name}-0.3.1-dev-x86_64";
+        copyChannel = false;
+      };
       lockedPassword = user:
         user.initialHashedPassword == "!"
         && user.initialPassword == null
@@ -50,33 +70,51 @@
       nixosConfigurations = {
         postern-compute = compute;
         postern-desktop = desktop;
+        postern-mobile = mobile;
+        postern-compute-vm = computeVm;
+        postern-desktop-vm = desktopVm;
       };
       packages.${system} = {
         default = parallelData;
         parallel-data = parallelData;
+        postern-status = posternStatus;
+        compute-vm-image = vmImage "compute-vm" computeVm;
+        desktop-vm-image = vmImage "desktop-vm" desktopVm;
         iso = compute.config.system.build.isoImage;
         compute-iso = compute.config.system.build.isoImage;
         desktop-iso = desktop.config.system.build.isoImage;
+        mobile-iso = mobile.config.system.build.isoImage;
       };
       checks.${system} = {
         parallel-data = parallelData;
-        privacy = pkgs.callPackage ./os/tests/privacy.nix { inherit parallelData; };
+        postern-status = posternStatus;
+        privacy = pkgs.callPackage ./os/tests/privacy.nix { inherit parallelData posternStatus; };
         image-policy =
           assert privateImage compute;
           assert privateImage desktop;
+          assert privateImage mobile;
+          assert mobile.config.programs.firefox.policies.DisableTelemetry;
+          assert privateImage computeVm;
+          assert privateImage desktopVm;
+          assert compute.config.postern.imageType == "live-development";
+          assert computeVm.config.postern.imageType == "vm-development";
           assert !desktop.config.services.gnome.gnome-online-accounts.enable;
           assert desktop.config.programs.firefox.policies.DisableTelemetry;
           assert compute.config.boot.kernel.sysctl."kernel.core_pattern" != "core";
           pkgs.runCommand "postern-image-policy" { } ''
             mkdir -p "$out"
-            echo 'Both image configurations satisfy the evaluated baseline.' > "$out/result.txt"
+            echo 'All five image configurations satisfy the evaluated baseline.' > "$out/result.txt"
           '';
       };
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
           nix bashInteractive python3 coreutils qemu xorriso git jq
-          parallelData
+          ffmpeg-headless
+          parallelData posternStatus
         ];
+        # Caption font for scripts/postern-demo.py; without it captions are
+        # written only to the subtitle file.
+        POSTERN_DEMO_FONT = "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf";
       };
     };
 }
